@@ -249,7 +249,6 @@
         "CERT_MANAGER_VERSION=\"(?<currentValue>[^\"]+)\""
       ],
       "depNameTemplate": "cert-manager",
-      "registryUrlTemplate": "https://charts.jetstack.io",
       "datasourceTemplate": "helm",
       "autoReplaceStringTemplate": "CERT_MANAGER_VERSION=\"{{newValue}}\""
     },
@@ -261,7 +260,6 @@
         "CAPI_OPERATOR_VERSION=\"(?<currentValue>[^\"]+)\""
       ],
       "depNameTemplate": "cluster-api-operator",
-      "registryUrlTemplate": "https://kubernetes-sigs.github.io/cluster-api-operator",
       "datasourceTemplate": "helm",
       "autoReplaceStringTemplate": "CAPI_OPERATOR_VERSION=\"{{newValue}}\""
     },
@@ -388,6 +386,18 @@
       "matchDatasources": ["docker"],
       "matchFileNames": ["bootstrap-rs/Dockerfile"],
       "pinDigests": true
+    },
+    {
+      "description": "Resolve cert-manager Helm repo once across declarative and imperative pins",
+      "matchDatasources": ["helm"],
+      "matchPackageNames": ["cert-manager"],
+      "registryUrls": ["https://charts.jetstack.io"]
+    },
+    {
+      "description": "Resolve cluster-api-operator Helm repo once across declarative and imperative pins",
+      "matchDatasources": ["helm"],
+      "matchPackageNames": ["cluster-api-operator"],
+      "registryUrls": ["https://kubernetes-sigs.github.io/cluster-api-operator"]
     },
     {
       "description": "No automerge anywhere; merges stay manual (issue #74)",

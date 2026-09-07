@@ -83,7 +83,7 @@ docker save -o airgap/archives/docker.io_library_registry_2.tar docker.io/librar
 echo "    saved Zarf init package and host-daemon image archives"
 
 WORKLOAD_IMAGES=(
-  registry.k8s.io/pause:3.10.1@sha256:278fb9dbcca9518083ad1e11276933a2e96f23de604a3a08cc3c80002767d24c
+  registry.k8s.io/pause:3.10.2@sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4
   docker.io/kindest/kindnetd:v20260528-9350166c@sha256:92f49a1b2c9242058481fc3e13412c19a62cfeb090717dad4598719d32351f1f
   ghcr.io/controlplaneio-fluxcd/flux-operator:v0.58.0@sha256:1c919ce1e28716f817ded65c06df0b7a8269542387d5a2ce50212450473c6209
   ghcr.io/fluxcd/source-controller:v1.9.4@sha256:8a8ed0a57b8b86f561d5a4309a69f65e62f0cebe4de8801593c5ff35a3bc3c23

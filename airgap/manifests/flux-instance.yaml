@@ -52,7 +52,7 @@ spec:
   sync:
     interval: 1m
     kind: OCIRepository
-    url: oci://###ZARF_CONST_REGISTRY_INTERNAL###/knr-ops-airgap
+    url: oci://###ZARF_CONST_REGISTRY_INTERNAL###/krops-airgap
     ref: latest
     path: mgmt/local-host
     pullSecret: private-registry

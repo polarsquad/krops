@@ -7,7 +7,7 @@ spec:
   clusterSelector:
     matchLabels:
       fluxcd: enabled
-      knr-ops.polarsquad.com/environment: local-host
+      krops.polarsquad.com/environment: local-host
   repoURL: oci://ghcr.io/controlplaneio-fluxcd/charts
   chartName: flux-operator
   version: "0.58.0"

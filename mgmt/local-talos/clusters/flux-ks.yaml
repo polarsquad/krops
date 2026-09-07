@@ -1,5 +1,5 @@
 # The Talos management cluster: created by CAPT in the kind bootstrap
-# cluster, moved into itself by `clusterctl move` (knr-bootstrap pivot), and
+# cluster, moved into itself by `clusterctl move` (krops-bootstrap pivot), and
 # from then on reconciled from GitHub by the Flux instance running inside it.
 # Health check gates on the Cluster's Available condition (v1beta2 serves
 # Available, not Ready).

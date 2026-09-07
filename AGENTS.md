@@ -1,4 +1,4 @@
-# AGENTS.md: knr-ops
+# AGENTS.md: krops
 
 Guidance for AI coding agents working in this repository.
 
@@ -27,7 +27,7 @@ resources. There is no app source code here, only declarative infrastructure.
   #105). Same component layout as `mgmt/aws/` minus addons
   (`infrastructure/`, `capi-providers/`, `clusters/management/`), synced
   from the GitHub GitRepository source like `mgmt/aws`, NOT the laptop OCI
-  registry (a physical machine cannot reach knr-registry). Providers are
+  registry (a physical machine cannot reach krops-registry). Providers are
   Talos + Tinkerbell (CABPT/CACPPT from sidero-community releases, CAPT)
   instead of CAPD; the cluster definition is imperative (explicit
   controlPlaneRef, no ClusterClass) with committed site-specific values
@@ -57,7 +57,7 @@ resources. There is no app source code here, only declarative infrastructure.
   attempted). Both deploy evidence artifacts are uploaded. Running both is
   a temporary comparison of validation accuracy and performance; the less
   effective job will be removed after enough runs are evaluated.
-- `bootstrap-rs/`: `knr-bootstrap`, the Rust CLI that ports the imperative
+- `bootstrap-rs/`: `krops-bootstrap`, the Rust CLI that ports the imperative
   lifecycle (bootstrap + pivot; teardown under issue #100). Behavioral port:
   same step order, messages, and env interface as the scripts, plus
   rerun-safe-by-default semantics. Chart versions it installs imperatively
@@ -67,7 +67,7 @@ resources. There is no app source code here, only declarative infrastructure.
 - `bootstrap.sh` / `pivot.sh` / `teardown.sh`: the shell equivalents of the
   CLI's phases. Kept until the binary completes full parity runs per
   environment, then retired (issues #92/#95/#100). The lifecycle mise tasks
-  (`bootstrap`/`pivot`/`teardown`) run the knr-ops-toolbox container via
+  (`bootstrap`/`pivot`/`teardown`) run the krops-toolbox container via
   `scripts/toolbox-run.sh` (issue #104); the scripts remain the native path
   for development.
 - `docs/`: detailed documentation (see the table in README.md).
@@ -194,7 +194,7 @@ audit, including untouched legacy files.
 Load these only when the task touches their domain:
 
 - `docs/architecture.md`: reconciliation order, how workload apps are delivered.
-- `docs/bootstrap-cli.md`: the `knr-bootstrap` Rust CLI: interface, env knobs, pivot, parity status.
+- `docs/bootstrap-cli.md`: the `krops-bootstrap` Rust CLI: interface, env knobs, pivot, parity status.
 - `docs/extending.md`: adding a workload cluster, adding apps, adding other providers (Azure, Talos, k0smotron).
 - `docs/secrets.md`: SOPS + age setup, credential rotation.
 - `docs/konflate.md`: rendered PR review, CI gate, tokens, write-back.

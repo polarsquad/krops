@@ -59,7 +59,7 @@ impl TeardownConfig {
             .context("HOME is not set; cannot locate the management kubeconfig")?;
         let mgmt_kubeconfig = value("MGMT_KUBECONFIG")
             .map(PathBuf::from)
-            .unwrap_or_else(|| home.join(".kube/knr-ops-mgmt.yaml"));
+            .unwrap_or_else(|| home.join(".kube/krops-mgmt.yaml"));
         Ok(Self {
             // Literal "1" enables (shell boolean gate parity).
             aws_only: flag("AWS_ONLY", "1"),
@@ -429,7 +429,7 @@ impl AwsSweepTarget {
             eks_cluster_name: eks_cluster_name.to_string(),
             // The management cluster runs no workload ACK controllers,
             // so it owns no RDS instance; the sweep unit skips absent ids.
-            rds_instance: format!("knr-ops-{cluster_name}-db"),
+            rds_instance: format!("krops-{cluster_name}-db"),
         }
     }
 
@@ -1009,7 +1009,7 @@ pub async fn cleanup_cfn_stack(stack: &str, region: &str) {
     }
 }
 
-/// 4e. VPC resources, gated on the CAPA ownership tag (knr-ops scope
+/// 4e. VPC resources, gated on the CAPA ownership tag (krops scope
 /// only): NAT gateways + their EIPs, subnets, IGWs, route tables,
 /// security groups (rules first, then the groups), the VPC itself.
 pub async fn cleanup_vpc_resources(target: &AwsSweepTarget) {
@@ -2080,11 +2080,11 @@ mod tests {
     fn s3_bucket_name_substitutes_the_config_pattern() {
         assert_eq!(
             s3_bucket_name(
-                "knr-ops-{account_id}-{cluster_name}-data",
+                "krops-{account_id}-{cluster_name}-data",
                 "123456789012",
                 "eu-north-1-workload"
             ),
-            "knr-ops-123456789012-eu-north-1-workload-data"
+            "krops-123456789012-eu-north-1-workload-data"
         );
     }
 
@@ -2145,8 +2145,8 @@ mod tests {
         );
         assert_eq!(t.capa_tag_key(), capa_tag_key("eu-north-1-management"));
         assert_eq!(
-            t.bucket_name("knr-ops-{account_id}-{cluster_name}-data", "acct"),
-            "knr-ops-acct-eu-north-1-management-data"
+            t.bucket_name("krops-{account_id}-{cluster_name}-data", "acct"),
+            "krops-acct-eu-north-1-management-data"
         );
     }
 }

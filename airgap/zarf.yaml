@@ -1,11 +1,11 @@
-# Zarf package: air-gapped knr-ops prototype (local-host / CAPD profile).
+# Zarf package: air-gapped krops prototype (local-host / CAPD profile).
 #
 # Ownership split:
 #   Zarf deploys the substrate  : cert-manager, flux-operator, FluxInstance,
 #                                 CAPI core, kubeadm bootstrap/control-plane,
-#                                 CAPD, CAAPH, and the knr-ops config artifact.
+#                                 CAPD, CAAPH, and the krops config artifact.
 #   Flux reconciles the workload: the trimmed mgmt/local-host tree carried as
-#                                 the knr-ops-airgap OCI artifact (clusters/,
+#                                 the krops-airgap OCI artifact (clusters/,
 #                                 addons/cni/, addons/flux-apps/).
 #
 # The kind node images and the workload-node pod images are NOT in this
@@ -14,9 +14,9 @@
 # before any cluster exists.
 kind: ZarfPackageConfig
 metadata:
-  name: knr-ops-airgap
+  name: krops-airgap
   version: 0.1.0
-  description: Air-gapped knr-ops prototype (local-host CAPD profile)
+  description: Air-gapped krops prototype (local-host CAPD profile)
   architecture: arm64
 constants:
   # In-cluster DNS name of the Zarf internal registry. In-cluster fetchers
@@ -73,15 +73,15 @@ components:
         name: flux-operator
         namespace: flux-system
 
-  # knr-ops GitOps config artifact. Built connected-side by
+  # krops GitOps config artifact. Built connected-side by
   # scripts/build-config-artifact.sh (trimmed airgap tree, pushed to the local
   # registry), then carried across the gap inside this package and pushed into
   # the Zarf internal registry at deploy time by Zarf's image pipeline.
-  - name: knr-ops-config
+  - name: krops-config
     required: true
-    description: knr-ops mgmt/local-host (airgap-trimmed) as an OCI artifact
+    description: krops mgmt/local-host (airgap-trimmed) as an OCI artifact
     images:
-      - localhost:5001/knr-ops-airgap:latest
+      - localhost:5001/krops-airgap:latest
 
   # FluxInstance: points the management Flux at the config artifact in the
   # Zarf internal registry. distribution.artifact is omitted so the operator
@@ -97,12 +97,12 @@ components:
     required: true
     files:
       - source: manifests/flux-instance.yaml
-        target: /tmp/knr-ops-airgap/flux-instance.yaml
+        target: /tmp/krops-airgap/flux-instance.yaml
     actions:
       onDeploy:
         after:
           - description: Apply the FluxInstance (kubectl, ambient context)
-            cmd: kubectl apply -f /tmp/knr-ops-airgap/flux-instance.yaml
+            cmd: kubectl apply -f /tmp/krops-airgap/flux-instance.yaml
             maxTotalSeconds: 120
           - description: Wait for Flux to be Ready (controllers + sync)
             cmd: kubectl -n flux-system wait --for=condition=Ready fluxinstance/flux --timeout=10m

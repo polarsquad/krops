@@ -19,7 +19,7 @@ metadata:
   name: data
   namespace: default
 spec:
-  name: knr-ops-${AWS_ACCOUNT_ID}-${CLUSTER_NAME}-data
+  name: krops-${AWS_ACCOUNT_ID}-${CLUSTER_NAME}-data
   createBucketConfiguration:
     locationConstraint: ${AWS_REGION}
   publicAccessBlock:
@@ -47,8 +47,8 @@ spec:
           "Principal": "*",
           "Action": "s3:*",
           "Resource": [
-            "arn:aws:s3:::knr-ops-${AWS_ACCOUNT_ID}-${CLUSTER_NAME}-data",
-            "arn:aws:s3:::knr-ops-${AWS_ACCOUNT_ID}-${CLUSTER_NAME}-data/*"
+            "arn:aws:s3:::krops-${AWS_ACCOUNT_ID}-${CLUSTER_NAME}-data",
+            "arn:aws:s3:::krops-${AWS_ACCOUNT_ID}-${CLUSTER_NAME}-data/*"
           ],
           "Condition": {
             "Bool": { "aws:SecureTransport": "false" }

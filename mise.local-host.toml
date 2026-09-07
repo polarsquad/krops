@@ -1,5 +1,5 @@
 [env]
-KNR_OPS_PROFILE = "local-host"
+KROPS_PROFILE = "local-host"
 
 [tasks.oci-push]
 description = "Package the local Git checkout as an OCI artifact and push it to the local registry"
@@ -10,9 +10,9 @@ cd "$REPO_ROOT"
 
 REGISTRY_PORT="${REGISTRY_PORT:-5001}"
 # Toolbox runs reach the registry by kind-network name (the CLI exports
-# REGISTRY_HOST=knr-registry there); host runs default to localhost.
+# REGISTRY_HOST=krops-registry there); host runs default to localhost.
 REGISTRY_HOST="${REGISTRY_HOST:-localhost}"
-OCI_REPOSITORY="${OCI_REPOSITORY:-knr-ops}"
+OCI_REPOSITORY="${OCI_REPOSITORY:-krops}"
 OCI_TAG="${OCI_TAG:-latest}"
 OCI_URL="oci://${REGISTRY_HOST}:${REGISTRY_PORT}/${OCI_REPOSITORY}:${OCI_TAG}"
 OCI_MGMT_SOURCE_PATH="mgmt/local-host"
@@ -37,7 +37,7 @@ GIT_REF="${GIT_REF:-detached}"
 SOURCE_URL=$(git config --get remote.origin.url || true)
 SOURCE_URL="${SOURCE_URL:-file://${REPO_ROOT}}"
 
-ARTIFACT_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/knr-ops-oci.XXXXXX")
+ARTIFACT_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/krops-oci.XXXXXX")
 cleanup_artifact_root() {
   rm -rf "$ARTIFACT_ROOT"
 }

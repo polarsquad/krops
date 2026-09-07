@@ -1,5 +1,5 @@
 [env]
-KNR_OPS_PROFILE = "aws"
+KROPS_PROFILE = "aws"
 
 [tools]
 aws-cli = "2.36.32"
@@ -10,9 +10,9 @@ description = "Provision the clusterawsadm IAM CloudFormation stack for CAPA"
 run = "clusterawsadm bootstrap iam create-cloudformation-stack --region ${AWS_REGION:-eu-north-1}"
 
 [tasks.kubeconfigs]
-description = "Export workload-cluster kubeconfigs to ~/.kube/knr-ops-workloads.yaml (use: export KUBECONFIG=~/.kube/knr-ops-workloads.yaml)"
+description = "Export workload-cluster kubeconfigs to ~/.kube/krops-workloads.yaml (use: export KUBECONFIG=~/.kube/krops-workloads.yaml)"
 run = '''
-KUBECONFIG_FILE="${KUBECONFIG_FILE:-$HOME/.kube/knr-ops-workloads.yaml}"
+KUBECONFIG_FILE="${KUBECONFIG_FILE:-$HOME/.kube/krops-workloads.yaml}"
 fail=0
 # Regions are discovered from the cluster definitions in Git.
 for region in $(find mgmt/aws/clusters -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort); do

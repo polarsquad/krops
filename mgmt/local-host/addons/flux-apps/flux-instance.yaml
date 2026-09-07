@@ -36,7 +36,7 @@ data:
         domain: cluster.local
       sync:
         kind: OCIRepository
-        url: oci://knr-registry:5000/knr-ops
+        url: oci://krops-registry:5000/krops
         ref: latest
         path: workload/local-host
       kustomize:
@@ -57,7 +57,7 @@ spec:
   clusterSelector:
     matchLabels:
       fluxcd: enabled
-      knr-ops.polarsquad.com/environment: local-host
+      krops.polarsquad.com/environment: local-host
   strategy: ApplyOnce
   resources:
     - kind: ConfigMap

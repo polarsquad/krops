@@ -15,7 +15,7 @@
 #   6. deletes the kind bootstrap cluster.
 #
 # Run from a checkout of the revision you want self-managed (normally main):
-#   mise run pivot                  # aws environment (KNR_OPS_PROFILE=aws)
+#   mise run pivot                  # aws environment (KROPS_PROFILE=aws)
 #   mise -E local-host run pivot    # local-host environment
 #
 # bootstrap.sh execs this script by default (BOOTSTRAP_PIVOT=0 opts out).
@@ -32,12 +32,12 @@ cd "$(dirname "$0")"
 
 source ./bootstrap-common.sh
 
-PROFILE="${KNR_OPS_PROFILE:-${1:-aws}}"
+PROFILE="${KROPS_PROFILE:-${1:-aws}}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
-REGISTRY_NAME="${REGISTRY_NAME:-knr-registry}"
+REGISTRY_NAME="${REGISTRY_NAME:-krops-registry}"
 REGISTRY_PORT="${REGISTRY_PORT:-5001}"
 MGMT_NS="default"
-MGMT_KUBECONFIG="${MGMT_KUBECONFIG:-$HOME/.kube/knr-ops-mgmt.yaml}"
+MGMT_KUBECONFIG="${MGMT_KUBECONFIG:-$HOME/.kube/krops-mgmt.yaml}"
 PIVOT_SKIP_DELETE="${PIVOT_SKIP_DELETE:-0}"
 
 # Chart versions installed imperatively in the target before Flux exists.
@@ -156,7 +156,7 @@ export_mgmt_kubeconfig() {
 
   kubectl --kubeconfig "$MGMT_KUBECONFIG" config rename-context \
     "$(kubectl --kubeconfig "$MGMT_KUBECONFIG" config current-context)" \
-    knr-ops-mgmt >/dev/null
+    krops-mgmt >/dev/null
 
   echo ">>> Waiting for management-cluster nodes to be ready..."
   kubectl --kubeconfig "$MGMT_KUBECONFIG" wait --for=condition=Ready node --all --timeout=15m
@@ -347,8 +347,8 @@ delete_bootstrap_cluster() {
   echo ">>> Pivot complete: the management cluster is self-managed."
   echo ">>> Management kubeconfig: ${MGMT_KUBECONFIG}"
   echo ">>> Use with: KUBECONFIG=${MGMT_KUBECONFIG} kubectl get clusters"
-  if kubectl config use-context knr-ops-mgmt >/dev/null 2>&1; then
-    echo ">>> kubectl context switched to knr-ops-mgmt"
+  if kubectl config use-context krops-mgmt >/dev/null 2>&1; then
+    echo ">>> kubectl context switched to krops-mgmt"
   else
     echo ">>> To use it by default: export KUBECONFIG=${MGMT_KUBECONFIG}"
   fi

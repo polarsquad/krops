@@ -1,9 +1,9 @@
 [package]
-name = "knr-bootstrap"
+name = "krops-bootstrap"
 version = "0.2.0"
 edition = "2021"
 rust-version = "1.96"
-description = "One-time imperative bootstrap for the knr-ops management cluster (Rust port of bootstrap.sh)"
+description = "One-time imperative bootstrap for the krops management cluster (Rust port of bootstrap.sh)"
 license = "Apache-2.0"
 
 [dependencies]

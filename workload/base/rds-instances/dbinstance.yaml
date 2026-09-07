@@ -19,7 +19,7 @@ metadata:
   name: db
   namespace: default
 spec:
-  dbInstanceIdentifier: knr-ops-${CLUSTER_NAME}-db
+  dbInstanceIdentifier: krops-${CLUSTER_NAME}-db
   engine: postgres
   engineVersion: "17"
   # Smallest current-generation instance class (2 vCPU Graviton, 1 GiB RAM)

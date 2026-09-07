@@ -540,7 +540,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "knr-bootstrap"
+name = "krops-bootstrap"
 version = "0.2.0"
 dependencies = [
  "anyhow",

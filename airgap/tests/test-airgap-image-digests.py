@@ -14,7 +14,7 @@ INVENTORY_FILES = {
     "airgap/zarf.yaml",
 }
 LOCAL_EXCEPTIONS = {
-    "localhost:5001/knr-ops-airgap:latest": (
+    "localhost:5001/krops-airgap:latest": (
         "built immediately before packaging; the build script substitutes the "
         "selected OCI registry and tag"
     ),

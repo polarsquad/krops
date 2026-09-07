@@ -154,7 +154,7 @@ seed_helm() {
 seed_flux() {
   SEED_KUBECONFIG="${1:-}"
 
-  local registry_name="${REGISTRY_NAME:-knr-registry}"
+  local registry_name="${REGISTRY_NAME:-krops-registry}"
   local registry_port="${REGISTRY_PORT:-5001}"
   local anon_registry_config
   anon_registry_config="$(mktemp)"
@@ -218,7 +218,7 @@ seed_flux() {
   else
     FLUX_INSTANCE_ARGS+=(
       --set instance.sync.kind=OCIRepository
-      --set instance.sync.url="oci://${registry_name}:5000/${OCI_REPOSITORY:-knr-ops}"
+      --set instance.sync.url="oci://${registry_name}:5000/${OCI_REPOSITORY:-krops}"
       --set instance.sync.ref="${OCI_TAG:-latest}"
       --set instance.sync.path=mgmt/local-host
       --set-json 'instance.kustomize.patches=[{"patch":"- op: add\n  path: /spec/insecure\n  value: true","target":{"kind":"OCIRepository"}}]'

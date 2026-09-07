@@ -5,9 +5,9 @@ set -euo pipefail
 
 source "$(dirname "$0")/bootstrap-common.sh"
 
-PROFILE="${KNR_OPS_PROFILE:-${1:-aws}}"
+PROFILE="${KROPS_PROFILE:-${1:-aws}}"
 GIT_BRANCH="main"
-REGISTRY_NAME="knr-registry"
+REGISTRY_NAME="krops-registry"
 REGISTRY_PORT="${REGISTRY_PORT:-5001}"
 REGISTRY_READY_RETRIES="${REGISTRY_READY_RETRIES:-120}"
 LOCAL_RECONCILE_TIMEOUT="${LOCAL_RECONCILE_TIMEOUT:-15m}"
@@ -117,7 +117,7 @@ if [ "$PROFILE" = local-host ]; then
 
   echo ">>> Publishing initial OCI artifact from the local Git checkout..."
   mise -E local-host run oci-push
-  echo ">>> Initial OCI artifact is available at oci://localhost:${REGISTRY_PORT}/${OCI_REPOSITORY:-knr-ops}:${OCI_TAG:-latest}"
+  echo ">>> Initial OCI artifact is available at oci://localhost:${REGISTRY_PORT}/${OCI_REPOSITORY:-krops}:${OCI_TAG:-latest}"
 fi
 
 # ── Steps 2–4: Seed Flux (operator, secrets, FluxInstance) ────────────────────
@@ -242,7 +242,7 @@ if [ "$PROFILE" = aws ]; then
 else
   echo ">>> Local-host profile complete: Flux is reconciling from the local OCI artifact"
   echo ">>> Local registry: localhost:${REGISTRY_PORT} (cluster endpoint: ${REGISTRY_NAME}:5000)"
-  echo ">>> OCI source: oci://${REGISTRY_NAME}:5000/${OCI_REPOSITORY:-knr-ops}:${OCI_TAG:-latest} (path: mgmt/local-host)"
+  echo ">>> OCI source: oci://${REGISTRY_NAME}:5000/${OCI_REPOSITORY:-krops}:${OCI_TAG:-latest} (path: mgmt/local-host)"
   echo ">>> Watch progress with: flux get sources oci --watch"
   echo ">>> No AWS resources were provisioned"
 fi
@@ -253,7 +253,7 @@ fi
 # cluster via CAPA/CAPD), then pivot.sh moves the CAPI inventory into it and
 # deletes the kind cluster. Opt out with BOOTSTRAP_PIVOT=0 to keep the kind
 # bootstrap cluster as the management cluster (pre-#79 behavior).
-export KNR_OPS_PROFILE="$PROFILE"
+export KROPS_PROFILE="$PROFILE"
 if [ "${BOOTSTRAP_PIVOT:-1}" = 1 ]; then
   # EXIT traps do not fire across exec; clean up the seed temp files first.
   cleanup_bootstrap

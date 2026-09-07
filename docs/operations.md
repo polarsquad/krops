@@ -4,8 +4,8 @@
 
 ### Toolbox container (primary interface)
 
-The toolbox image (`ghcr.io/polarsquad/knr-ops-toolbox`) carries
-`knr-bootstrap` plus every tool used by bootstrap, pivot, and teardown. It
+The toolbox image (`ghcr.io/polarsquad/krops-toolbox`) carries
+`krops-bootstrap` plus every tool used by bootstrap, pivot, and teardown. It
 intentionally omits development-only Go and Python toolchains and the Zarf CLI.
 The host needs the repository checkout and a running Docker engine or Podman
 5.5+.
@@ -17,8 +17,8 @@ GitHub OIDC, and attach a Syft SPDX JSON SBOM attestation. Build the current
 checkout locally:
 
 ```sh
-docker build -f bootstrap-rs/Dockerfile -t knr-ops-toolbox:dev .
-export TOOLBOX_IMAGE=knr-ops-toolbox:dev
+docker build -f bootstrap-rs/Dockerfile -t krops-toolbox:dev .
+export TOOLBOX_IMAGE=krops-toolbox:dev
 mkdir -p .kube
 ```
 
@@ -80,7 +80,7 @@ The same wrapper powers `mise run bootstrap`, `mise run pivot`, and
 `mise run teardown`. It detects the engine, loads every `.env` assignment with
 outer quote stripping, and passes only this allowlist into the container:
 
-- Engine and lifecycle: `CONTAINER_ENGINE`, `ENGINE_SOCK`, `KNR_OPS_PROFILE`,
+- Engine and lifecycle: `CONTAINER_ENGINE`, `ENGINE_SOCK`, `KROPS_PROFILE`,
   `REGISTRY_PORT`, `OCI_REPOSITORY`, `OCI_TAG`, `BOOTSTRAP_PIVOT`,
   `PIVOT_SKIP_DELETE`
 - GitHub and age: `GIT_REPO_URL`, `GITHUB_TOKEN`, `GITHUB_USER`, `AGE_KEY_FILE`,
@@ -98,19 +98,19 @@ not require host mise.
 
 Inside the toolbox:
 
-- The entrypoint sets `KNR_TOOLBOX=1` and resolves the daemon-side
+- The entrypoint sets `KROPS_TOOLBOX=1` and resolves the daemon-side
   `ENGINE_SOCK` used by kind's socket mount.
 - Each new toolbox container best-effort joins an existing `kind` network at
   startup. Bootstrap joins explicitly after creating kind; recreate, pivot, and
   teardown detach before deleting the bootstrap cluster.
-- Kind's internal API endpoint and `knr-registry:5000` then resolve by name.
+- Kind's internal API endpoint and `krops-registry:5000` then resolve by name.
 - Host-only CAPD endpoint rewrites are skipped because the recorded endpoints
   already resolve on that network.
 - `KUBECONFIG` must name one writable file. The documented invocation uses
   `/workspace/.kube/kind.yaml`, and the CLI replaces it with kind's internal
   kubeconfig after creation.
 - `/root/.kube` maps to the checkout's `.kube/`, so the exported management
-  kubeconfig persists on the host as `.kube/knr-ops-mgmt.yaml`.
+  kubeconfig persists on the host as `.kube/krops-mgmt.yaml`.
 
 ### Verifying a toolbox release
 
@@ -118,8 +118,8 @@ After the first release is published, replace `X.Y.Z` in these commands with
 the matching Cargo and Git tag version:
 
 ```sh
-IMAGE=ghcr.io/polarsquad/knr-ops-toolbox:X.Y.Z
-IDENTITY=https://github.com/polarsquad/knr-ops/.github/workflows/toolbox-release.yml@refs/tags/vX.Y.Z
+IMAGE=ghcr.io/polarsquad/krops-toolbox:X.Y.Z
+IDENTITY=https://github.com/polarsquad/krops/.github/workflows/toolbox-release.yml@refs/tags/vX.Y.Z
 
 cosign verify \
   --certificate-identity "$IDENTITY" \
@@ -151,7 +151,7 @@ requires a Rust
 toolchain ([rustup](https://rustup.rs/); the pin lives in
 `bootstrap-rs/rust-toolchain.toml`). The lifecycle mise tasks still use the
 toolbox. For a fully native run from the repository root, invoke
-`./bootstrap-rs/target/debug/knr-bootstrap` or call `./bootstrap.sh`,
+`./bootstrap-rs/target/debug/krops-bootstrap` or call `./bootstrap.sh`,
 `./pivot.sh`, and `./teardown.sh` directly.
 
 You also need:
@@ -169,13 +169,13 @@ You also need:
   For the ACK controllers the same principal additionally needs
   `iam:CreateRole`/`PutRolePolicy`/`GetRole`/`TagRole`,
   `iam:CreateUser`/`PutUserPolicy`/`GetUser`/`GetUserPolicy`/`TagUser`
-  (for the `knr-ops-reader` console user), and
+  (for the `krops-reader` console user), and
   `eks:CreatePodIdentityAssociation`/`DescribePodIdentityAssociation`/
   `DeletePodIdentityAssociation`. The `rds:*` management and
   `secretsmanager:CreateSecret`/`TagResource`/`RotateSecret` permissions
   (managed master passwords) used by the workload clusters' ACK RDS
   controllers are granted through the Git-declared
-  `knr-ops-ack-rds-controller` pod-identity role — no extra static
+  `krops-ack-rds-controller` pod-identity role — no extra static
   credentials are required for them.
 - The `clusterawsadm` IAM CloudFormation stack provisioned before bootstrap and
   removed by a full AWS teardown:
@@ -240,7 +240,7 @@ environment.
 
 Repository-owned lifecycle configuration lives in `bootstrap.toml`. It defines
 the environment names, sync paths, management clusters, imperative chart
-versions, provider manifests, and teardown targets. `knr-bootstrap` reads it
+versions, provider manifests, and teardown targets. `krops-bootstrap` reads it
 from the working directory unless `BOOTSTRAP_CONFIG` selects another path.
 Runtime environment variables take precedence over configurable defaults, and
 `mise run validate` cross-checks the file against the manifests.
@@ -275,7 +275,7 @@ steps in the `mgmt` management cluster, but does not create GitHub or SOPS
 secrets. Instead, it bootstraps a local Docker Registry container (`registry:2`)
 running on the host machine (accessible at `localhost:5001` by default),
 publishes the `mgmt/local-host/` and `workload/local-host/` folders as the
-initial `knr-ops:latest` OCI
+initial `krops:latest` OCI
 artifact, and configures Flux to reconcile that path from the artifact. Flux
 then installs the CAPI core, kubeadm, and Docker infrastructure providers and
 creates `local-workload`, a one-control-plane/one-worker Kubernetes cluster in
@@ -322,7 +322,7 @@ OCI_REPOSITORY=my-config OCI_TAG=v1 \
 
 # FluxInstance pulls and reconciles the artifact's mgmt/local-host kustomization.
 # The bootstrap configures kind's containerd to mirror localhost:5001 to the
-# registry's in-cluster endpoint, knr-registry:5000.
+# registry's in-cluster endpoint, krops-registry:5000.
 ```
 
 The artifact contains only `mgmt/local-host/` and `workload/local-host/`,
@@ -338,18 +338,18 @@ Watch reconciliation after a toolbox run with the persisted management
 kubeconfig:
 
 ```sh
-export KUBECONFIG="$PWD/.kube/knr-ops-mgmt.yaml"
+export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
 flux get kustomizations --watch
 ```
 
 A native CLI or shell run writes the same context to
-`~/.kube/knr-ops-mgmt.yaml` unless `MGMT_KUBECONFIG` overrides it.
+`~/.kube/krops-mgmt.yaml` unless `MGMT_KUBECONFIG` overrides it.
 
 For the local-host environment, export and verify the CAPD workload kubeconfig
 after `docker-workload-cluster` reports Ready:
 
 ```sh
-export KUBECONFIG="$PWD/.kube/knr-ops-mgmt.yaml"  # toolbox management cluster
+export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"  # toolbox management cluster
 mise -E local-host run kubeconfigs
 KUBECONFIG=local-workload.kubeconfig kubectl get nodes
 ```
@@ -386,7 +386,7 @@ For the local-host end-to-end chain:
 
 ```sh
 mise -E local-host run bootstrap
-export KUBECONFIG="$PWD/.kube/knr-ops-mgmt.yaml"
+export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
 mise -E local-host run kubeconfigs
 KUBECONFIG=local-workload.kubeconfig flux get all --all-namespaces
 mise -E local-host run podinfo-port-forward  # browse to http://localhost:9898
@@ -400,20 +400,20 @@ For the AWS chain:
 
 ```sh
 # Management cluster after a toolbox run
-export KUBECONFIG="$PWD/.kube/knr-ops-mgmt.yaml"
+export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
 kubectl get kustomizations -n flux-system            # all Ready
 kubectl get clusters.cluster.x-k8s.io -A             # Provisioned
 kubectl get roles.iam.services.k8s.aws -n ack-system
 kubectl get podidentityassociations.eks.services.k8s.aws -n ack-system
 
 # Workload clusters: export kubeconfigs first
-#   mise -E aws run kubeconfigs && export KUBECONFIG=~/.kube/knr-ops-workloads.yaml
+#   mise -E aws run kubeconfigs && export KUBECONFIG=~/.kube/krops-workloads.yaml
 #   kubectl config use-context eu-north-1-workload   (or eu-west-1-workload)
 kubectl get kustomizations -n flux-system            # aws-operators, s3-buckets, rds-instances, iam-roles
 
 # AWS
-aws s3api get-bucket-encryption    --bucket knr-ops-<account>-eu-north-1-workload-data
-aws s3api get-public-access-block  --bucket knr-ops-<account>-eu-north-1-workload-data
+aws s3api get-bucket-encryption    --bucket krops-<account>-eu-north-1-workload-data
+aws s3api get-public-access-block  --bucket krops-<account>-eu-north-1-workload-data
 ```
 
 ## Pivot recovery
@@ -447,9 +447,9 @@ until the final kind deletion. If a pivot phase fails:
 > to delete.
 
 The management kubeconfig is written to `MGMT_KUBECONFIG`, with context
-`knr-ops-mgmt`. Native runs default to `~/.kube/knr-ops-mgmt.yaml`; the toolbox
-mount makes its `/root/.kube/knr-ops-mgmt.yaml` appear on the host as
-`./.kube/knr-ops-mgmt.yaml`.
+`krops-mgmt`. Native runs default to `~/.kube/krops-mgmt.yaml`; the toolbox
+mount makes its `/root/.kube/krops-mgmt.yaml` appear on the host as
+`./.kube/krops-mgmt.yaml`.
 
 ## Teardown
 
@@ -461,7 +461,7 @@ mise -E local-host run teardown   # local-host
 mise -E local-talos run teardown  # local-talos
 ```
 
-Native equivalents are `knr-bootstrap teardown [PROFILE]` and the retained
+Native equivalents are `krops-bootstrap teardown [PROFILE]` and the retained
 `./teardown.sh` reference path. The positional profile selects an environment
 from `bootstrap.toml`. Teardown reads resource names and targets from
 `bootstrap.toml` and discovers where the CAPI controllers are running:
@@ -479,7 +479,7 @@ The main controls keep the shell interface:
 | `FORCE_KIND_DELETE` | `0` | Literal `1` overrides the final controller-host deletion guard |
 | `CLUSTER_DELETE_TIMEOUT` | `1200` seconds | CAPI cluster deletion wait (aws workloads, local-talos management) |
 | `PROVIDER_DELETE_TIMEOUT` | `300` seconds | CAPI provider deletion wait |
-| `MGMT_KUBECONFIG` | native: `~/.kube/knr-ops-mgmt.yaml` | Post-pivot controller-host kubeconfig |
+| `MGMT_KUBECONFIG` | native: `~/.kube/krops-mgmt.yaml` | Post-pivot controller-host kubeconfig |
 
 The hard preflight depends on the mode:
 
@@ -497,7 +497,7 @@ with explicit `-e` entries or a native run for recovery overrides.
 For `local-host`, teardown suspends the workload Kustomization, deletes the
 CAPD workload cluster, waits for its containers to disappear, removes either
 the pre-pivot kind cluster or the post-pivot self-managed management
-containers, and removes `knr-registry` last.
+containers, and removes `krops-registry` last.
 
 For `local-talos`, teardown suspends Flux and deletes every CAPI Cluster,
 the management cluster included: the deletion IS the release, and CAPT
@@ -513,7 +513,7 @@ controller host. It then runs a best-effort AWS sweep for both workload
 regions and the self-managed management cluster. The sweep removes pod
 identity associations, nodegroups, EKS control planes, orphaned RDS instances,
 CAPA-tagged VPC resources in dependency order, versioned S3 buckets, CAPA and
-ACK IAM roles, the `knr-ops-reader` user, and the `clusterawsadm`
+ACK IAM roles, the `krops-reader` user, and the `clusterawsadm`
 CloudFormation stack. It removes CAPI providers and bootstrap Helm releases
 when the controller host remains reachable.
 

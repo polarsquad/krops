@@ -7,7 +7,7 @@
 # IRSA it does not embed a per-cluster OIDC provider ID, which is what makes
 # this approach fully declarable in Git ahead of cluster creation.
 #
-# Permissions are scoped to bucket-level management of knr-ops-* buckets only.
+# Permissions are scoped to bucket-level management of krops-* buckets only.
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: iam.services.k8s.aws/v1alpha1
 kind: Role
@@ -15,8 +15,8 @@ metadata:
   name: ack-s3-controller
   namespace: ack-system
 spec:
-  name: knr-ops-ack-s3-controller
-  description: "ACK S3 controller on knr-ops workload clusters (EKS Pod Identity)"
+  name: krops-ack-s3-controller
+  description: "ACK S3 controller on krops workload clusters (EKS Pod Identity)"
   assumeRolePolicyDocument: |
     {
       "Version": "2012-10-17",
@@ -66,7 +66,7 @@ spec:
               "s3:PutIntelligentTieringConfiguration",
               "s3:ListBucket"
             ],
-            "Resource": "arn:aws:s3:::knr-ops-*"
+            "Resource": "arn:aws:s3:::krops-*"
           }
         ]
       }

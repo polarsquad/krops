@@ -23,7 +23,7 @@ metadata:
   name: local-talos-management
   namespace: default
   labels:
-    knr-ops.polarsquad.com/environment: local-talos
+    krops.polarsquad.com/environment: local-talos
 spec:
   clusterNetwork:
     pods:

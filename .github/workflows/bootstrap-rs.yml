@@ -87,7 +87,7 @@ jobs:
           platforms: linux/arm64
           push: false
           load: true
-          tags: knr-ops-toolbox:ci
+          tags: krops-toolbox:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -96,8 +96,8 @@ jobs:
           # /workspace has no bootstrap.toml in CI (the repo is mounted
           # there at runtime); --help must be probed from the checkout.
           docker run --rm --entrypoint sh -v "$PWD:/workspace:ro" \
-            -w /workspace knr-ops-toolbox:ci -c '
+            -w /workspace krops-toolbox:ci -c '
             for t in kind kubectl helm clusterctl flux sops age aws docker xargs git curl; do
               command -v "$t" >/dev/null || { echo "::error::$t missing on PATH"; exit 1; }
             done
-            knr-bootstrap --help >/dev/null'
+            krops-bootstrap --help >/dev/null'

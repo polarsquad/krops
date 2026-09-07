@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cross-check bootstrap.toml against the Git manifests (issue #98).
 
-The chart versions knr-bootstrap installs imperatively must equal the
+The chart versions krops-bootstrap installs imperatively must equal the
 versions Flux reconciles from Git, or Flux cannot adopt the imperative
 installs without drift. Fails when they disagree, when a declared
 provider-manifest or sync path is missing, when an environment's kind
@@ -122,13 +122,13 @@ def main() -> int:
                     f"environments.{name} teardown cluster-name {cluster_name!r} "
                     f"does not start with its region {region!r}"
                 )
-            # The RDS instance id is knr-ops-<cluster>-db (workload/base/
+            # The RDS instance id is krops-<cluster>-db (workload/base/
             # rds-instances/dbinstance.yaml substitutes CLUSTER_NAME).
             rds = workload.get("rds-instance", "")
-            if cluster_name and rds != f"knr-ops-{cluster_name}-db":
+            if cluster_name and rds != f"krops-{cluster_name}-db":
                 failures.append(
                     f"environments.{name} teardown rds-instance {rds!r} != "
-                    f"knr-ops-{cluster_name}-db"
+                    f"krops-{cluster_name}-db"
                 )
             # The EKS name is '<namespace>_<kcp-name>' — only the namespace
             # separator becomes an underscore (teardown.sh documents this
@@ -145,9 +145,9 @@ def main() -> int:
     teardown = config.get("teardown", {})
     if teardown:
         expected_roles = [
-            "knr-ops-ack-s3-controller",
-            "knr-ops-ack-rds-controller",
-            "knr-ops-ack-iam-controller",
+            "krops-ack-s3-controller",
+            "krops-ack-rds-controller",
+            "krops-ack-iam-controller",
         ]
         roles = teardown.get("global-iam-roles", [])
         for role in expected_roles:
@@ -155,8 +155,8 @@ def main() -> int:
                 failures.append(f"teardown.global-iam-roles missing {role}")
         reader_user = REPO_ROOT / "mgmt/aws/infrastructure/aws-global-iam/reader-user.yaml"
         users = teardown.get("global-iam-users", [])
-        if reader_user.is_file() and "knr-ops-reader" not in users:
-            failures.append("teardown.global-iam-users missing knr-ops-reader")
+        if reader_user.is_file() and "krops-reader" not in users:
+            failures.append("teardown.global-iam-users missing krops-reader")
         pattern = teardown.get("s3-bucket-pattern", "")
         if pattern and "{account_id}" not in pattern or "{cluster_name}" not in pattern:
             failures.append(

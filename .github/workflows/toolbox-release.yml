@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 name: toolbox-release
 
-# Publishes ghcr.io/polarsquad/knr-ops-toolbox on semver tags (issue #104).
+# Publishes ghcr.io/polarsquad/krops-toolbox on semver tags (issue #104).
 # The tag must equal the version in bootstrap-rs/Cargo.toml; the gate job
 # fails the release when they disagree. Signing is cosign keyless via the
 # workflow's GitHub OIDC identity (same identity model as the air-gapped
@@ -61,7 +61,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6.2.0
         with:
-          images: ghcr.io/polarsquad/knr-ops-toolbox
+          images: ghcr.io/polarsquad/krops-toolbox
           # The default latest=auto flavor adds latest for stable semver
           # tags without moving it for prereleases.
           tags: |
@@ -101,9 +101,9 @@ jobs:
         run: |
           # Sign each tag's digest; verification is against the workflow
           # identity (certificate issuer/subject per cosign docs):
-          #   cosign verify ghcr.io/polarsquad/knr-ops-toolbox:X.Y.Z \
+          #   cosign verify ghcr.io/polarsquad/krops-toolbox:X.Y.Z \
           #     --certificate-identity-regexp \
-          #       '^https://github.com/polarsquad/knr-ops/.github/workflows/toolbox-release.yml@refs/tags/vX.Y.Z$' \
+          #       '^https://github.com/polarsquad/krops/.github/workflows/toolbox-release.yml@refs/tags/vX.Y.Z$' \
           #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
           digest="${{ steps.build.outputs.digest }}"
           IFS=',' read -ra tag_list <<< "$TAGS"

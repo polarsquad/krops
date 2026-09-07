@@ -16,15 +16,15 @@
 # AWS cleanup (step 4) targets resources that CAPA does not manage or may leave
 # behind. VPC deletion is scoped exclusively to resources tagged by CAPA
 # (sigs.k8s.io/cluster-api-provider-aws/cluster/{clusterName}=owned) so only
-# knr-ops infrastructure is touched.
+# krops infrastructure is touched.
 #
 # Usage:
 #   ./teardown.sh              # Full teardown (k8s + AWS)
-#   KNR_OPS_PROFILE=local-host ./teardown.sh  # Delete CAPD workload + management cluster
+#   KROPS_PROFILE=local-host ./teardown.sh  # Delete CAPD workload + management cluster
 #   AWS_ONLY=1 ./teardown.sh   # AWS orphan cleanup only (skip k8s steps)
 set -euo pipefail
 
-PROFILE="${KNR_OPS_PROFILE:-${1:-aws}}"
+PROFILE="${KROPS_PROFILE:-${1:-aws}}"
 
 preflight_checks() {
   case "$PROFILE" in
@@ -127,10 +127,10 @@ if [ "$PROFILE" = local-host ]; then
   fi
 
   # Clean up the local container registry used by local-host profile
-  if [ -n "${CONTAINER_ENGINE:-}" ] && $CONTAINER_ENGINE ps -a --filter "name=^knr-registry$" | grep -q "knr-registry"; then
-    echo ">>> Removing local registry container 'knr-registry'..."
-    $CONTAINER_ENGINE rm -f knr-registry
-    echo "✓   registry container 'knr-registry' removed"
+  if [ -n "${CONTAINER_ENGINE:-}" ] && $CONTAINER_ENGINE ps -a --filter "name=^krops-registry$" | grep -q "krops-registry"; then
+    echo ">>> Removing local registry container 'krops-registry'..."
+    $CONTAINER_ENGINE rm -f krops-registry
+    echo "✓   registry container 'krops-registry' removed"
   fi
 
   exit 0
@@ -144,14 +144,14 @@ REGIONS="eu-north-1 eu-west-1"
 
 # Global IAM roles (region-independent): the ACK controller pod-identity roles
 # and the per-cluster reader roles created by the workload ACK IAM controllers
-# (knr-ops-${CLUSTER_NAME}-reader, see workload/base/iam-roles/role.yaml)
-GLOBAL_IAM_ROLES="knr-ops-ack-s3-controller knr-ops-ack-rds-controller knr-ops-ack-iam-controller knr-ops-eu-north-1-workload-reader knr-ops-eu-west-1-workload-reader"
+# (krops-${CLUSTER_NAME}-reader, see workload/base/iam-roles/role.yaml)
+GLOBAL_IAM_ROLES="krops-ack-s3-controller krops-ack-rds-controller krops-ack-iam-controller krops-eu-north-1-workload-reader krops-eu-west-1-workload-reader"
 
 # Global IAM users: the console reader user created by the management
 # cluster's ACK IAM controller (mgmt/aws/infrastructure/aws-global-iam/
 # reader-user.yaml). Users need different cleanup than roles: login profile
 # (console password) + inline policies + the user itself.
-GLOBAL_IAM_USERS="knr-ops-reader"
+GLOBAL_IAM_USERS="krops-reader"
 
 # CloudFormation stack created by clusterawsadm bootstrap iam
 CFN_STACK_NAME="cluster-api-provider-aws-sigs-k8s-io"
@@ -235,18 +235,18 @@ _get_cluster_name() {
 # CAPA tags the VPC resources and EIPs it creates with
 # sigs.k8s.io/cluster-api-provider-aws/cluster/<Cluster name>=owned
 # (verified against the live account). VPC/EIP cleanup is gated on this tag so
-# only knr-ops infrastructure is ever touched.
+# only krops infrastructure is ever touched.
 _get_capa_tag_key() {
   echo "sigs.k8s.io/cluster-api-provider-aws/cluster/$(_get_cluster_name "$1")"
 }
 
 # RDS instance identifier created by the ACK RDS controller on each workload
-# cluster: knr-ops-${CLUSTER_NAME}-db (see workload/base/rds-instances/dbinstance.yaml
+# cluster: krops-${CLUSTER_NAME}-db (see workload/base/rds-instances/dbinstance.yaml
 # and the cluster-vars ConfigMap in mgmt/aws/addons/flux-apps/flux-instance.yaml).
 _get_rds_instance() {
   case "$1" in
-    eu-north-1) echo "knr-ops-eu-north-1-workload-db" ;;
-    eu-west-1)  echo "knr-ops-eu-west-1-workload-db" ;;
+    eu-north-1) echo "krops-eu-north-1-workload-db" ;;
+    eu-west-1)  echo "krops-eu-west-1-workload-db" ;;
     *)          return 1 ;;
   esac
 }
@@ -414,7 +414,7 @@ _cleanup_s3_bucket() {
     2>/dev/null || warn "  Failed to delete S3 bucket $_bucket"
 }
 
-# ── VPC resources (knr-ops only – gated on CAPA ownership tag) ─────────────────
+# ── VPC resources (krops only – gated on CAPA ownership tag) ─────────────────
 _cleanup_vpc_resources() {
   _region="$1"; _cluster="$2"
   _cluster_tag_key=$(_get_capa_tag_key "$_region")
@@ -494,7 +494,7 @@ _delete_subnets() {
   _subnet_region="$1"; _subnet_vpc="$2"
 
   # No "non-default" filter needed: the enclosing VPC is CAPA-tagged, so it is
-  # never the account's default VPC and every subnet in it belongs to knr-ops.
+  # never the account's default VPC and every subnet in it belongs to krops.
   # ("default" is not a valid subnet filter name – using it makes the describe
   # call fail silently and skip subnet deletion entirely.)
   for _subnet_id in $(aws ec2 describe-subnets \
@@ -804,8 +804,8 @@ fi
 #   4f. S3 buckets                 – ACK-created versioned data buckets
 #   4g. IAM roles + users          – CAPA per-cluster roles (prefix sweep)
 #                                   + ACK controller roles
-#                                   + ACK-created knr-ops-*-reader roles
-#                                   + the knr-ops-reader console user
+#                                   + ACK-created krops-*-reader roles
+#                                   + the krops-reader console user
 #   4h. CloudFormation stack       – clusterawsadm bootstrap stack
 
 step_aws_cleanup() {
@@ -838,16 +838,16 @@ step_aws_cleanup() {
     _cleanup_rds_instance "$_region" "$(_get_rds_instance "$_region")"
   done
 
-  # ── 4e: VPC resources (CAPA-tagged only – knr-ops scope) ───────────────────
+  # ── 4e: VPC resources (CAPA-tagged only – krops scope) ───────────────────
   for _region in $REGIONS; do
     _cleanup_vpc_resources "$_region" "$(_get_cluster_name "$_region")"
   done
 
-  # ── 4f: S3 buckets (knr-ops-${ACCOUNT_ID}-${CLUSTER_NAME}-data) ────────────
+  # ── 4f: S3 buckets (krops-${ACCOUNT_ID}-${CLUSTER_NAME}-data) ────────────
   _account_id=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || true)
   if [ -n "$_account_id" ]; then
     for _region in $REGIONS; do
-      _cleanup_s3_bucket "knr-ops-${_account_id}-$(_get_cluster_name "$_region")-data" "$_region"
+      _cleanup_s3_bucket "krops-${_account_id}-$(_get_cluster_name "$_region")-data" "$_region"
     done
   else
     warn "  Could not determine AWS account ID – skipping S3 bucket cleanup"

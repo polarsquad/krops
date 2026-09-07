@@ -20,7 +20,7 @@ Renovate discovers and updates versions in:
 - `bootstrap-rs/Cargo.toml` and `bootstrap-rs/Cargo.lock`: Rust crate
   dependencies through Renovate's Cargo manager.
 - `bootstrap.toml`: the Flux Operator, cert-manager, and CAPI Operator chart
-  pins consumed by `knr-bootstrap`. One annotation-driven custom manager reads
+  pins consumed by `krops-bootstrap`. One annotation-driven custom manager reads
   the adjacent `# renovate:` metadata. `mise run validate` cross-checks these
   pins against their declarative Helm releases and proxies.
 - `bootstrap-rs/Dockerfile`: digest-pinned build and runtime base images, plus
@@ -44,7 +44,7 @@ digest-pinned while retaining readable tags. Nothing automerges.
 
 ## Toolbox release version
 
-The `knr-bootstrap` package version lives in `bootstrap-rs/Cargo.toml`. It is a
+The `krops-bootstrap` package version lives in `bootstrap-rs/Cargo.toml`. It is a
 release version, not a dependency pin, so Renovate does not increment it. When
 a `v*` tag is pushed, `.github/workflows/toolbox-release.yml` fails unless the
 tag matches that package version, then publishes the multi-architecture
@@ -79,10 +79,10 @@ verify the pairing during review.
 - EKS addon versions (`*-eksbuild.*`) have no public registry datasource and
   are updated manually.
 - Unversioned local tags such as
-  `localhost:5001/knr-ops-airgap:latest` have no comparable release version
+  `localhost:5001/krops-airgap:latest` have no comparable release version
   and remain untracked.
 - `scripts/toolbox-run.sh` defaults `TOOLBOX_IMAGE` to the mutable
-  `ghcr.io/polarsquad/knr-ops-toolbox:latest`; Renovate does not manage this
+  `ghcr.io/polarsquad/krops-toolbox:latest`; Renovate does not manage this
   runtime default.
 - The toolbox Dockerfile installs `docker-ce-cli` from Docker's apt repository
   without a package-version pin. Its client version intentionally follows that

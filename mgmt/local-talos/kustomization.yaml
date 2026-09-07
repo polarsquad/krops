@@ -3,13 +3,13 @@ kind: Kustomization
 # Root of the local-talos GitHub-synced tree: each entry registers Flux
 # Kustomizations reconciling the corresponding component from the
 # GitRepository source (like mgmt/aws, NOT the laptop OCI registry:
-# a physical machine cannot reach the laptop-hosted knr-registry).
+# a physical machine cannot reach the laptop-hosted krops-registry).
 #
 # Deliberately absent vs local-host:
 # - addons/cni: CNI on Talos is built in (flannel default).
 # - addons/flux-apps + caaph-system: no HelmChartProxy consumers — this
 #   environment is management-only (#105 scope fence); the management
-#   cluster's own Flux instance is seeded by knr-bootstrap, not by Git.
+#   cluster's own Flux instance is seeded by krops-bootstrap, not by Git.
 #   A future Talos workload cluster issue adds both back.
 resources:
   - infrastructure/flux-ks.yaml

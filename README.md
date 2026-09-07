@@ -1,7 +1,7 @@
-# knr-ops
+# krops
 ## kubernetes-native resource operations
 
-![knr-ops logo](docs/knr-ops-logo.svg)
+![krops logo](docs/krops-logo.svg)
 
 A GitOps pattern for managing cloud infrastructure through the Kubernetes API:
 no Terraform, no DSLs, no state files, no second toolchain. This repository is
@@ -40,7 +40,7 @@ the self-managed management plane, syncing from GitHub like `aws`. Scope
 fence: management-only, no workload cluster.
 
 The imperative part of the lifecycle (bootstrap, pivot, and teardown) is a
-single Rust CLI, [`knr-bootstrap`](docs/bootstrap-cli.md), that replaces the
+single Rust CLI, [`krops-bootstrap`](docs/bootstrap-cli.md), that replaces the
 shell scripts as they complete parity runs. After the one-time bootstrap and
 pivot, **everything is declared in Git as YAML**. The `aws` environment
 declares 2 CAPI workload clusters: 4 node pools (ARM and GPU) across 2
@@ -77,11 +77,11 @@ not a developer self-service portal; you are the consumer.
   pivot the management cluster manages itself through the same GitOps flow it
   drives.
 
-![knr-ops aws architecture](docs/aws-infra.svg)
+![krops aws architecture](docs/aws-infra.svg)
 
-![knr-ops local-host architecture](docs/local-host-infra.svg)
+![krops local-host architecture](docs/local-host-infra.svg)
 
-![knr-ops air-gap architecture](docs/air-gap-infra.svg)
+![krops air-gap architecture](docs/air-gap-infra.svg)
 
 ## Prerequisites
 
@@ -92,10 +92,10 @@ needs only the repository checkout and a running engine:
   socket
 - The toolbox image. No semver release has been published yet, so build the
   current checkout with
-  `docker build -f bootstrap-rs/Dockerfile -t knr-ops-toolbox:dev .`
+  `docker build -f bootstrap-rs/Dockerfile -t krops-toolbox:dev .`
 
 A future matching `v*` tag publishes
-`ghcr.io/polarsquad/knr-ops-toolbox` for Linux amd64 and arm64 as `X.Y.Z`,
+`ghcr.io/polarsquad/krops-toolbox` for Linux amd64 and arm64 as `X.Y.Z`,
 `X.Y`, and stable `latest`, with a keyless signature and SPDX SBOM
 attestation. The `aws` environment additionally requires a GitHub PAT with
 read access, AWS credentials and service quotas, and an age private key. The
@@ -116,14 +116,14 @@ Build the current checkout and run the complete local-host lifecycle with only
 Docker installed:
 
 ```sh
-docker build -f bootstrap-rs/Dockerfile -t knr-ops-toolbox:dev .
+docker build -f bootstrap-rs/Dockerfile -t krops-toolbox:dev .
 mkdir -p .kube
 docker run --rm -it \
   -v "$PWD:/workspace" -w /workspace \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v "$PWD/.kube:/root/.kube" \
   -e KUBECONFIG=/workspace/.kube/kind.yaml \
-  knr-ops-toolbox:dev local-host
+  krops-toolbox:dev local-host
 
 # Teardown uses the same mounts and the teardown subcommand:
 docker run --rm -it \
@@ -131,10 +131,10 @@ docker run --rm -it \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v "$PWD/.kube:/root/.kube" \
   -e KUBECONFIG=/workspace/.kube/kind.yaml \
-  knr-ops-toolbox:dev teardown local-host
+  krops-toolbox:dev teardown local-host
 ```
 
-Use `ghcr.io/polarsquad/knr-ops-toolbox:<version>` instead of the local image
+Use `ghcr.io/polarsquad/krops-toolbox:<version>` instead of the local image
 for a published release. The AWS form must also pass the Git source, PAT, age
 key path, and any AWS credential variables. Podman socket paths vary by host.
 `scripts/toolbox-run.sh` handles those mounts, loads `.env` without preserving
@@ -145,14 +145,14 @@ For hosts with mise, the lifecycle tasks call that wrapper. Installing the
 pinned native tools also enables key generation, validation, and inspection:
 
 ```sh
-docker build -f bootstrap-rs/Dockerfile -t knr-ops-toolbox:dev .
-export TOOLBOX_IMAGE=knr-ops-toolbox:dev
+docker build -f bootstrap-rs/Dockerfile -t krops-toolbox:dev .
+export TOOLBOX_IMAGE=krops-toolbox:dev
 mise trust
 mise install
 cp .env.example .env        # aws and local-talos: fill in the Git source and PAT
 mise run sops-keygen         # first time only: age key for SOPS
 mise run bootstrap           # toolbox: bootstrap, Flux handoff, then pivot
-export KUBECONFIG="$PWD/.kube/knr-ops-mgmt.yaml"
+export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
 flux get kustomizations --watch
 mise run validate            # shell syntax, bootstrap.toml cross-check, overlays
 mise run teardown            # toolbox: reverse-order lifecycle cleanup
@@ -169,7 +169,7 @@ The shared toolchain is defined in `mise.toml`. AWS-specific tools are layered
 through `mise.aws.toml`; use the `aws` environment when those tools are
 needed. The `local-host` environment creates the management kind cluster, a
 local OCI registry, and the Flux Operator and FluxInstance. It publishes the
-`mgmt/local-host/` and `workload/local-host/` folders as the `knr-ops:latest`
+`mgmt/local-host/` and `workload/local-host/` folders as the `krops:latest`
 OCI artifact. Flux installs CAPI with its Docker infrastructure provider (CAPD),
 provisions a local one-control-plane/one-worker workload cluster, and installs
 a separate Flux instance there. That workload Flux instance reconciles Podinfo,
@@ -178,11 +178,11 @@ workload delivery and application access. This covers the complete GitOps and
 CAPI lifecycle without provisioning AWS resources:
 
 ```sh
-docker build -f bootstrap-rs/Dockerfile -t knr-ops-toolbox:dev .
-export TOOLBOX_IMAGE=knr-ops-toolbox:dev
+docker build -f bootstrap-rs/Dockerfile -t krops-toolbox:dev .
+export TOOLBOX_IMAGE=krops-toolbox:dev
 mise -E local-host install
 mise -E local-host run bootstrap
-export KUBECONFIG="$PWD/.kube/knr-ops-mgmt.yaml"
+export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
 mise -E local-host run oci-push  # republish local management and workload paths
 mise -E local-host run kubeconfigs
 mise -E local-host run podinfo-port-forward  # http://localhost:9898
@@ -215,15 +215,15 @@ machine, and the site values in
 ```sh
 mise -E local-talos install  # adds talosctl
 mise -E local-talos run bootstrap
-export KUBECONFIG="$PWD/.kube/knr-ops-mgmt.yaml"
+export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
 mise -E local-talos run kubeconfigs
 mise -E local-talos run teardown  # releases the Hardware; never wipes the machine
 ```
 
 ## The bootstrap CLI
 
-The single `knr-bootstrap` binary implements bootstrap, the default pivot, and
-`knr-bootstrap teardown`. Repository-owned cluster names, paths, chart
+The single `krops-bootstrap` binary implements bootstrap, the default pivot, and
+`krops-bootstrap teardown`. Repository-owned cluster names, paths, chart
 versions, provider manifests, and teardown targets come from
 [`bootstrap.toml`](bootstrap.toml); `mise run validate` cross-checks that file
 against the Git manifests. Sequence-level behavior and generic fallback
@@ -240,10 +240,10 @@ teardown controls, toolbox release, and current parity status.
 
 | Page | Contents |
 |---|---|
-| [docs/bootstrap-cli.md](docs/bootstrap-cli.md) | The `knr-bootstrap` lifecycle CLI: toolbox distribution, interface, `bootstrap.toml`, pivot, teardown, parity status |
+| [docs/bootstrap-cli.md](docs/bootstrap-cli.md) | The `krops-bootstrap` lifecycle CLI: toolbox distribution, interface, `bootstrap.toml`, pivot, teardown, parity status |
 | [docs/dependencies.md](docs/dependencies.md) | Renovate-managed dependency updates: covered surfaces, update procedure, intentional differences |
 | [docs/architecture.md](docs/architecture.md) | Architecture diagram, reconciliation order, how workload apps are delivered |
-| [docs/aws-iam.md](docs/aws-iam.md) | EKS Pod Identity, ACK controller IAM roles, per-cluster reader roles, the `knr-ops-reader` console user |
+| [docs/aws-iam.md](docs/aws-iam.md) | EKS Pod Identity, ACK controller IAM roles, per-cluster reader roles, the `krops-reader` console user |
 | [docs/workload-resources.md](docs/workload-resources.md) | S3 bucket security posture, RDS instances, known limitations |
 | [docs/konflate.md](docs/konflate.md) | Rendered Flux PR review: GitHub Actions gate, in-cluster instance, write-back to PRs, tokens |
 | [docs/secrets.md](docs/secrets.md) | SOPS + age secret management, key setup, credential rotation |

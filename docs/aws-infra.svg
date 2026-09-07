@@ -12,7 +12,7 @@
   <rect width="1600" height="1150" fill="#0f0f0f"/>
 
   <!-- ===== title block ===== -->
-  <text x="800" y="60" text-anchor="middle" font-family="DejaVu Sans" font-size="40" font-weight="bold" fill="#ff78c9">knr-ops &#183; GitOps Architecture &#183; 1 Repo &#215; 2 Lifecycles</text>
+  <text x="800" y="60" text-anchor="middle" font-family="DejaVu Sans" font-size="40" font-weight="bold" fill="#ff78c9">krops &#183; GitOps Architecture &#183; 1 Repo &#215; 2 Lifecycles</text>
   <text x="800" y="96" text-anchor="middle" font-family="DejaVu Sans" font-size="19" fill="#8f8f8f">Flux + CAPI/CAPA + ACK &#183; the management plane provisions clusters &#183; workload planes reconcile apps</text>
 
   <!-- ===== section headers ===== -->
@@ -71,7 +71,7 @@
   <rect x="620" y="150" width="400" height="330" rx="14" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
   <rect x="636" y="158" width="368" height="5" rx="2.5" fill="#ab9fd6"/>
   <text x="820" y="198" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#ab9fd6">Git Repository</text>
-  <text x="820" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#8f8f8f">(polarsquad/knr-ops)</text>
+  <text x="820" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#8f8f8f">(polarsquad/krops)</text>
   <!-- folder tree -->
   <g fill="none" stroke-width="1.7">
     <path d="M660,250 h9 l4,5 h15 v16 h-28 z" stroke="#85c7bb"/>

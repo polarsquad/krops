@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# offline-run.sh — autonomous Wi-Fi-off validation of the knr-ops airgap bundle.
+# offline-run.sh — autonomous Wi-Fi-off validation of the krops airgap bundle.
 #
 # This script is designed to run with NO operator and NO LLM/agent attached:
 # it waits until the internet is unreachable, runs the full deploy, verifies,
@@ -21,7 +21,7 @@ LOG=/tmp/airgap-offline-run.log
 SUMMARY=/tmp/airgap-offline-summary.txt
 AIRGAP_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 ARCHIVES="$AIRGAP_DIR/archives"
-PACKAGE_INPUT="${1:-$ARCHIVES/zarf-package-knr-ops-airgap-arm64-0.1.0.tar.zst}"
+PACKAGE_INPUT="${1:-$ARCHIVES/zarf-package-krops-airgap-arm64-0.1.0.tar.zst}"
 PACKAGE_DIR=$(cd "$(dirname "$PACKAGE_INPUT")" && pwd)
 PACKAGE="$PACKAGE_DIR/$(basename "$PACKAGE_INPUT")"
 if [ ! -f "$PACKAGE" ]; then
@@ -45,14 +45,14 @@ if [ -n "${ZARF_VERIFY_KEY:-}" ]; then
 else
   VERIFY_ARGS+=(
     --certificate-identity
-    'https://github.com/polarsquad/knr-ops/.github/workflows/air-gapped.yml@refs/heads/main'
+    'https://github.com/polarsquad/krops/.github/workflows/air-gapped.yml@refs/heads/main'
     --certificate-oidc-issuer
     'https://token.actions.githubusercontent.com'
   )
 fi
 
 export CLUSTER_NAME=airgap-mgmt
-export REGISTRY_NAME=knr-registry-airgap
+export REGISTRY_NAME=krops-registry-airgap
 export REGISTRY_PORT=5002
 MGMT_CTX="kind-airgap-mgmt"
 WL_KCFG=/tmp/airgap-wl.kubeconfig
@@ -200,7 +200,7 @@ if [ -n "$port" ]; then
     wlf=$("$KUBECTL" --kubeconfig="$WL_KCFG" -n flux-system get ocirepository flux-system \
       -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
   done
-  [ "$wlf" = "True" ] && pass "workload Flux sync Ready from knr-registry" || fail "workload Flux sync ready=$wlf"
+  [ "$wlf" = "True" ] && pass "workload Flux sync Ready from krops-registry" || fail "workload Flux sync ready=$wlf"
 
   podinfo=$("$KUBECTL" --kubeconfig="$WL_KCFG" -n podinfo get pods --no-headers 2>/dev/null | grep -c " Running ")
   for i in $(seq 1 20); do

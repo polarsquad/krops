@@ -1,11 +1,11 @@
 ---
 # ══════════════════════════════════════════════════════════════════════════════
 # IAM user for humans: log into the AWS console and assume the per-cluster
-# read-only reader roles (knr-ops-<cluster>-reader, see
+# read-only reader roles (krops-<cluster>-reader, see
 # workload/base/iam-roles/role.yaml) to view the resources this repo creates.
 # Reconciled by the ACK IAM controller on this (management) cluster.
 #
-# The only permission is sts:AssumeRole on knr-ops-*-reader roles — the user
+# The only permission is sts:AssumeRole on krops-*-reader roles — the user
 # can see nothing directly; everything goes through a reader role. The account
 # ID is wildcarded because ${AWS_ACCOUNT_ID} substitution is not available on
 # the management cluster (no cluster-vars ConfigMap here), same as the role
@@ -15,7 +15,7 @@
 # LoginProfile resource in the ACK IAM controller). After the user is
 # reconciled, set the console password ONCE imperatively:
 #
-#   aws iam create-login-profile --user-name knr-ops-reader \
+#   aws iam create-login-profile --user-name krops-reader \
 #     --password '<initial-password>' --password-reset-required
 #
 # See the "Console access" section in docs/aws-iam.md.
@@ -26,17 +26,17 @@ metadata:
   name: reader-user
   namespace: ack-system
 spec:
-  name: knr-ops-reader
+  name: krops-reader
   inlinePolicies:
-    assume-knr-ops-reader-roles: |
+    assume-krops-reader-roles: |
       {
         "Version": "2012-10-17",
         "Statement": [
           {
-            "Sid": "AssumeKnrOpsReaderRoles",
+            "Sid": "AssumeKropsReaderRoles",
             "Effect": "Allow",
             "Action": "sts:AssumeRole",
-            "Resource": "arn:aws:iam::*:role/knr-ops-*-reader"
+            "Resource": "arn:aws:iam::*:role/krops-*-reader"
           }
         ]
       }

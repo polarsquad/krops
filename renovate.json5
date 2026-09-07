@@ -1,5 +1,5 @@
 {
-  // Renovate config for knr-ops (issue #74).
+  // Renovate config for krops (issue #74).
   // Runs via the hosted Renovate GitHub App (issue #90).
   // Version sources covered:
   //   - Flux / Helm / Kubernetes manifests under mgmt/ and workload/
@@ -357,7 +357,7 @@
     },
     // EKS addon versions (*-eksbuild.*) intentionally not managed: they have
     // no public registry datasource. Tracked in issue #74 as manual updates.
-    // The locally built localhost:5001/knr-ops-airgap:latest artifact is
+    // The locally built localhost:5001/krops-airgap:latest artifact is
     // extracted but intentionally disabled by the scoped packageRule below.
     // ── end customManagers ────────────────────────────────────────────────
   ],
@@ -375,7 +375,7 @@
     {
       "description": "Do not resolve the air-gap config artifact built locally per run",
       "matchDatasources": ["docker"],
-      "matchPackageNames": ["localhost:5001/knr-ops-airgap"],
+      "matchPackageNames": ["localhost:5001/krops-airgap"],
       "matchFileNames": [
         "airgap/images.txt",
         "airgap/zarf.yaml",

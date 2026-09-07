@@ -1,4 +1,4 @@
-//! knr-bootstrap – One-time imperative bootstrap for the management cluster.
+//! krops-bootstrap – One-time imperative bootstrap for the management cluster.
 //! Everything after this program runs is driven by GitOps (Flux).
 //!
 //! Rust port of `bootstrap.sh` including its default exit: unless
@@ -15,7 +15,7 @@
 //!
 //! Everything repository-specific (names, paths, chart pins, environments)
 //! comes from `bootstrap.toml` (see `config.rs`, issue #98); the binary is
-//! a generic bootstrap engine and knr-ops is its first consumer.
+//! a generic bootstrap engine and krops is its first consumer.
 
 mod config;
 mod teardown;
@@ -44,21 +44,21 @@ const DEFAULT_REGISTRY_READY_RETRIES: u32 = 120;
 const DEFAULT_LOCAL_RECONCILE_TIMEOUT: &str = "15m";
 const DEFAULT_GITHUB_USER: &str = "git";
 const DEFAULT_AGE_KEY_FILE: &str = "age.agekey";
-const DEFAULT_OCI_REPOSITORY: &str = "knr-ops";
+const DEFAULT_OCI_REPOSITORY: &str = "krops";
 const DEFAULT_OCI_TAG: &str = "latest";
 const NODE_READY_TIMEOUT: &str = "120s";
 
 // Pivot defaults mirroring pivot.sh's `${VAR:-default}` values. The
 // repository-specific defaults (mgmt cluster names, ready timeouts, kind
 // names, contexts, namespaces) come from bootstrap.toml instead.
-const DEFAULT_MGMT_KUBECONFIG_RELATIVE: &str = ".kube/knr-ops-mgmt.yaml";
+const DEFAULT_MGMT_KUBECONFIG_RELATIVE: &str = ".kube/krops-mgmt.yaml";
 const DEFAULT_MGMT_POLL_INTERVAL: u64 = 10;
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
 
 /// Resolve the active environment name the way bootstrap.sh does
-/// (`PROFILE="${KNR_OPS_PROFILE:-${1:-aws}}"`): a non-empty
-/// KNR_OPS_PROFILE wins over the positional argument, then the config's
+/// (`PROFILE="${KROPS_PROFILE:-${1:-aws}}"`): a non-empty
+/// KROPS_PROFILE wins over the positional argument, then the config's
 /// bootstrap.default-environment. clap resolves positional-over-env (the
 /// opposite), so the env var is read manually instead of #[arg(env)].
 /// The name must be an [environments.*] section of bootstrap.toml; the
@@ -76,7 +76,7 @@ fn resolve_environment(
     config.environment(name).map(|_| name.to_string())
 }
 
-/// One-time imperative bootstrap for the knr-ops management cluster.
+/// One-time imperative bootstrap for the krops management cluster.
 ///
 /// Behavioral port of bootstrap.sh: the CLI surface is the script's
 /// surface — a positional profile, `--recreate`, and the environment.
@@ -84,9 +84,9 @@ fn resolve_environment(
 /// (see `Config`); the expanded flag interface is deferred for separate
 /// review in a follow-up.
 #[derive(Parser, Debug)]
-#[command(name = "knr-bootstrap", version, about)]
+#[command(name = "krops-bootstrap", version, about)]
 struct Cli {
-    /// Deployment profile (a non-empty KNR_OPS_PROFILE takes precedence
+    /// Deployment profile (a non-empty KROPS_PROFILE takes precedence
     /// over this argument, matching bootstrap.sh; default: the config's
     /// bootstrap.default-environment). Valid names are the
     /// [environments.*] sections of bootstrap.toml.
@@ -110,7 +110,7 @@ struct Cli {
 enum SubCommand {
     /// Destroy all infrastructure the bootstrap created, in reverse order.
     Teardown {
-        /// Deployment profile (KNR_OPS_PROFILE takes precedence, as
+        /// Deployment profile (KROPS_PROFILE takes precedence, as
         /// everywhere else; default: bootstrap.default-environment).
         profile: Option<String>,
     },
@@ -191,7 +191,7 @@ impl Config {
         let with_default =
             |name: &str, default: &str| value(name).unwrap_or_else(|| default.to_string());
         let profile = resolve_environment(
-            value("KNR_OPS_PROFILE").as_deref(),
+            value("KROPS_PROFILE").as_deref(),
             cli.profile.as_deref(),
             &repo,
         )?;
@@ -235,7 +235,7 @@ impl Config {
             ),
             container_engine: value("CONTAINER_ENGINE"),
             engine_sock: value("ENGINE_SOCK"),
-            toolbox: with_default("KNR_TOOLBOX", "0") == "1",
+            toolbox: with_default("KROPS_TOOLBOX", "0") == "1",
             git_repo_url: value("GIT_REPO_URL"),
             github_token: value("GITHUB_TOKEN"),
             github_user: with_default("GITHUB_USER", DEFAULT_GITHUB_USER),
@@ -264,7 +264,7 @@ impl Config {
     }
 }
 
-/// Default management kubeconfig path: `$HOME/.kube/knr-ops-mgmt.yaml`
+/// Default management kubeconfig path: `$HOME/.kube/krops-mgmt.yaml`
 /// (pivot.sh `MGMT_KUBECONFIG` default).
 fn default_mgmt_kubeconfig() -> PathBuf {
     std::env::var_os("HOME")
@@ -327,10 +327,10 @@ fn toolbox_kubeconfig_path(toolbox: bool, kubeconfig: Option<&str>) -> Result<Op
     }
     let path = kubeconfig
         .filter(|value| !value.is_empty())
-        .context("KUBECONFIG must name one writable file when KNR_TOOLBOX=1")?;
+        .context("KUBECONFIG must name one writable file when KROPS_TOOLBOX=1")?;
     ensure!(
         !path.contains(':'),
-        "KUBECONFIG must name a single file when KNR_TOOLBOX=1"
+        "KUBECONFIG must name a single file when KROPS_TOOLBOX=1"
     );
     Ok(Some(PathBuf::from(path)))
 }
@@ -766,7 +766,7 @@ fn toolbox_container_id() -> Option<String> {
 }
 
 /// Attach the toolbox container to the kind network so kind-network
-/// endpoints (the internal API server, knr-registry:5000) resolve.
+/// endpoints (the internal API server, krops-registry:5000) resolve.
 /// Idempotent: docker exits 0 on re-attach, but podman errors with "is
 /// already connected", so failures are retried against a captured-error
 /// check instead of string-matching the (inherited) stderr.
@@ -775,7 +775,7 @@ pub(crate) async fn toolbox_join_kind_network(cfg: &Config, engine: &str) -> Res
         return Ok(());
     }
     let Some(id) = toolbox_container_id() else {
-        bail!("KNR_TOOLBOX=1 but /etc/hostname is unreadable; cannot join the kind network");
+        bail!("KROPS_TOOLBOX=1 but /etc/hostname is unreadable; cannot join the kind network");
     };
     let out = Command::new(engine)
         .args(["network", "connect", "kind", &id])
@@ -2281,7 +2281,7 @@ async fn main() -> Result<()> {
     // bootstrap Config resolution (which validates bootstrap/pivot knobs).
     if let Some(SubCommand::Teardown { profile }) = &cli.command {
         let name = resolve_environment(
-            std::env::var("KNR_OPS_PROFILE")
+            std::env::var("KROPS_PROFILE")
                 .ok()
                 .filter(|v| !v.is_empty())
                 .as_deref(),
@@ -2304,7 +2304,7 @@ async fn main() -> Result<()> {
             local_reconcile_timeout: DEFAULT_LOCAL_RECONCILE_TIMEOUT.to_string(),
             container_engine: std::env::var("CONTAINER_ENGINE").ok(),
             engine_sock: std::env::var("ENGINE_SOCK").ok(),
-            toolbox: std::env::var("KNR_TOOLBOX").is_ok_and(|value| value == "1"),
+            toolbox: std::env::var("KROPS_TOOLBOX").is_ok_and(|value| value == "1"),
             git_repo_url: None,
             github_token: None,
             github_user: DEFAULT_GITHUB_USER.to_string(),
@@ -2326,7 +2326,7 @@ async fn main() -> Result<()> {
 
     let cfg = Config::load(&cli, repo)?;
     let http = reqwest::Client::builder()
-        .user_agent(concat!("knr-bootstrap/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("krops-bootstrap/", env!("CARGO_PKG_VERSION")))
         .connect_timeout(HTTP_CONNECT_TIMEOUT)
         .timeout(HTTP_REQUEST_TIMEOUT)
         .build()
@@ -2443,7 +2443,7 @@ mod tests {
 
     // A Config skeleton for tests that only exercise profile-gated logic.
     fn teardown_minimal_config() -> Config {
-        let cli = Cli::try_parse_from(["knr-bootstrap", "aws"]).unwrap();
+        let cli = Cli::try_parse_from(["krops-bootstrap", "aws"]).unwrap();
         Config::from_env(&cli, repo_config(), |_| None).unwrap()
     }
 
@@ -2458,7 +2458,7 @@ mod tests {
     fn cli_rejects_unknown_profile() {
         // Positional profile names are validated against bootstrap.toml at
         // resolution time (they name [environments.*] sections), not by clap.
-        let cli = Cli::try_parse_from(["knr-bootstrap", "bogus"]).unwrap();
+        let cli = Cli::try_parse_from(["krops-bootstrap", "bogus"]).unwrap();
         assert!(Config::from_env(&cli, repo_config(), |_| None).is_err());
     }
 
@@ -2467,19 +2467,19 @@ mod tests {
         // The expanded flag interface is deferred (review follow-up): the
         // CLI accepts only the positional profile and --recreate.
         for rejected in [
-            ["knr-bootstrap", "--registry-port", "5500"],
-            ["knr-bootstrap", "--github-token", "x"],
-            ["knr-bootstrap", "--oci-tag", "dev"],
-            ["knr-bootstrap", "--container-engine", "docker"],
+            ["krops-bootstrap", "--registry-port", "5500"],
+            ["krops-bootstrap", "--github-token", "x"],
+            ["krops-bootstrap", "--oci-tag", "dev"],
+            ["krops-bootstrap", "--container-engine", "docker"],
             // Pivot knobs are env-only (BOOTSTRAP_PIVOT / PIVOT_SKIP_DELETE),
             // per the #95 entry-point decision: no new CLI surface.
-            ["knr-bootstrap", "aws", "--no-pivot"],
-            ["knr-bootstrap", "aws", "--pivot"],
-            ["knr-bootstrap", "--mgmt-kubeconfig", "/tmp/x.yaml"],
+            ["krops-bootstrap", "aws", "--no-pivot"],
+            ["krops-bootstrap", "aws", "--pivot"],
+            ["krops-bootstrap", "--mgmt-kubeconfig", "/tmp/x.yaml"],
             // Teardown knobs are env-only too (AWS_ONLY /
             // FORCE_KIND_DELETE), matching teardown.sh's interface.
-            ["knr-bootstrap", "teardown", "--aws-only"],
-            ["knr-bootstrap", "teardown", "--force-kind-delete"],
+            ["krops-bootstrap", "teardown", "--aws-only"],
+            ["krops-bootstrap", "teardown", "--force-kind-delete"],
         ] {
             assert!(
                 Cli::try_parse_from(rejected).is_err(),
@@ -2491,7 +2491,7 @@ mod tests {
     #[test]
     fn config_defaults_match_script() {
         let cfg = config_from(
-            &Cli::try_parse_from(["knr-bootstrap", "local-host"]).unwrap(),
+            &Cli::try_parse_from(["krops-bootstrap", "local-host"]).unwrap(),
             |_| None,
         );
         assert_eq!(cfg.profile, "local-host");
@@ -2501,7 +2501,7 @@ mod tests {
         assert_eq!(cfg.local_reconcile_timeout, "15m");
         assert_eq!(cfg.github_user, "git");
         assert_eq!(cfg.age_key_file, PathBuf::from("age.agekey"));
-        assert_eq!(cfg.oci_repository, "knr-ops");
+        assert_eq!(cfg.oci_repository, "krops");
         assert_eq!(cfg.oci_tag, "latest");
         assert!(cfg.container_engine.is_none());
         assert!(cfg.git_repo_url.is_none());
@@ -2526,7 +2526,7 @@ mod tests {
             ),
             ("capd-system", "docker")
         );
-        assert_eq!(cfg.repo.bootstrap.registry_name, "knr-registry");
+        assert_eq!(cfg.repo.bootstrap.registry_name, "krops-registry");
         assert_eq!(cfg.repo.bootstrap.flux_namespace, "flux-system");
         assert_eq!(cfg.repo.bootstrap.mgmt_namespace, "default");
         assert_eq!(cfg.repo.charts["flux-operator"], "0.58.0");
@@ -2534,7 +2534,7 @@ mod tests {
 
     #[test]
     fn config_reads_env_knobs_with_script_semantics() {
-        let cli = Cli::try_parse_from(["knr-bootstrap"]).unwrap();
+        let cli = Cli::try_parse_from(["krops-bootstrap"]).unwrap();
         let get = |name: &str| -> Option<String> {
             match name {
                 "REGISTRY_PORT" => Some("5500".into()),
@@ -2555,7 +2555,7 @@ mod tests {
 
     #[test]
     fn config_reads_pivot_knobs_with_script_semantics() {
-        let cli = Cli::try_parse_from(["knr-bootstrap", "aws"]).unwrap();
+        let cli = Cli::try_parse_from(["krops-bootstrap", "aws"]).unwrap();
         let get = |name: &str| -> Option<String> {
             match name {
                 "BOOTSTRAP_PIVOT" => Some("0".into()),
@@ -2578,9 +2578,9 @@ mod tests {
 
     #[test]
     fn config_reads_toolbox_runtime_knobs() {
-        let cli = Cli::try_parse_from(["knr-bootstrap", "local-host"]).unwrap();
+        let cli = Cli::try_parse_from(["krops-bootstrap", "local-host"]).unwrap();
         let cfg = config_from(&cli, |name| match name {
-            "KNR_TOOLBOX" => Some("1".into()),
+            "KROPS_TOOLBOX" => Some("1".into()),
             "ENGINE_SOCK" => Some("/run/user/501/podman/podman.sock".into()),
             _ => None,
         });
@@ -2590,14 +2590,14 @@ mod tests {
             cfg.engine_sock.as_deref(),
             Some("/run/user/501/podman/podman.sock")
         );
-        assert_eq!(cfg.registry_endpoint(), ("knr-registry".into(), 5000));
+        assert_eq!(cfg.registry_endpoint(), ("krops-registry".into(), 5000));
         assert!(!cfg.should_rewrite_capd_endpoint());
     }
 
     #[test]
     fn host_runtime_keeps_localhost_endpoints() {
         let cfg = config_from(
-            &Cli::try_parse_from(["knr-bootstrap", "local-host"]).unwrap(),
+            &Cli::try_parse_from(["krops-bootstrap", "local-host"]).unwrap(),
             |_| None,
         );
 
@@ -2702,7 +2702,7 @@ mod tests {
 
     #[test]
     fn config_rejects_invalid_poll_interval() {
-        let cli = Cli::try_parse_from(["knr-bootstrap", "aws"]).unwrap();
+        let cli = Cli::try_parse_from(["krops-bootstrap", "aws"]).unwrap();
         let err = Config::from_env(&cli, repo_config(), |name| match name {
             "MGMT_POLL_INTERVAL" => Some("often".into()),
             _ => None,
@@ -2715,7 +2715,7 @@ mod tests {
     fn config_rejects_zero_poll_interval() {
         // 0 parses as u64 but divides by zero in the Phase 1 attempt
         // arithmetic; reject it at startup like any other invalid value.
-        let cli = Cli::try_parse_from(["knr-bootstrap", "aws"]).unwrap();
+        let cli = Cli::try_parse_from(["krops-bootstrap", "aws"]).unwrap();
         let err = Config::from_env(&cli, repo_config(), |name| match name {
             "MGMT_POLL_INTERVAL" => Some("0".into()),
             _ => None,
@@ -2726,7 +2726,7 @@ mod tests {
 
     #[test]
     fn config_rejects_invalid_ready_timeout() {
-        let cli = Cli::try_parse_from(["knr-bootstrap", "aws"]).unwrap();
+        let cli = Cli::try_parse_from(["krops-bootstrap", "aws"]).unwrap();
         let err = Config::from_env(&cli, repo_config(), |name| match name {
             "MGMT_READY_TIMEOUT" => Some("abc".into()),
             _ => None,
@@ -2755,7 +2755,7 @@ mod tests {
         // the Python cross-check (mise run validate) additionally verifies
         // every declared path exists on disk.
         let cfg = config_from(
-            &Cli::try_parse_from(["knr-bootstrap", "aws"]).unwrap(),
+            &Cli::try_parse_from(["krops-bootstrap", "aws"]).unwrap(),
             |_| None,
         );
         assert_eq!(cfg.environment.mgmt_cluster, "eu-north-1-management");
@@ -2779,7 +2779,7 @@ mod tests {
         );
 
         let cfg = config_from(
-            &Cli::try_parse_from(["knr-bootstrap", "local-host"]).unwrap(),
+            &Cli::try_parse_from(["krops-bootstrap", "local-host"]).unwrap(),
             |_| None,
         );
         assert_eq!(cfg.environment.mgmt_cluster, "local-management");
@@ -2806,7 +2806,7 @@ mod tests {
 
     #[test]
     fn config_rejects_non_numeric_registry_port() {
-        let cli = Cli::try_parse_from(["knr-bootstrap", "local-host"]).unwrap();
+        let cli = Cli::try_parse_from(["krops-bootstrap", "local-host"]).unwrap();
         let err = Config::from_env(&cli, repo_config(), |name| match name {
             "REGISTRY_PORT" => Some("not-a-port".into()),
             _ => None,
@@ -2818,7 +2818,7 @@ mod tests {
     #[test]
     fn environment_resolution_matches_script_precedence() {
         let repo = repo_config();
-        // Non-empty env wins over the positional, like ${KNR_OPS_PROFILE:-${1:-aws}}.
+        // Non-empty env wins over the positional, like ${KROPS_PROFILE:-${1:-aws}}.
         assert_eq!(
             resolve_environment(Some("aws"), Some("local-host"), &repo).unwrap(),
             "aws"
@@ -2850,28 +2850,28 @@ mod tests {
 
     #[test]
     fn cli_accepts_recreate_flag() {
-        let cli = Cli::try_parse_from(["knr-bootstrap", "aws", "--recreate"]).unwrap();
+        let cli = Cli::try_parse_from(["krops-bootstrap", "aws", "--recreate"]).unwrap();
         assert!(cli.recreate);
     }
 
     #[test]
     fn parse_github_repo_accepts_https_urls() {
         for url in [
-            "https://github.com/polarsquad/knr-ops",
-            "https://github.com/polarsquad/knr-ops/",
-            "https://github.com/polarsquad/knr-ops.git",
+            "https://github.com/polarsquad/krops",
+            "https://github.com/polarsquad/krops/",
+            "https://github.com/polarsquad/krops.git",
         ] {
-            assert_eq!(parse_github_repo(url), Some("polarsquad/knr-ops"), "{url}");
+            assert_eq!(parse_github_repo(url), Some("polarsquad/krops"), "{url}");
         }
     }
 
     #[test]
     fn parse_github_repo_rejects_bad_urls() {
         for url in [
-            "git@github.com:polarsquad/knr-ops.git",
-            "https://gitlab.com/polarsquad/knr-ops",
+            "git@github.com:polarsquad/krops.git",
+            "https://gitlab.com/polarsquad/krops",
             "https://github.com/polarsquad",
-            "https://github.com//knr-ops",
+            "https://github.com//krops",
             "https://github.com/polarsquad/",
             "",
         ] {
@@ -2920,13 +2920,13 @@ mod tests {
 
     #[test]
     fn kind_config_includes_registry_patch_for_local_host_only() {
-        let local = render_kind_config(true, 5001, "/var/run/docker.sock", "knr-registry");
+        let local = render_kind_config(true, 5001, "/var/run/docker.sock", "krops-registry");
         assert!(local.contains("containerdConfigPatches"));
         assert!(local.contains("localhost:5001"));
-        assert!(local.contains("http://knr-registry:5000"));
+        assert!(local.contains("http://krops-registry:5000"));
         assert!(local.contains("hostPath: /var/run/docker.sock"));
 
-        let aws = render_kind_config(false, 5001, "/var/run/docker.sock", "knr-registry");
+        let aws = render_kind_config(false, 5001, "/var/run/docker.sock", "krops-registry");
         assert!(!aws.contains("containerdConfigPatches"));
         assert!(aws.contains("kind: Cluster"));
         assert!(aws.contains("role: control-plane"));

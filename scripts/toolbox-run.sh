@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# toolbox-run.sh – thin wrapper that runs the knr-ops toolbox container
+# toolbox-run.sh – thin wrapper that runs the krops toolbox container
 # (issue #104). The raw `docker run`/`podman run` invocation in
 # docs/operations.md is the primary interface; `mise run bootstrap|pivot|
 # teardown` call this wrapper for hosts that already have mise.
@@ -17,17 +17,17 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
-TOOLBOX_IMAGE="${TOOLBOX_IMAGE:-ghcr.io/polarsquad/knr-ops-toolbox:latest}"
+TOOLBOX_IMAGE="${TOOLBOX_IMAGE:-ghcr.io/polarsquad/krops-toolbox:latest}"
 
 usage() {
   cat >&2 <<EOF
-Usage: scripts/toolbox-run.sh <bootstrap|pivot|teardown> [extra knr-bootstrap args]
+Usage: scripts/toolbox-run.sh <bootstrap|pivot|teardown> [extra krops-bootstrap args]
 
 Env:
   TOOLBOX_IMAGE   image reference (default: ${TOOLBOX_IMAGE};
                   build locally with: docker build -f bootstrap-rs/Dockerfile \\
-                    -t knr-ops-toolbox:dev . && TOOLBOX_IMAGE=knr-ops-toolbox:dev)
-  KNR_OPS_PROFILE aws | local-host | local-talos
+                    -t krops-toolbox:dev . && TOOLBOX_IMAGE=krops-toolbox:dev)
+  KROPS_PROFILE aws | local-host | local-talos
                   (default: the mise environment in use)
 EOF
   exit 2
@@ -109,7 +109,7 @@ fi
 PASS_ENV=(
   -e CONTAINER_ENGINE
   -e ENGINE_SOCK
-  -e KNR_OPS_PROFILE
+  -e KROPS_PROFILE
   -e REGISTRY_PORT
   -e OCI_REPOSITORY
   -e OCI_TAG

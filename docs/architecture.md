@@ -13,14 +13,14 @@ managing secure S3 buckets, PostgreSQL instances, and read-only IAM roles)
 running on each workload cluster.
 
 The operator normally runs the imperative lifecycle through the
-`knr-ops-toolbox` container. It mounts the host engine socket, joins the kind
+`krops-toolbox` container. It mounts the host engine socket, joins the kind
 network while the bootstrap cluster exists, and leaves no toolbox workload in
 the managed clusters. This packaging changes the host tool boundary, not the
 Flux or CAPI reconciliation architecture.
 
 ```mermaid
 flowchart TD
-    subgraph bootstrap["Bootstrap (one-time, knr-bootstrap CLI)"]
+    subgraph bootstrap["Bootstrap (one-time, krops-bootstrap CLI)"]
         KIND[kind cluster: mgmt, disposable]
         HELM[Helm: flux-operator + FluxInstance]
         SEC[Secrets: flux-github-pat + sops-age]
@@ -28,7 +28,7 @@ flowchart TD
         KIND --> SEC
     end
 
-    subgraph git["Git: github.com/polarsquad/knr-ops"]
+    subgraph git["Git: github.com/polarsquad/krops"]
         REPO[(main branch)]
     end
 
@@ -46,7 +46,7 @@ flowchart TD
         CAAPH[caaph-system]
         ACKC["ack-controllers (SOPS creds)<br/>ACK IAM + EKS controllers"]
         ACKPI["ack-pod-identity<br/>IAM Role + PodIdentityAssociations"]
-        AWSIAM["aws-iam<br/>knr-ops-reader console user"]
+        AWSIAM["aws-iam<br/>krops-reader console user"]
         KONF["konflate (SOPS token)<br/>rendered Flux PR review"]
         EUN[eu-north-1 cluster def]
         EUW[eu-west-1 cluster def]
@@ -68,16 +68,16 @@ flowchart TD
     subgraph aws["AWS"]
         EKS1[EKS: eu-north-1-workload<br/>ARM + GPU node pools<br/>pod-identity agent addon]
         EKS2[EKS: eu-west-1-workload<br/>ARM + GPU node pools<br/>pod-identity agent addon]
-        ROLE[IAM Role: knr-ops-ack-s3-controller<br/>trust: pods.eks.amazonaws.com]
-        RDSROLE[IAM Role: knr-ops-ack-rds-controller<br/>trust: pods.eks.amazonaws.com]
-        IAMROLE[IAM Role: knr-ops-ack-iam-controller<br/>trust: pods.eks.amazonaws.com]
-        B1[(S3: knr-ops-...-eu-north-1-workload-data)]
-        B2[(S3: knr-ops-...-eu-west-1-workload-data)]
-        DB1[(RDS: knr-ops-eu-north-1-workload-db)]
-        DB2[(RDS: knr-ops-eu-west-1-workload-db)]
-        RD1[IAM Role: knr-ops-eu-north-1-workload-reader<br/>trust: account root]
-        RD2[IAM Role: knr-ops-eu-west-1-workload-reader<br/>trust: account root]
-        RUSER[IAM User: knr-ops-reader<br/>console login, assumes reader roles]
+        ROLE[IAM Role: krops-ack-s3-controller<br/>trust: pods.eks.amazonaws.com]
+        RDSROLE[IAM Role: krops-ack-rds-controller<br/>trust: pods.eks.amazonaws.com]
+        IAMROLE[IAM Role: krops-ack-iam-controller<br/>trust: pods.eks.amazonaws.com]
+        B1[(S3: krops-...-eu-north-1-workload-data)]
+        B2[(S3: krops-...-eu-west-1-workload-data)]
+        DB1[(RDS: krops-eu-north-1-workload-db)]
+        DB2[(RDS: krops-eu-west-1-workload-db)]
+        RD1[IAM Role: krops-eu-north-1-workload-reader<br/>trust: account root]
+        RD2[IAM Role: krops-eu-west-1-workload-reader<br/>trust: account root]
+        RUSER[IAM User: krops-reader<br/>console login, assumes reader roles]
     end
 
     EUN -->|CAPA provisions| EKS1
@@ -156,7 +156,7 @@ laptop.
 The management cluster also runs a single
 [konflate](https://github.com/home-operations/konflate) instance
 (`mgmt/aws/infrastructure/konflate/`), pointed at this repo
-(`github://polarsquad/knr-ops`, rendering from the repo root). It renders each
+(`github://polarsquad/krops`, rendering from the repo root). It renders each
 open PR at its merge-base and head and shows the diff of the *rendered* Flux
 output — blast radius, image changes, render failures, and danger lint —
 instead of the raw file diff. Results reach the PR two ways: a GitHub Actions

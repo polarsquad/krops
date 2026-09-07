@@ -1,6 +1,6 @@
-# Contributing to knr-ops
+# Contributing to krops
 
-knr-ops is a working reference implementation, not a product: it shows how to
+krops is a working reference implementation, not a product: it shows how to
 run cloud infrastructure through the Kubernetes API with CAPI, Flux, and
 provider operators, and nothing else. Contributions that sharpen that
 demonstration, make it reproducible on more platforms, or make it safer to
@@ -18,7 +18,7 @@ Work is organized into numbered milestones that build on each other.
 | Milestone | State | What it delivered or still owes |
 |---|---|---|
 | 1-renovate-foundations | closed | Renovate as the hosted GitHub App, the central version catalog retired, a shared integration-test harness (`tests/renovate_harness.py`) |
-| 2-rust-bootstrap | closed | `knr-bootstrap`, the Rust CLI covering bootstrap, pivot, and teardown; `bootstrap.toml` as the repository-owned configuration; the toolbox container image |
+| 2-rust-bootstrap | closed | `krops-bootstrap`, the Rust CLI covering bootstrap, pivot, and teardown; `bootstrap.toml` as the repository-owned configuration; the toolbox container image |
 | 3-environments | open | `local-talos` wiring and docs are on `main`; the hardware acceptance run (#105) is pending. Azure via ASO (#71) and GCP via Config Connector (#72) are unstarted |
 | 4-hardening | open | Air-gap supply chain (#80): digest pins everywhere, signed SBOMs, offline verification, transactional updates. The build, signing, and publication model needs a design decision first (#138) |
 
@@ -43,10 +43,10 @@ the best places to start if you are new to the repository.
 
 Labels mark the entry points:
 
-- [`good first issue`](https://github.com/polarsquad/knr-ops/labels/good%20first%20issue):
+- [`good first issue`](https://github.com/polarsquad/krops/labels/good%20first%20issue):
   scoped, self-contained, no cloud account or hardware needed. Mostly
   documentation and script fixes.
-- [`help wanted`](https://github.com/polarsquad/knr-ops/labels/help%20wanted):
+- [`help wanted`](https://github.com/polarsquad/krops/labels/help%20wanted):
   larger items the maintainers are not actively working on, including the
   Azure and GCP providers and the Python test tooling.
 - `bug`, `documentation`, `enhancement` classify the change type.
@@ -81,12 +81,12 @@ The toolbox container is the primary lifecycle interface; native tools are
 for development and validation.
 
 ```sh
-git clone https://github.com/polarsquad/knr-ops.git
-cd knr-ops
+git clone https://github.com/polarsquad/krops.git
+cd krops
 mise trust
 mise install                 # kubectl, kind, flux, sops, age, kustomize, ...
-docker build -f bootstrap-rs/Dockerfile -t knr-ops-toolbox:dev .
-export TOOLBOX_IMAGE=knr-ops-toolbox:dev
+docker build -f bootstrap-rs/Dockerfile -t krops-toolbox:dev .
+export TOOLBOX_IMAGE=krops-toolbox:dev
 mise run validate            # must pass on a clean checkout before you change anything
 ```
 
@@ -228,6 +228,6 @@ Run the checks that match what you touched. CI runs all of them.
 
 ## License
 
-knr-ops is licensed under the Apache License 2.0 (`LICENSE`). By submitting a
+krops is licensed under the Apache License 2.0 (`LICENSE`). By submitting a
 contribution you agree that it is licensed under the same terms. The project
 does not currently require a Developer Certificate of Origin sign-off.

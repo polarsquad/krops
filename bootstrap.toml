@@ -1,6 +1,6 @@
-# Repository-owned configuration for knr-bootstrap (issue #98).
+# Repository-owned configuration for krops-bootstrap (issue #98).
 #
-# Everything knr-ops-specific the binary needs is declared here; the binary
+# Everything krops-specific the binary needs is declared here; the binary
 # itself is a generic bootstrap engine. Environment variables (REGISTRY_PORT,
 # GIT_REPO_URL, BOOTSTRAP_KUBECONTEXT, ...) keep their precedence over these
 # values at runtime. Locate this file with BOOTSTRAP_CONFIG when not running
@@ -10,7 +10,7 @@
 # to preserve bootstrap.sh's exact wording ('local-host' before 'aws').
 #
 # Profile resolution: the [environments.*] section name is authoritative;
-# KNR_OPS_PROFILE matches it exactly. Each environment's `kind` restates
+# KROPS_PROFILE matches it exactly. Each environment's `kind` restates
 # the section name, and the cross-check fails if the two disagree.
 
 [bootstrap]
@@ -18,12 +18,12 @@ default-environment = "aws"
 git-branch = "main"
 kind-cluster = "mgmt"
 kind-context = "kind-mgmt"
-registry-name = "knr-registry"
+registry-name = "krops-registry"
 flux-namespace = "flux-system"
 github-pat-secret = "flux-github-pat"
 sops-age-secret = "sops-age"
 mgmt-namespace = "default"
-mgmt-context = "knr-ops-mgmt"
+mgmt-context = "krops-mgmt"
 
 [charts]
 # Chart versions installed imperatively before Flux exists. Keep in sync
@@ -40,7 +40,7 @@ cert-manager = "1.21.1"
 capi-operator = "0.28.0"
 
 [teardown]
-# Constants for `knr-bootstrap teardown` (issue #100), mirroring the literal
+# Constants for `krops-bootstrap teardown` (issue #100), mirroring the literal
 # lists in teardown.sh; tests/test-bootstrap-config.py cross-checks them
 # against the Git manifests that define the same names.
 # CloudFormation stack created by `clusterawsadm bootstrap iam`.
@@ -49,17 +49,17 @@ cfn-stack-name = "cluster-api-provider-aws-sigs-k8s-io"
 # (mgmt/aws/infrastructure/ack-pod-identity/) and the per-cluster reader
 # roles created by the workload ACK IAM controllers.
 global-iam-roles = [
-  "knr-ops-ack-s3-controller",
-  "knr-ops-ack-rds-controller",
-  "knr-ops-ack-iam-controller",
-  "knr-ops-eu-north-1-workload-reader",
-  "knr-ops-eu-west-1-workload-reader",
+  "krops-ack-s3-controller",
+  "krops-ack-rds-controller",
+  "krops-ack-iam-controller",
+  "krops-eu-north-1-workload-reader",
+  "krops-eu-west-1-workload-reader",
 ]
 # The console reader user created by the management cluster's ACK IAM
 # controller (mgmt/aws/infrastructure/aws-global-iam/reader-user.yaml).
-global-iam-users = ["knr-ops-reader"]
+global-iam-users = ["krops-reader"]
 # S3 bucket pattern (workload/base/s3-buckets/bucket.yaml).
-s3-bucket-pattern = "knr-ops-{account_id}-{cluster_name}-data"
+s3-bucket-pattern = "krops-{account_id}-{cluster_name}-data"
 
 [environments.local-host]
 kind = "local-host"
@@ -126,13 +126,13 @@ mgmt-iam-role-prefix = "eu-north-1-management"
 region = "eu-north-1"
 cluster-name = "eu-north-1-workload"
 eks-cluster-name = "default_eu-north-1-workload-control-plane"
-rds-instance = "knr-ops-eu-north-1-workload-db"
+rds-instance = "krops-eu-north-1-workload-db"
 
 [[environments.aws.teardown.aws-workloads]]
 region = "eu-west-1"
 cluster-name = "eu-west-1-workload"
 eks-cluster-name = "default_eu-west-1-workload-control-plane"
-rds-instance = "knr-ops-eu-west-1-workload-db"
+rds-instance = "krops-eu-west-1-workload-db"
 
 [environments.local-talos]
 kind = "local-talos"

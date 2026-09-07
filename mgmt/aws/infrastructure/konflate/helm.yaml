@@ -4,7 +4,7 @@
 #
 # Reviews this repo's open PRs as RENDERED Flux diffs (blast radius, image
 # changes, render failures, danger lint) instead of raw file diffs. A single
-# instance on the MANAGEMENT cluster tracks github://polarsquad/knr-ops and
+# instance on the MANAGEMENT cluster tracks github://polarsquad/krops and
 # renders from the repo root, which is where every Flux Kustomization path in
 # this repo (./mgmt/aws/..., ./workload/...) resolves against.
 #
@@ -55,7 +55,7 @@ spec:
   values:
     config:
       # Forge URI of the repository to review.
-      repo: github://polarsquad/knr-ops
+      repo: github://polarsquad/krops
       # Empty cluster path = render from the repo root, matching this repo's
       # root-relative Flux Kustomization paths.
       clusterPath: ""

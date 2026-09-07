@@ -1,6 +1,6 @@
 # Security policy
 
-knr-ops is a reference implementation of a GitOps pattern for managing cloud
+krops is a reference implementation of a GitOps pattern for managing cloud
 infrastructure through the Kubernetes API. It is not a product with a
 release cadence, but its manifests, scripts, CLI, container image, and CI
 workflows provision real cloud resources and handle real credentials, so
@@ -9,7 +9,7 @@ security reports are taken seriously.
 ## Reporting a vulnerability
 
 Report privately through GitHub:
-[Report a vulnerability](https://github.com/polarsquad/knr-ops/security/advisories/new).
+[Report a vulnerability](https://github.com/polarsquad/krops/security/advisories/new).
 This opens a draft security advisory visible only to the repository
 maintainers.
 
@@ -36,7 +36,7 @@ is merged.
 ## Supported versions
 
 Only `main` is supported. There are no release branches. The toolbox image
-`ghcr.io/polarsquad/knr-ops-toolbox` is published from `v*` tags when they
+`ghcr.io/polarsquad/krops-toolbox` is published from `v*` tags when they
 exist; the newest tag is the only supported image version, and fixes land
 on `main` first.
 
@@ -63,13 +63,13 @@ Out of scope:
 - Vulnerabilities in upstream projects the repository consumes (Flux,
   Cluster API and its providers, ACK controllers, konflate, Zarf, Talos,
   Tinkerbell, kind). Report those upstream; a report here is welcome only
-  if knr-ops configures the component in a way that makes the issue worse
+  if krops configures the component in a way that makes the issue worse
   or bypasses a mitigation.
 - The AWS service side (EKS, IAM, S3, RDS) itself.
 - Deployments made from forks or adapted copies of this repository. The
   README states the intended use: fork it and adapt it. Once adapted, the
   security posture is the operator's.
-- The demo `knr-ops-reader` console user password, which is set
+- The demo `krops-reader` console user password, which is set
   imperatively by the operator and never stored in Git.
 
 ## What the repository already does
@@ -85,7 +85,7 @@ a gap.
   on them. The management cluster holds the CAPA and ACK credentials as
   SOPS-encrypted secrets. See `docs/aws-iam.md`.
 - Read access to AWS is scoped: one IAM user whose only permission is
-  `sts:AssumeRole` into per-cluster `knr-ops-*-reader` roles.
+  `sts:AssumeRole` into per-cluster `krops-*-reader` roles.
 - S3 buckets block all public access, enforce SSE, enable versioning,
   disable ACLs, and deny non-TLS requests. See `docs/workload-resources.md`.
 - The `konflate` PR review workflow uses only the workflow `GITHUB_TOKEN`
@@ -95,9 +95,9 @@ a gap.
   identity) and carries an SPDX SBOM attestation. Verify with:
 
   ```sh
-  cosign verify ghcr.io/polarsquad/knr-ops-toolbox:X.Y.Z \
+  cosign verify ghcr.io/polarsquad/krops-toolbox:X.Y.Z \
     --certificate-identity-regexp \
-      '^https://github.com/polarsquad/knr-ops/.github/workflows/toolbox-release.yml@refs/tags/vX.Y.Z$' \
+      '^https://github.com/polarsquad/krops/.github/workflows/toolbox-release.yml@refs/tags/vX.Y.Z$' \
     --certificate-oidc-issuer https://token.actions.githubusercontent.com
   ```
 

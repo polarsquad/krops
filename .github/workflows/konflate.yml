@@ -41,7 +41,7 @@ jobs:
         ports:
           - 8080:8080
         env:
-          KONFLATE_REPO: github://polarsquad/knr-ops
+          KONFLATE_REPO: github://polarsquad/krops
           KONFLATE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Render only the PR that triggered this run.
           KONFLATE_PR_FILTER_EXPR: pr.number == ${{ github.event.pull_request.number }}

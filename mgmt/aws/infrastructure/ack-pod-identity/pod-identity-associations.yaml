@@ -1,7 +1,7 @@
 ---
 # ══════════════════════════════════════════════════════════════════════════════
 # EKS Pod Identity associations: bind each ACK controller ServiceAccount on
-# each workload cluster to its knr-ops-ack-* IAM role (S3, RDS, and IAM).
+# each workload cluster to its krops-ack-* IAM role (S3, RDS, and IAM).
 #
 # Reconciled by the ACK EKS controller on this (management) cluster. The
 # association can only be created once the EKS cluster exists — ACK retries

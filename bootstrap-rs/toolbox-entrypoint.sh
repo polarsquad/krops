@@ -1,10 +1,10 @@
 #!/bin/sh
-# toolbox-entrypoint.sh – launcher for the knr-ops toolbox image (issue #104).
+# toolbox-entrypoint.sh – launcher for the krops toolbox image (issue #104).
 #
-# The image's ENTRYPOINT runs knr-bootstrap directly; this launcher is the
+# The image's ENTRYPOINT runs krops-bootstrap directly; this launcher is the
 # documented `docker run`/`podman run` command's inner command when the
 # operator wants a shell or a custom argv, and the wiring point for the
-# toolbox runtime knobs the binary reads (KNR_TOOLBOX, ENGINE_SOCK,
+# toolbox runtime knobs the binary reads (KROPS_TOOLBOX, ENGINE_SOCK,
 # CONTAINER_ENGINE, KUBECONFIG).
 #
 # Usage inside the image (set by the run invocation):
@@ -16,7 +16,7 @@
 #   2. resolves the ENGINE_SOCK source path the daemon-side kind network
 #      needs (macOS Docker Desktop and remote Podman sockets do not live at
 #      /var/run/docker.sock);
-#   3. exports the toolbox knobs and execs knr-bootstrap (PID 1 semantics:
+#   3. exports the toolbox knobs and execs krops-bootstrap (PID 1 semantics:
 #      signals reach the CLI directly).
 set -eu
 
@@ -78,7 +78,7 @@ fi
 # ── 3. Join the kind network (best-effort) ────────────────────────────────────
 # Every `docker run` starts a NEW container, so the network attachment must
 # happen per container start, not once per cluster. The kind network exists
-# after the first bootstrap; joining makes knr-registry and kind-network
+# after the first bootstrap; joining makes krops-registry and kind-network
 # endpoints resolve for ANY invocation (oci-push, kubectl, a shell). Failure
 # is expected and silent before the first bootstrap creates the network; the
 # bootstrap itself joins explicitly after cluster creation.
@@ -91,6 +91,6 @@ if [ -n "$HOSTNAME_ID" ]; then
 fi
 
 # ── 4. Toolbox mode + exec ────────────────────────────────────────────────────
-export KNR_TOOLBOX=1
+export KROPS_TOOLBOX=1
 
-exec knr-bootstrap "$@"
+exec krops-bootstrap "$@"

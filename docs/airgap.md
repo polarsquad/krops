@@ -1,6 +1,6 @@
-# Air-gapped knr-ops with Zarf (local-host / CAPD environment)
+# Air-gapped krops with Zarf (local-host / CAPD environment)
 
-This document describes how knr-ops is packaged with [Zarf](https://zarf.dev)
+This document describes how krops is packaged with [Zarf](https://zarf.dev)
 on a connected machine and deployed end-to-end with **no internet access**:
 the management cluster, Flux, CAPI, and a CAPD workload cluster, all from one
 package plus a small set of image archives.
@@ -39,7 +39,7 @@ to check relevant working-tree changes without registry or network access.
 Run `python3 airgap/tests/test-airgap-image-digests.py --all` in a clone to
 audit every air-gap inventory and shell script, including untouched legacy
 files.
-The locally built `localhost:5001/knr-ops-airgap:latest` config artifact is the
+The locally built `localhost:5001/krops-airgap:latest` config artifact is the
 only documented exception because it is created immediately before packaging.
 
 Every package build must be signed. For an operator build, generate or obtain
@@ -65,7 +65,7 @@ airgap/scripts/build-package.sh               airgap/scripts/offline-run.sh
   zarf package sign                            4. zarf init + package deploy
         |                                      zarf init --registry-mode=nodeport
         v                                      zarf package deploy
-zarf-package-knr-ops-airgap-*.tar.zst               |
+zarf-package-krops-airgap-*.tar.zst               |
 archives/ (node images, workload images,           v
   charts, zarf-init tarball)                 Zarf internal registry (127.0.0.1:31999)
                                                     + agent (mutating webhook)
@@ -73,19 +73,19 @@ archives/ (node images, workload images,           v
                                                CAPI core+providers, CAPD, CAAPH
                                              FluxInstance -> sync from Zarf registry
                                              Flux -> clusters/docker (CAPD) -> workload
-                                             workload Flux <- knr-registry (config+charts)
+                                             workload Flux <- krops-registry (config+charts)
 ```
 
 **Ownership split.** Zarf owns the *substrate* (internal registry, agent,
 cert-manager, the flux-operator chart, CAPI core + kubeadm bootstrap /
-control-plane + CAPD + CAAPH component manifests, and the knr-ops config
+control-plane + CAPD + CAAPH component manifests, and the krops config
 artifact). Flux owns the *workload definitions* (the CAPD cluster, the kindnet
 CNI addon, the per-cluster Flux addon), reconciled from the config artifact.
 The `mgmt/` and `workload/` trees in git are **not** modified; the airgap
 variant is generated at build time by `build-config-artifact.sh`.
 
 **Why OCI, not Gitea.** The local-host environment moved from a GitHub
-`GitRepository` to an OCI-artifact sync (`oci://knr-registry:5000/knr-ops`)
+`GitRepository` to an OCI-artifact sync (`oci://krops-registry:5000/krops`)
 in PRs #30/#31/#33. There is no `GitRepository` left to rewrite, so the Zarf
 git-server is unused; the config crosses the gap as an OCI artifact inside the
 Zarf package and is published into Zarf's internal registry at deploy time.
@@ -98,14 +98,14 @@ The verification linchpin is the agent's **image rewrite** plus a Ready
 |---|---|
 | `zarf` CLI binary | runs the deploy |
 | `archives/zarf-init-arm64-v0.83.0.tar.zst` | `zarf init` (registry + agent) |
-| `zarf-package-knr-ops-airgap-arm64-0.1.0.tar.zst` | signed package, including per-component Syft JSON/HTML SBOMs and the Sigstore signature bundle |
+| `zarf-package-krops-airgap-arm64-0.1.0.tar.zst` | signed package, including per-component Syft JSON/HTML SBOMs and the Sigstore signature bundle |
 | `archives/kindest_node_v1.37.0_mgmt.tar` | mgmt kind node (host daemon) |
 | `archives/kindest_node_v1.37.0.tar` | CAPD workload and management nodes (host daemon) |
 | `archives/kindest_haproxy_*.tar` | CAPD load balancer |
-| `archives/docker.io_library_registry_2.tar` | knr-registry container |
+| `archives/docker.io_library_registry_2.tar` | krops-registry container |
 | `archives/workload-pod-images.tar` | flux controllers + podinfo for `preLoadImages` |
-| `archives/charts/{flux-operator,podinfo}-*.tgz` | OCI charts seeded into knr-registry |
-| `config-artifact/` | trimmed GitOps tree, re-pushed as `knr-ops:latest` |
+| `archives/charts/{flux-operator,podinfo}-*.tgz` | OCI charts seeded into krops-registry |
+| `config-artifact/` | trimmed GitOps tree, re-pushed as `krops:latest` |
 
 The CI artifact excludes the `zarf` CLI; fetch it via mise or the Zarf release
 for the deploy host's target OS before crossing the gap.
@@ -155,11 +155,11 @@ Gap (deploy) — from `airgap/`:
 
 ```sh
 # CI keyless-signed package (default trusted workflow identity)
-scripts/offline-run.sh zarf-package-knr-ops-airgap-arm64-0.1.0.tar.zst
+scripts/offline-run.sh zarf-package-krops-airgap-arm64-0.1.0.tar.zst
 
 # Operator key-signed package
 ZARF_VERIFY_KEY=/transfer/cosign.pub \
-  scripts/offline-run.sh zarf-package-knr-ops-airgap-arm64-0.1.0.tar.zst
+  scripts/offline-run.sh zarf-package-krops-airgap-arm64-0.1.0.tar.zst
 ```
 
 Before it creates or changes a cluster, `offline-run.sh` verifies the package
@@ -185,7 +185,7 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
 - `kubectl get pods -A -o jsonpath=...`: every non-kind-baked image is
   prefixed `127.0.0.1:31999/` (the Zarf internal registry).
 - `kubectl -n flux-system get ocirepository`: `url` is
-  `oci://zarf-docker-registry.zarf.svc.cluster.local:5000/knr-ops-airgap`,
+  `oci://zarf-docker-registry.zarf.svc.cluster.local:5000/krops-airgap`,
   Ready with a stored digest equal to the connected-side push.
 - `flux get kustomizations`: all Ready, from the artifact.
 - `kubectl get clusters.cluster.x-k8s.io -A`: workload cluster `Provisioned` /
@@ -226,7 +226,7 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
 
 ## Known limitations / follow-ups
 
-- The `knr-ops-toolbox` image is not included in `airgap/images.txt` or the
+- The `krops-toolbox` image is not included in `airgap/images.txt` or the
   current Zarf package. Offline deployment still uses the dedicated
   `airgap/scripts/` flow and its pinned tool and image inventory; the connected
   toolbox lifecycle does not replace that flow yet.
@@ -236,7 +236,7 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
   replaces kind; not prototyped here.
 - **Single architecture** (arm64). Multi-arch is a `--architecture` follow-up.
 - The **flux-operator chart for the HelmChartProxy** and the podinfo chart are
-  seeded into knr-registry as OCI charts; CAAPH fetches them over plain HTTP
+  seeded into krops-registry as OCI charts; CAAPH fetches them over plain HTTP
   (verified). The workload-cluster FluxInstance omits `distribution.artifact`
   the same way as the mgmt one.
 - **AWS flavor is out of scope** here but shapes the design: in a disconnected
@@ -246,6 +246,6 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
 ## Update drill
 
 A config-only change (edit the tree, re-run `build-config-artifact.sh`,
-re-push `knr-ops:latest` to knr-registry) moves the workload Flux to a new
+re-push `krops:latest` to krops-registry) moves the workload Flux to a new
 digest without rebuilding the package. A substrate change (images/components)
 requires `build-package.sh` and a fresh `zarf package deploy`.

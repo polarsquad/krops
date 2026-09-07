@@ -1,6 +1,6 @@
 //! Repository-owned bootstrap configuration (`bootstrap.toml`, issue #98).
 //!
-//! Everything knr-ops-specific the binary needs is declared in this file;
+//! Everything krops-specific the binary needs is declared in this file;
 //! the binary itself is a generic bootstrap engine. The environment knobs
 //! (`Config::from_env`, see main.rs) keep their precedence over these
 //! values at runtime. The file is located via `BOOTSTRAP_CONFIG` or
@@ -20,7 +20,7 @@ pub struct BootstrapConfig {
     pub charts: IndexMap<String, String>,
     /// Teardown constants (issue #100): AWS orphan-sweep names and the
     /// post-pivot controller-host removal rules. Optional so minimal test
-    /// fixtures and non-knr-ops consumers keep parsing.
+    /// fixtures and non-krops consumers keep parsing.
     #[serde(default)]
     pub teardown: TeardownSection,
     /// Environments keyed by section name, in file order (error messages
@@ -120,7 +120,7 @@ pub struct AwsWorkload {
     /// EKS cluster name: CAPA creates it with dashes converted to
     /// underscores (e.g. `default_eu-north-1-workload-control-plane`).
     pub eks_cluster_name: String,
-    /// RDS instance identifier (e.g. `knr-ops-eu-north-1-workload-db`).
+    /// RDS instance identifier (e.g. `krops-eu-north-1-workload-db`).
     pub rds_instance: String,
 }
 
@@ -204,7 +204,7 @@ impl BootstrapConfig {
         Ok(())
     }
 
-    /// Resolve an environment by name (KNR_OPS_PROFILE value or positional
+    /// Resolve an environment by name (KROPS_PROFILE value or positional
     /// argument); the error lists the valid names in file order.
     pub fn environment(&self, name: &str) -> Result<&Environment> {
         self.environments
@@ -233,12 +233,12 @@ default-environment = "aws"
 git-branch = "main"
 kind-cluster = "mgmt"
 kind-context = "kind-mgmt"
-registry-name = "knr-registry"
+registry-name = "krops-registry"
 flux-namespace = "flux-system"
 github-pat-secret = "flux-github-pat"
 sops-age-secret = "sops-age"
 mgmt-namespace = "default"
-mgmt-context = "knr-ops-mgmt"
+mgmt-context = "krops-mgmt"
 
 [charts]
 flux-operator = "0.58.0"

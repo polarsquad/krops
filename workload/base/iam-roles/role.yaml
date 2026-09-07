@@ -8,7 +8,7 @@
 # allowed to call sts:AssumeRole on this role can assume it.
 #
 # Permissions are read-only, scoped to the resources this repo creates on BOTH
-# clusters (knr-ops-* S3 buckets and RDS instances): only RDS Describe actions
+# clusters (krops-* S3 buckets and RDS instances): only RDS Describe actions
 # that support resource-level scoping are used — no blanket rds:Describe* on *.
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: iam.services.k8s.aws/v1alpha1
@@ -17,8 +17,8 @@ metadata:
   name: reader
   namespace: default
 spec:
-  name: knr-ops-${CLUSTER_NAME}-reader
-  description: "Read-only access to knr-ops S3 buckets and RDS instances"
+  name: krops-${CLUSTER_NAME}-reader
+  description: "Read-only access to krops S3 buckets and RDS instances"
   assumeRolePolicyDocument: |
     {
       "Version": "2012-10-17",
@@ -31,12 +31,12 @@ spec:
       ]
     }
   inlinePolicies:
-    knr-ops-read-only: |
+    krops-read-only: |
       {
         "Version": "2012-10-17",
         "Statement": [
           {
-            "Sid": "ReadKnrOpsBuckets",
+            "Sid": "ReadKropsBuckets",
             "Effect": "Allow",
             "Action": [
               "s3:ListBucket",
@@ -47,18 +47,18 @@ spec:
               "s3:GetLifecycleConfiguration"
             ],
             "Resource": [
-              "arn:aws:s3:::knr-ops-*",
-              "arn:aws:s3:::knr-ops-*/*"
+              "arn:aws:s3:::krops-*",
+              "arn:aws:s3:::krops-*/*"
             ]
           },
           {
-            "Sid": "ReadKnrOpsInstances",
+            "Sid": "ReadKropsInstances",
             "Effect": "Allow",
             "Action": [
               "rds:DescribeDBInstances",
               "rds:ListTagsForResource"
             ],
-            "Resource": "arn:aws:rds:*:${AWS_ACCOUNT_ID}:db:knr-ops-*"
+            "Resource": "arn:aws:rds:*:${AWS_ACCOUNT_ID}:db:krops-*"
           }
         ]
       }

@@ -7,7 +7,7 @@
 # committed in mgmt/local-talos/clusters/management/cluster.yaml.
 
 [env]
-KNR_OPS_PROFILE = "local-talos"
+KROPS_PROFILE = "local-talos"
 
 [tools]
 talosctl = "1.14.0"
@@ -16,12 +16,12 @@ talosctl = "1.14.0"
 description = "Export the Talos management-cluster kubeconfig (no rewrite: the machine is remote)"
 run = '''
 MGMT_CLUSTER="${MGMT_CLUSTER:-local-talos-management}"
-MGMT_KUBECONFIG="${MGMT_KUBECONFIG:-$HOME/.kube/knr-ops-mgmt.yaml}"
+MGMT_KUBECONFIG="${MGMT_KUBECONFIG:-$HOME/.kube/krops-mgmt.yaml}"
 clusterctl get kubeconfig "$MGMT_CLUSTER" -n default > "$MGMT_KUBECONFIG"
 chmod 600 "$MGMT_KUBECONFIG"
 kubectl --kubeconfig "$MGMT_KUBECONFIG" config rename-context \
   "$(kubectl --kubeconfig "$MGMT_KUBECONFIG" config current-context)" \
-  knr-ops-mgmt >/dev/null
+  krops-mgmt >/dev/null
 echo "Wrote ${MGMT_KUBECONFIG}"
 echo "Use with: KUBECONFIG=${MGMT_KUBECONFIG} kubectl get nodes"
 '''

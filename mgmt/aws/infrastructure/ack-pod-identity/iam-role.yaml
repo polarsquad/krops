@@ -6,10 +6,10 @@
 # Same static pods.eks.amazonaws.com trust policy as the S3 and RDS roles,
 # fully declarable in Git ahead of cluster creation.
 #
-# Permissions are scoped to management of knr-ops-* roles only. Known
+# Permissions are scoped to management of krops-* roles only. Known
 # trade-off: name-scoped iam:CreateRole + iam:PutRolePolicy is still a
 # privilege-escalation surface — the controller can grant ANY permission to a
-# role, as long as the role is named knr-ops-*. Consistent with the pragmatic
+# role, as long as the role is named krops-*. Consistent with the pragmatic
 # name-based scoping used by the other ACK controller roles in this file's
 # directory.
 # ══════════════════════════════════════════════════════════════════════════════
@@ -19,8 +19,8 @@ metadata:
   name: ack-iam-controller
   namespace: ack-system
 spec:
-  name: knr-ops-ack-iam-controller
-  description: "ACK IAM controller on knr-ops workload clusters (EKS Pod Identity)"
+  name: krops-ack-iam-controller
+  description: "ACK IAM controller on krops workload clusters (EKS Pod Identity)"
   assumeRolePolicyDocument: |
     {
       "Version": "2012-10-17",
@@ -38,7 +38,7 @@ spec:
         "Version": "2012-10-17",
         "Statement": [
           {
-            "Sid": "ManageKnrOpsRoles",
+            "Sid": "ManageKropsRoles",
             "Effect": "Allow",
             "Action": [
               "iam:CreateRole",
@@ -57,7 +57,7 @@ spec:
               "iam:UntagRole",
               "iam:ListRoleTags"
             ],
-            "Resource": "arn:aws:iam::*:role/knr-ops-*"
+            "Resource": "arn:aws:iam::*:role/krops-*"
           }
         ]
       }

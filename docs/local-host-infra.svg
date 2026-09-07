@@ -15,7 +15,7 @@
   <rect width="1600" height="1150" fill="#0f0f0f"/>
 
   <!-- ===== title block ===== -->
-  <text x="800" y="60" text-anchor="middle" font-family="DejaVu Sans" font-size="40" font-weight="bold" fill="#ff78c9">knr-ops &#183; local-host Environment &#183; Same Chain, Zero Cloud</text>
+  <text x="800" y="60" text-anchor="middle" font-family="DejaVu Sans" font-size="40" font-weight="bold" fill="#ff78c9">krops &#183; local-host Environment &#183; Same Chain, Zero Cloud</text>
   <text x="800" y="96" text-anchor="middle" font-family="DejaVu Sans" font-size="19" fill="#8f8f8f">Flux + CAPI/CAPD &#183; local OCI registry replaces GitHub &#183; the full GitOps + CAPI lifecycle on one laptop</text>
 
   <!-- ===== section headers ===== -->
@@ -75,11 +75,11 @@
   <rect x="620" y="150" width="400" height="330" rx="14" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
   <rect x="636" y="158" width="368" height="5" rx="2.5" fill="#ab9fd6"/>
   <text x="820" y="198" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#ab9fd6">Local OCI Registry</text>
-  <text x="820" y="222" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="16" fill="#8f8f8f">knr-registry:5000</text>
+  <text x="820" y="222" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="16" fill="#8f8f8f">krops-registry:5000</text>
   <!-- artifact box -->
   <rect x="652" y="244" width="336" height="60" rx="10" fill="#1d1d30" stroke="#ab9fd6" stroke-opacity="0.6" stroke-width="1.2"/>
-  <text x="820" y="269" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#ab9fd6">oci://knr-registry:5000/knr-ops</text>
-  <text x="820" y="292" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#d6d6d6">knr-ops:latest</text>
+  <text x="820" y="269" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#ab9fd6">oci://krops-registry:5000/krops</text>
+  <text x="820" y="292" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#d6d6d6">krops:latest</text>
   <!-- folder tree -->
   <g fill="none" stroke-width="1.7">
     <path d="M672,326 h9 l4,5 h15 v16 h-28 z" stroke="#85c7bb"/>
@@ -150,7 +150,7 @@
   <text x="1140" y="214" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0f0f0f">1</text>
   <text x="1168" y="204" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">Toolbox creates kind + registry;</text>
   <text x="1168" y="230" font-family="DejaVu Sans Mono" font-size="15.5" fill="#ab9fd6">oci-push publishes mgmt/ and</text>
-  <text x="1168" y="256" font-family="DejaVu Sans Mono" font-size="15.5" fill="#ab9fd6">workload/ as knr-ops:latest.</text>
+  <text x="1168" y="256" font-family="DejaVu Sans Mono" font-size="15.5" fill="#ab9fd6">workload/ as krops:latest.</text>
   <text x="1168" y="282" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">No GitHub PAT, no AWS account.</text>
   <line x1="1122" y1="316" x2="1504" y2="316" stroke="#34344a" stroke-width="1.2"/>
 

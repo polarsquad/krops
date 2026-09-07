@@ -1,4 +1,4 @@
-# knr-ops airgap image inventory (local-host / CAPD profile)
+# krops airgap image inventory (local-host / CAPD profile)
 # Source: live connected baseline, harvested 2026-08-17.
 #   mgmt pod images   : kubectl -n <ns> get pods -o json (kind-mgmt context)
 #   mgmt node store   : docker exec mgmt-control-plane crictl images
@@ -62,7 +62,7 @@ registry.k8s.io/kube-proxy:v1.37.0
 registry.k8s.io/etcd:3.7.1-0
 registry.k8s.io/kube-scheduler:v1.37.0
 registry.k8s.io/pause:3.10.2
-# workload cluster runs its own Flux (synced from knr-registry:5000)
+# workload cluster runs its own Flux (synced from krops-registry:5000)
 ghcr.io/controlplaneio-fluxcd/flux-operator:v0.58.0
 ghcr.io/fluxcd/helm-controller:v1.6.3
 ghcr.io/fluxcd/kustomize-controller:v1.9.4

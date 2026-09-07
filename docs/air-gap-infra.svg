@@ -18,7 +18,7 @@
   <rect width="1600" height="1150" fill="#0f0f0f"/>
 
   <!-- ===== title block ===== -->
-  <text x="800" y="60" text-anchor="middle" font-family="DejaVu Sans" font-size="40" font-weight="bold" fill="#ff78c9">knr-ops &#183; Zarf Air-Gap Bundle &#183; Radio Off, Chain Intact</text>
+  <text x="800" y="60" text-anchor="middle" font-family="DejaVu Sans" font-size="40" font-weight="bold" fill="#ff78c9">krops &#183; Zarf Air-Gap Bundle &#183; Radio Off, Chain Intact</text>
   <text x="800" y="96" text-anchor="middle" font-family="DejaVu Sans" font-size="19" fill="#8f8f8f">Zarf packages the local-host environment &#183; build connected, deploy with no internet &#183; two registries, one package</text>
 
   <!-- ===== section headers ===== -->
@@ -42,11 +42,11 @@
   <rect x="636" y="158" width="368" height="5" rx="2.5" fill="#ab9fd6"/>
   <text x="820" y="198" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#ab9fd6">The Bundle</text>
   <text x="820" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#8f8f8f">(what crosses the gap)</text>
-  <text x="656" y="258" font-family="DejaVu Sans Mono" font-size="15" fill="#d6d6d6">zarf-package-knr-ops-airgap-*.tar.zst</text>
+  <text x="656" y="258" font-family="DejaVu Sans Mono" font-size="15" fill="#d6d6d6">zarf-package-krops-airgap-*.tar.zst</text>
   <text x="656" y="286" font-family="DejaVu Sans Mono" font-size="15" fill="#d6d6d6">zarf-init tarball + zarf CLI</text>
   <text x="656" y="314" font-family="DejaVu Sans Mono" font-size="15" fill="#d6d6d6">archives/*.tar <tspan font-family="DejaVu Sans" fill="#8f8f8f">(kind nodes, images)</tspan></text>
   <text x="656" y="342" font-family="DejaVu Sans Mono" font-size="15" fill="#d6d6d6">charts/*.tgz <tspan font-family="DejaVu Sans" fill="#8f8f8f">(flux-operator, podinfo)</tspan></text>
-  <text x="656" y="370" font-family="DejaVu Sans Mono" font-size="15" fill="#d6d6d6">config-artifact/ <tspan font-family="DejaVu Sans" fill="#8f8f8f">&#8594; knr-ops:latest</tspan></text>
+  <text x="656" y="370" font-family="DejaVu Sans Mono" font-size="15" fill="#d6d6d6">config-artifact/ <tspan font-family="DejaVu Sans" fill="#8f8f8f">&#8594; krops:latest</tspan></text>
 
   <!-- build -> bundle arrow -->
   <line x1="508" y1="278" x2="612" y2="278" stroke="#85c7bb" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
@@ -104,7 +104,7 @@
   <text x="776" y="635" font-family="DejaVu Sans" font-size="13" fill="#8f8f8f">(local)</text>
   <rect x="700" y="672" width="306" height="66" rx="8" fill="#1d1d30" stroke="#d693b1" stroke-opacity="0.6" stroke-width="1.2"/>
   <text x="853" y="697" text-anchor="middle" font-family="DejaVu Sans" font-size="12.5" fill="#d6d6d6">syncs config + charts from</text>
-  <text x="853" y="721" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#d693b1">knr-registry:5000</text>
+  <text x="853" y="721" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#d693b1">krops-registry:5000</text>
   <!-- podinfo chip -->
   <rect x="700" y="762" width="306" height="70" rx="10" fill="#1d1d30" stroke="#3d3d55" stroke-width="1.2"/>
   <g stroke="#cfa07e" stroke-width="1.8" fill="none">
@@ -140,7 +140,7 @@
   <text x="1140" y="344" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0f0f0f">2</text>
   <text x="1168" y="334" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">The bundle crosses the gap. Offline:</text>
   <text x="1168" y="360" font-family="DejaVu Sans Mono" font-size="15.5" fill="#ab9fd6">docker load archives; create kind</text>
-  <text x="1168" y="386" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">mgmt cluster, seed knr-registry.</text>
+  <text x="1168" y="386" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">mgmt cluster, seed krops-registry.</text>
   <line x1="1122" y1="420" x2="1504" y2="420" stroke="#34344a" stroke-width="1.2"/>
 
   <!-- step 3 -->
@@ -165,7 +165,7 @@
   <circle cx="1140" cy="780" r="15" fill="#d693b1"/>
   <text x="1140" y="786" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0f0f0f">5</text>
   <text x="1168" y="776" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">Workload Flux pulls config + charts</text>
-  <text x="1168" y="802" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">from knr-registry; podinfo runs</text>
+  <text x="1168" y="802" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">from krops-registry; podinfo runs</text>
   <text x="1168" y="828" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">from pre-loaded images. Zero pulls,</text>
   <text x="1168" y="854" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">zero public packets.</text>
   <line x1="1122" y1="888" x2="1504" y2="888" stroke="#34344a" stroke-width="1.2"/>
@@ -173,7 +173,7 @@
   <!-- update drill -->
   <text x="1122" y="930" font-family="DejaVu Sans" font-size="22" font-weight="bold" fill="#f2c464">Update drill</text>
   <text x="1122" y="962" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">Config-only change: rebuild + re-push</text>
-  <text x="1122" y="988" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6"><tspan font-family="DejaVu Sans Mono" font-size="16" fill="#fafafa">knr-ops:latest</tspan>, no package rebuild.</text>
+  <text x="1122" y="988" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6"><tspan font-family="DejaVu Sans Mono" font-size="16" fill="#fafafa">krops:latest</tspan>, no package rebuild.</text>
   <text x="1122" y="1014" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">Substrate change: new package +</text>
   <text x="1122" y="1040" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">fresh <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#fafafa">zarf package deploy</tspan>.</text>
 

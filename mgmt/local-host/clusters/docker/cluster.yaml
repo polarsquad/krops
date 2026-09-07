@@ -5,7 +5,7 @@ metadata:
   namespace: default
   labels:
     fluxcd: enabled
-    knr-ops.polarsquad.com/environment: local-host
+    krops.polarsquad.com/environment: local-host
 spec:
   clusterNetwork:
     pods:

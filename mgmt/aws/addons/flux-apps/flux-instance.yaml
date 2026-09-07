@@ -59,7 +59,7 @@ data:
         domain: "cluster.local"
       sync:
         kind: GitRepository
-        url: "https://github.com/polarsquad/knr-ops"
+        url: "https://github.com/polarsquad/krops"
         ref: "refs/heads/main"
         path: "workload/eu-north-01"
         pullSecret: "flux-github-pat"
@@ -112,7 +112,7 @@ data:
         domain: "cluster.local"
       sync:
         kind: GitRepository
-        url: "https://github.com/polarsquad/knr-ops"
+        url: "https://github.com/polarsquad/krops"
         ref: "refs/heads/main"
         path: "workload/eu-west-01"
         pullSecret: "flux-github-pat"

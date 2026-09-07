@@ -93,13 +93,13 @@ description = "Pivot the management cluster from local kind to the CAPI-managed 
 run = "scripts/toolbox-run.sh pivot"
 
 [tasks.mgmt-kubeconfig]
-description = "Export the management-cluster kubeconfig to ~/.kube/knr-ops-mgmt.yaml"
+description = "Export the management-cluster kubeconfig to ~/.kube/krops-mgmt.yaml"
 run = '''
-MGMT_CLUSTER="${MGMT_CLUSTER:-$(case "${KNR_OPS_PROFILE:-aws}" in local-host) echo local-management;; local-talos) echo local-talos-management;; *) echo eu-north-1-management;; esac)}"
-MGMT_KUBECONFIG="${MGMT_KUBECONFIG:-$HOME/.kube/knr-ops-mgmt.yaml}"
+MGMT_CLUSTER="${MGMT_CLUSTER:-$(case "${KROPS_PROFILE:-aws}" in local-host) echo local-management;; local-talos) echo local-talos-management;; *) echo eu-north-1-management;; esac)}"
+MGMT_KUBECONFIG="${MGMT_KUBECONFIG:-$HOME/.kube/krops-mgmt.yaml}"
 clusterctl get kubeconfig "$MGMT_CLUSTER" -n default > "$MGMT_KUBECONFIG"
 chmod 600 "$MGMT_KUBECONFIG"
-if [ "${KNR_OPS_PROFILE:-aws}" = local-host ]; then
+if [ "${KROPS_PROFILE:-aws}" = local-host ]; then
   # CAPD records the load balancer's container-network IP, which is not
   # routable from macOS. Point at the port published on localhost instead.
   engine="${CONTAINER_ENGINE:-docker}"
@@ -117,7 +117,7 @@ if [ "${KNR_OPS_PROFILE:-aws}" = local-host ]; then
 fi
 kubectl --kubeconfig "$MGMT_KUBECONFIG" config rename-context \
   "$(kubectl --kubeconfig "$MGMT_KUBECONFIG" config current-context)" \
-  knr-ops-mgmt >/dev/null
+  krops-mgmt >/dev/null
 echo "Wrote ${MGMT_KUBECONFIG}"
 echo "Use with: KUBECONFIG=${MGMT_KUBECONFIG} kubectl get clusters"
 '''

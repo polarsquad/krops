@@ -8,7 +8,7 @@ metadata:
     # CNI (CAPD clusters ship none). Deliberately NOT `fluxcd: enabled`: that
     # label would make the local-workload-flux-instance ClusterResourceSet
     # deploy a workload FluxInstance into the management cluster.
-    knr-ops.polarsquad.com/environment: local-host
+    krops.polarsquad.com/environment: local-host
 spec:
   clusterNetwork:
     pods:

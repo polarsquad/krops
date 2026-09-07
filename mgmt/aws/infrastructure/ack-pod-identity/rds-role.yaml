@@ -6,7 +6,7 @@
 # Same static pods.eks.amazonaws.com trust policy as the S3 role (role.yaml),
 # fully declarable in Git ahead of cluster creation.
 #
-# Permissions are scoped to management of knr-ops-* RDS resources, with three
+# Permissions are scoped to management of krops-* RDS resources, with three
 # additions required by the DBInstance spec we deploy:
 #   - secretsmanager on secret:rds!* — manageMasterUserPassword makes RDS
 #     create and rotate the master password secret on the caller's behalf
@@ -25,8 +25,8 @@ metadata:
   name: ack-rds-controller
   namespace: ack-system
 spec:
-  name: knr-ops-ack-rds-controller
-  description: "ACK RDS controller on knr-ops workload clusters (EKS Pod Identity)"
+  name: krops-ack-rds-controller
+  description: "ACK RDS controller on krops workload clusters (EKS Pod Identity)"
   assumeRolePolicyDocument: |
     {
       "Version": "2012-10-17",
@@ -50,7 +50,7 @@ spec:
             "Resource": "*"
           },
           {
-            "Sid": "ManageKnrOpsInstances",
+            "Sid": "ManageKropsInstances",
             "Effect": "Allow",
             "Action": [
               "rds:CreateDBInstance",
@@ -62,7 +62,7 @@ spec:
               "rds:AddTagsToResource",
               "rds:RemoveTagsFromResource"
             ],
-            "Resource": "arn:aws:rds:*:*:*:knr-ops-*"
+            "Resource": "arn:aws:rds:*:*:*:krops-*"
           },
           {
             "Sid": "ManagedMasterPasswordSecrets",

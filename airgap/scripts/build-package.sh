@@ -9,7 +9,7 @@
 #   4. zarf package create (including per-component Syft SBOMs)
 #   5. sign the completed package
 #
-# Output: zarf-package-knr-ops-airgap-arm64-0.1.0.tar.zst next to airgap/.
+# Output: zarf-package-krops-airgap-arm64-0.1.0.tar.zst next to airgap/.
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -35,10 +35,10 @@ echo "==> 2/5 config artifact"
 # published. Keep zarf.yaml's local-registry default for ordinary builds, but
 # temporarily rewrite its image reference when OCI_REGISTRY is overridden.
 if [ -n "${OCI_REGISTRY:-}" ]; then
-  OCI_REPOSITORY="${OCI_REPOSITORY:-knr-ops-airgap}"
+  OCI_REPOSITORY="${OCI_REPOSITORY:-krops-airgap}"
   OCI_TAG="${OCI_TAG:-latest}"
   ZARF_CONFIG="$REPO_ROOT/airgap/zarf.yaml"
-  ZARF_CONFIG_BACKUP=$(mktemp "${TMPDIR:-/tmp}/knr-ops-zarf.XXXXXX")
+  ZARF_CONFIG_BACKUP=$(mktemp "${TMPDIR:-/tmp}/krops-zarf.XXXXXX")
   cp "$ZARF_CONFIG" "$ZARF_CONFIG_BACKUP"
   restore_zarf_config() {
     cp "$ZARF_CONFIG_BACKUP" "$ZARF_CONFIG"
@@ -48,7 +48,7 @@ if [ -n "${OCI_REGISTRY:-}" ]; then
   trap 'exit 130' INT
   trap 'exit 143' TERM
 
-  EXPECTED_ARTIFACT="localhost:5001/knr-ops-airgap:latest"
+  EXPECTED_ARTIFACT="localhost:5001/krops-airgap:latest"
   CONFIG_ARTIFACT="${OCI_REGISTRY}/${OCI_REPOSITORY}:${OCI_TAG}"
   MATCH_COUNT=$(grep -Fc "$EXPECTED_ARTIFACT" "$ZARF_CONFIG" || true)
   if [ "$MATCH_COUNT" -ne 1 ]; then
@@ -98,7 +98,7 @@ done
 docker save -o airgap/archives/workload-pod-images.tar "${WORKLOAD_IMAGES[@]}"
 echo "    saved airgap/archives/workload-pod-images.tar"
 
-# OCI charts the workload cluster needs in the gap (seeded into knr-registry
+# OCI charts the workload cluster needs in the gap (seeded into krops-registry
 # by the stage script): the per-cluster flux-operator chart (HelmChartProxy)
 # and the podinfo chart (workload HelmRelease).
 mkdir -p airgap/archives/charts
@@ -110,7 +110,7 @@ echo "==> 4/5 zarf package create (SBOM generation enabled)"
 cd airgap
 mise x -- zarf package create . --confirm
 
-PACKAGE="$PWD/zarf-package-knr-ops-airgap-arm64-0.1.0.tar.zst"
+PACKAGE="$PWD/zarf-package-krops-airgap-arm64-0.1.0.tar.zst"
 if [ ! -f "$PACKAGE" ]; then
   echo "ERROR: expected Zarf package was not created: $PACKAGE" >&2
   exit 1

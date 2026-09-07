@@ -6,7 +6,7 @@
 #      - kindest/node v1.37.0 (mgmt kind node and CAPD workload/management
 #        nodes) — kind and CAPD `docker run` these directly from the host
 #        daemon, outside kubelet, so the Zarf agent cannot rewrite them.
-#      - kindest/haproxy (CAPD load balancer) and registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373 (krops-registry,
+#      - kindest/haproxy (CAPD load balancer) and registry:2 (krops-registry,
 #        recreated in Phase 5 for the workload cluster's Flux).
 #      - workload-pod-images.tar: flux-operator, flux controllers, podinfo —
 #        consumed via preLoadImages by CAPD DevMachineTemplates (Phase 5).

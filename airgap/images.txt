@@ -10,7 +10,7 @@
 #   [H] host Docker daemon image, consumed by kind + CAPD (NOT agent-rewriteable)
 #   [W] workload-node containerd store (separate from host daemon)
 #
-# NOTE: workload and management CAPD node images are kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5;
+# NOTE: workload and management CAPD node images are kindest/node:v1.37.0;
 #       the kind bootstrap mgmt node still runs v1.36.1 pending recreation
 #       (KIND_NODE_IMAGE now defaults to v1.37.0). Their embedded component
 #       versions differ (kindnetd, coredns, etcd, k8s).

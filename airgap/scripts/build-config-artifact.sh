@@ -126,28 +126,28 @@ data:
           - patch: |
               - op: replace
                 path: /spec/template/spec/containers/0/image
-                value: ghcr.io/fluxcd/source-controller:v1.9.4
+                value: ghcr.io/fluxcd/source-controller:v1.9.4@sha256:8a8ed0a57b8b86f561d5a4309a69f65e62f0cebe4de8801593c5ff35a3bc3c23
             target:
               kind: Deployment
               name: source-controller
           - patch: |
               - op: replace
                 path: /spec/template/spec/containers/0/image
-                value: ghcr.io/fluxcd/kustomize-controller:v1.9.4
+                value: ghcr.io/fluxcd/kustomize-controller:v1.9.4@sha256:2b8bec54ffb6caf421bd2a6c005d27f567d5dd4db7feb55794fb51fcabd69b8f
             target:
               kind: Deployment
               name: kustomize-controller
           - patch: |
               - op: replace
                 path: /spec/template/spec/containers/0/image
-                value: ghcr.io/fluxcd/helm-controller:v1.6.3
+                value: ghcr.io/fluxcd/helm-controller:v1.6.3@sha256:16ada99456385100698a5d7adf90aba8a2089d987ab541c9566b6d7b0e897038
             target:
               kind: Deployment
               name: helm-controller
           - patch: |
               - op: replace
                 path: /spec/template/spec/containers/0/image
-                value: ghcr.io/fluxcd/notification-controller:v1.9.3
+                value: ghcr.io/fluxcd/notification-controller:v1.9.3@sha256:071c351a0fb163eeb6a2bb82f1e894f51b6b0734216d2e97d3d99c9ab9d710b9
             target:
               kind: Deployment
               name: notification-controller
@@ -185,16 +185,16 @@ import sys
 path = sys.argv[1]
 txt = open(path).read()
 preload = """          preLoadImages:
-            - registry.k8s.io/pause:3.10.1
-            - docker.io/kindest/kindnetd:v20260528-9350166c
-            - ghcr.io/controlplaneio-fluxcd/flux-operator:v0.58.0
-            - ghcr.io/fluxcd/source-controller:v1.9.4
-            - ghcr.io/fluxcd/kustomize-controller:v1.9.4
-            - ghcr.io/fluxcd/helm-controller:v1.6.3
-            - ghcr.io/fluxcd/notification-controller:v1.9.3
-            - ghcr.io/stefanprodan/podinfo:6.14.0
+            - registry.k8s.io/pause:3.10.1@sha256:278fb9dbcca9518083ad1e11276933a2e96f23de604a3a08cc3c80002767d24c
+            - docker.io/kindest/kindnetd:v20260528-9350166c@sha256:92f49a1b2c9242058481fc3e13412c19a62cfeb090717dad4598719d32351f1f
+            - ghcr.io/controlplaneio-fluxcd/flux-operator:v0.58.0@sha256:1c919ce1e28716f817ded65c06df0b7a8269542387d5a2ce50212450473c6209
+            - ghcr.io/fluxcd/source-controller:v1.9.4@sha256:8a8ed0a57b8b86f561d5a4309a69f65e62f0cebe4de8801593c5ff35a3bc3c23
+            - ghcr.io/fluxcd/kustomize-controller:v1.9.4@sha256:2b8bec54ffb6caf421bd2a6c005d27f567d5dd4db7feb55794fb51fcabd69b8f
+            - ghcr.io/fluxcd/helm-controller:v1.6.3@sha256:16ada99456385100698a5d7adf90aba8a2089d987ab541c9566b6d7b0e897038
+            - ghcr.io/fluxcd/notification-controller:v1.9.3@sha256:071c351a0fb163eeb6a2bb82f1e894f51b6b0734216d2e97d3d99c9ab9d710b9
+            - ghcr.io/stefanprodan/podinfo:6.14.0@sha256:0a8aa037137c010a75aed8d3fe56931d0edd3bcd0e55acfb96db11e1e96397b1
 """
-anchor = "          customImage: kindest/node:v1.37.0\n"
+anchor = "          customImage: kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5\n"
 count = txt.count(anchor)
 if count != 2:
     sys.exit(f"ERROR: expected 2 DevMachineTemplate customImage anchors, found {count}")

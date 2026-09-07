@@ -6,7 +6,7 @@
 #      - kindest/node v1.37.0 (mgmt kind node and CAPD workload/management
 #        nodes) — kind and CAPD `docker run` these directly from the host
 #        daemon, outside kubelet, so the Zarf agent cannot rewrite them.
-#      - kindest/haproxy (CAPD load balancer) and registry:2 (krops-registry,
+#      - kindest/haproxy (CAPD load balancer) and registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373 (krops-registry,
 #        recreated in Phase 5 for the workload cluster's Flux).
 #      - workload-pod-images.tar: flux-operator, flux controllers, podinfo —
 #        consumed via preLoadImages by CAPD DevMachineTemplates (Phase 5).
@@ -23,7 +23,7 @@ AIRGAP_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 ARCHIVES="$AIRGAP_DIR/archives"
 
 CLUSTER_NAME="${CLUSTER_NAME:-mgmt}"
-KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-kindest/node:v1.37.0}"
+KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5}"
 DOCKER_SOCKET_PATH="${DOCKER_SOCKET_PATH:-/var/run/docker.sock}"
 
 if [ ! -S "$DOCKER_SOCKET_PATH" ]; then
@@ -75,7 +75,7 @@ if ! docker ps --filter "name=^${REGISTRY_NAME}$" --format '{{.Names}}' | grep -
     --health-interval=1s \
     --health-timeout=2s \
     --health-retries=15 \
-    registry:2 >/dev/null
+    registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373 >/dev/null
 fi
 
 registry_health=$(docker inspect --format \

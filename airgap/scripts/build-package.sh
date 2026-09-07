@@ -68,29 +68,29 @@ mise x -- zarf tools download-init \
   --output-directory airgap/archives
 
 HOST_IMAGES=(
-  kindest/node:v1.37.0
-  kindest/node:v1.37.0
-  kindest/haproxy:v20230606-42a2262b
-  docker.io/library/registry:2
+  kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+  kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+  kindest/haproxy:v20230606-42a2262b@sha256:001a06433666046dea44567c7d7c6adfc2ac0edb556576f6da507ff0b0f063d3
+  docker.io/library/registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
 )
 for img in "${HOST_IMAGES[@]}"; do
   docker pull --platform linux/arm64 "$img" >/dev/null
 done
-docker save -o airgap/archives/kindest_node_v1.37.0_mgmt.tar kindest/node:v1.37.0
-docker save -o airgap/archives/kindest_node_v1.37.0.tar kindest/node:v1.37.0
-docker save -o airgap/archives/kindest_haproxy_v20230606-42a2262b.tar kindest/haproxy:v20230606-42a2262b
-docker save -o airgap/archives/docker.io_library_registry_2.tar docker.io/library/registry:2
+docker save -o airgap/archives/kindest_node_v1.37.0_mgmt.tar kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+docker save -o airgap/archives/kindest_node_v1.37.0.tar kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+docker save -o airgap/archives/kindest_haproxy_v20230606-42a2262b.tar kindest/haproxy:v20230606-42a2262b@sha256:001a06433666046dea44567c7d7c6adfc2ac0edb556576f6da507ff0b0f063d3
+docker save -o airgap/archives/docker.io_library_registry_2.tar docker.io/library/registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
 echo "    saved Zarf init package and host-daemon image archives"
 
 WORKLOAD_IMAGES=(
-  registry.k8s.io/pause:3.10.1
-  docker.io/kindest/kindnetd:v20260528-9350166c
-  ghcr.io/controlplaneio-fluxcd/flux-operator:v0.58.0
-  ghcr.io/fluxcd/source-controller:v1.9.4
-  ghcr.io/fluxcd/kustomize-controller:v1.9.4
-  ghcr.io/fluxcd/helm-controller:v1.6.3
-  ghcr.io/fluxcd/notification-controller:v1.9.3
-  ghcr.io/stefanprodan/podinfo:6.14.0
+  registry.k8s.io/pause:3.10.1@sha256:278fb9dbcca9518083ad1e11276933a2e96f23de604a3a08cc3c80002767d24c
+  docker.io/kindest/kindnetd:v20260528-9350166c@sha256:92f49a1b2c9242058481fc3e13412c19a62cfeb090717dad4598719d32351f1f
+  ghcr.io/controlplaneio-fluxcd/flux-operator:v0.58.0@sha256:1c919ce1e28716f817ded65c06df0b7a8269542387d5a2ce50212450473c6209
+  ghcr.io/fluxcd/source-controller:v1.9.4@sha256:8a8ed0a57b8b86f561d5a4309a69f65e62f0cebe4de8801593c5ff35a3bc3c23
+  ghcr.io/fluxcd/kustomize-controller:v1.9.4@sha256:2b8bec54ffb6caf421bd2a6c005d27f567d5dd4db7feb55794fb51fcabd69b8f
+  ghcr.io/fluxcd/helm-controller:v1.6.3@sha256:16ada99456385100698a5d7adf90aba8a2089d987ab541c9566b6d7b0e897038
+  ghcr.io/fluxcd/notification-controller:v1.9.3@sha256:071c351a0fb163eeb6a2bb82f1e894f51b6b0734216d2e97d3d99c9ab9d710b9
+  ghcr.io/stefanprodan/podinfo:6.14.0@sha256:0a8aa037137c010a75aed8d3fe56931d0edd3bcd0e55acfb96db11e1e96397b1
 )
 for img in "${WORKLOAD_IMAGES[@]}"; do
   docker pull --platform linux/arm64 "$img" >/dev/null

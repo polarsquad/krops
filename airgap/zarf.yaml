@@ -39,10 +39,10 @@ components:
         valuesFiles:
           - values/cert-manager.yaml
     images:
-      - quay.io/jetstack/cert-manager-controller:v1.21.1
-      - quay.io/jetstack/cert-manager-cainjector:v1.21.1
-      - quay.io/jetstack/cert-manager-webhook:v1.21.1
-      - quay.io/jetstack/cert-manager-startupapicheck:v1.21.1
+      - quay.io/jetstack/cert-manager-controller:v1.21.1@sha256:416a2d76870d996460e62bd7f521bf14fa017be9e3e904aab92163a331fcb61a
+      - quay.io/jetstack/cert-manager-cainjector:v1.21.1@sha256:ccf6b919ec0500745a47a910118f834f9636d0aac1ff221245cd2557ed8c7c98
+      - quay.io/jetstack/cert-manager-webhook:v1.21.1@sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42
+      - quay.io/jetstack/cert-manager-startupapicheck:v1.21.1@sha256:d8ab6416e6e7303a86fa0a8daa82c94a8001f21c9d78eb2e7db20534e5d07ae8
     healthChecks:
       - apiVersion: apps/v1
         kind: Deployment
@@ -66,7 +66,7 @@ components:
         url: oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator
         version: 0.58.0
     images:
-      - ghcr.io/controlplaneio-fluxcd/flux-operator:v0.58.0
+      - ghcr.io/controlplaneio-fluxcd/flux-operator:v0.58.0@sha256:1c919ce1e28716f817ded65c06df0b7a8269542387d5a2ce50212450473c6209
     healthChecks:
       - apiVersion: apps/v1
         kind: Deployment
@@ -108,10 +108,10 @@ components:
             cmd: kubectl -n flux-system wait --for=condition=Ready fluxinstance/flux --timeout=10m
             maxTotalSeconds: 640
     images:
-      - ghcr.io/fluxcd/source-controller:v1.9.4
-      - ghcr.io/fluxcd/kustomize-controller:v1.9.4
-      - ghcr.io/fluxcd/helm-controller:v1.6.3
-      - ghcr.io/fluxcd/notification-controller:v1.9.3
+      - ghcr.io/fluxcd/source-controller:v1.9.4@sha256:8a8ed0a57b8b86f561d5a4309a69f65e62f0cebe4de8801593c5ff35a3bc3c23
+      - ghcr.io/fluxcd/kustomize-controller:v1.9.4@sha256:2b8bec54ffb6caf421bd2a6c005d27f567d5dd4db7feb55794fb51fcabd69b8f
+      - ghcr.io/fluxcd/helm-controller:v1.6.3@sha256:16ada99456385100698a5d7adf90aba8a2089d987ab541c9566b6d7b0e897038
+      - ghcr.io/fluxcd/notification-controller:v1.9.3@sha256:071c351a0fb163eeb6a2bb82f1e894f51b6b0734216d2e97d3d99c9ab9d710b9
 
   # CAPI core: 13 CRDs (Cluster, Machine, MachineDeployment, ClusterClass,
   # ClusterResourceSet, ...) + the capi-controller-manager. Captured from the
@@ -124,7 +124,7 @@ components:
         files:
           - manifests/core-cluster-api.components.yaml
     images:
-      - registry.k8s.io/cluster-api/cluster-api-controller:v1.14.0
+      - registry.k8s.io/cluster-api/cluster-api-controller:v1.14.0@sha256:4f57cf35b7de52e568eb85295f2a505268f29f1c7b76e7b12ce7cf6d2034f8f4
     healthChecks:
       - apiVersion: apps/v1
         kind: Deployment
@@ -146,9 +146,9 @@ components:
         files:
           - manifests/infrastructure-docker.components.yaml
     images:
-      - registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.14.0
-      - registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.14.0
-      - gcr.io/k8s-staging-cluster-api/capd-manager:v1.14.0
+      - registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.14.0@sha256:3209310007d8f015545f5cd621b110cc1af2bcf2538d91bbac81aaf989451102
+      - registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.14.0@sha256:bab6f68839cef892102427f03599dd4d7b433bcae0e4794724ba80253fb8aa98
+      - gcr.io/k8s-staging-cluster-api/capd-manager:v1.14.0@sha256:9b68fc45b6d564804d7a32c1d800751daa5d556e40c4c303d1ec4b8d610afa5a
     healthChecks:
       - apiVersion: apps/v1
         kind: Deployment
@@ -172,7 +172,7 @@ components:
         files:
           - manifests/addon-helm.components.yaml
     images:
-      - registry.k8s.io/cluster-api-helm/cluster-api-helm-controller:v0.6.4
+      - registry.k8s.io/cluster-api-helm/cluster-api-helm-controller:v0.6.4@sha256:97d2a86f8e35d23bb4656b26f4564b35f109e47a0dc4860b71089e52eb6e6a24
     healthChecks:
       - apiVersion: apps/v1
         kind: Deployment

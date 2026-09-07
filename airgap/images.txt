@@ -10,61 +10,61 @@
 #   [H] host Docker daemon image, consumed by kind + CAPD (NOT agent-rewriteable)
 #   [W] workload-node containerd store (separate from host daemon)
 #
-# NOTE: workload and management CAPD node images are kindest/node:v1.37.0;
+# NOTE: workload and management CAPD node images are kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5;
 #       the kind bootstrap mgmt node still runs v1.36.1 pending recreation
 #       (KIND_NODE_IMAGE now defaults to v1.37.0). Their embedded component
 #       versions differ (kindnetd, coredns, etcd, k8s).
 
 # ── Management cluster pod images [M] ─────────────────────────────────────────
-ghcr.io/controlplaneio-fluxcd/flux-operator:v0.58.0
-ghcr.io/fluxcd/helm-controller:v1.6.3
-ghcr.io/fluxcd/kustomize-controller:v1.9.4
-ghcr.io/fluxcd/notification-controller:v1.9.3
-ghcr.io/fluxcd/source-controller:v1.9.4
-quay.io/jetstack/cert-manager-controller:v1.21.1
-quay.io/jetstack/cert-manager-cainjector:v1.21.1
-quay.io/jetstack/cert-manager-webhook:v1.21.1
-quay.io/jetstack/cert-manager-startupapicheck:v1.21.1
-registry.k8s.io/capi-operator/cluster-api-operator:v0.29.0
-registry.k8s.io/cluster-api/cluster-api-controller:v1.14.0
-registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.14.0
-registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.14.0
-registry.k8s.io/cluster-api-helm/cluster-api-helm-controller:v0.6.4
-gcr.io/k8s-staging-cluster-api/capd-manager:v1.14.0
-registry.k8s.io/coredns/coredns:v1.14.7
-registry.k8s.io/kube-apiserver:v1.37.0
-registry.k8s.io/kube-controller-manager:v1.37.0
-registry.k8s.io/kube-proxy:v1.36.1
-registry.k8s.io/etcd:3.7.1-0
-registry.k8s.io/kube-scheduler:v1.37.0
-registry.k8s.io/pause:3.10
-docker.io/kindest/kindnetd:v20260528-9350166c
-docker.io/kindest/local-path-provisioner:v20260521-9fb22683
-docker.io/kindest/local-path-helper:v20260131-7181c60a
+ghcr.io/controlplaneio-fluxcd/flux-operator:v0.58.0@sha256:1c919ce1e28716f817ded65c06df0b7a8269542387d5a2ce50212450473c6209
+ghcr.io/fluxcd/helm-controller:v1.6.3@sha256:16ada99456385100698a5d7adf90aba8a2089d987ab541c9566b6d7b0e897038
+ghcr.io/fluxcd/kustomize-controller:v1.9.4@sha256:2b8bec54ffb6caf421bd2a6c005d27f567d5dd4db7feb55794fb51fcabd69b8f
+ghcr.io/fluxcd/notification-controller:v1.9.3@sha256:071c351a0fb163eeb6a2bb82f1e894f51b6b0734216d2e97d3d99c9ab9d710b9
+ghcr.io/fluxcd/source-controller:v1.9.4@sha256:8a8ed0a57b8b86f561d5a4309a69f65e62f0cebe4de8801593c5ff35a3bc3c23
+quay.io/jetstack/cert-manager-controller:v1.21.1@sha256:416a2d76870d996460e62bd7f521bf14fa017be9e3e904aab92163a331fcb61a
+quay.io/jetstack/cert-manager-cainjector:v1.21.1@sha256:ccf6b919ec0500745a47a910118f834f9636d0aac1ff221245cd2557ed8c7c98
+quay.io/jetstack/cert-manager-webhook:v1.21.1@sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42
+quay.io/jetstack/cert-manager-startupapicheck:v1.21.1@sha256:d8ab6416e6e7303a86fa0a8daa82c94a8001f21c9d78eb2e7db20534e5d07ae8
+registry.k8s.io/capi-operator/cluster-api-operator:v0.29.0@sha256:465e72f8b06ae96de7c142d552f898fb4d0d92ab5d71c8691e431a19d1b4955c
+registry.k8s.io/cluster-api/cluster-api-controller:v1.14.0@sha256:4f57cf35b7de52e568eb85295f2a505268f29f1c7b76e7b12ce7cf6d2034f8f4
+registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.14.0@sha256:3209310007d8f015545f5cd621b110cc1af2bcf2538d91bbac81aaf989451102
+registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.14.0@sha256:bab6f68839cef892102427f03599dd4d7b433bcae0e4794724ba80253fb8aa98
+registry.k8s.io/cluster-api-helm/cluster-api-helm-controller:v0.6.4@sha256:97d2a86f8e35d23bb4656b26f4564b35f109e47a0dc4860b71089e52eb6e6a24
+gcr.io/k8s-staging-cluster-api/capd-manager:v1.14.0@sha256:9b68fc45b6d564804d7a32c1d800751daa5d556e40c4c303d1ec4b8d610afa5a
+registry.k8s.io/coredns/coredns:v1.14.7@sha256:7efd3c635b03efd68c4e8398fc45f0d993d0e9ab016f72c1cefb0fd6d01aa286
+registry.k8s.io/kube-apiserver:v1.37.0@sha256:d1045e5c6d2f016797d22143eba7502e1bb712a4681836a7c35763a9c192dd70
+registry.k8s.io/kube-controller-manager:v1.37.0@sha256:997c997924eb8574f63f204a0b0af133aaf33c10df84009c32d34037f4e0e077
+registry.k8s.io/kube-proxy:v1.36.1@sha256:a96b6e12863ef766d18f69afaad7a5329220c37ce21cb232bcb58362d284f3f7
+registry.k8s.io/etcd:3.7.1-0@sha256:a9983dd6d9283138ab926daa307c6c25623636703ecf5645d5df4d666ce9eba2
+registry.k8s.io/kube-scheduler:v1.37.0@sha256:a27622f132aa09cf2461ba077894a070c0186ec607366d14e805912d4804d11f
+registry.k8s.io/pause:3.10@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a
+docker.io/kindest/kindnetd:v20260528-9350166c@sha256:92f49a1b2c9242058481fc3e13412c19a62cfeb090717dad4598719d32351f1f
+docker.io/kindest/local-path-provisioner:v20260521-9fb22683@sha256:b1de813bcdde9737a283ff1961725d66c412b235fe08f2a3dc707fece91674b8
+docker.io/kindest/local-path-helper:v20260131-7181c60a@sha256:ac7c7f08e86f7bef7d2ad6dee944ed89d3d2e7de0ebc00490d7ddf6c26628a06
 
 # ── Host Docker daemon images [H] (kind nodes + CAPD containers) ─────────────
-kindest/node:v1.37.0
-kindest/node:v1.37.0
-kindest/haproxy:v20230606-42a2262b
-docker.io/library/registry:2
+kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+kindest/haproxy:v20230606-42a2262b@sha256:001a06433666046dea44567c7d7c6adfc2ac0edb556576f6da507ff0b0f063d3
+docker.io/library/registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
 
 # ── Workload node containerd store [W] (v1.37.0 generation) ──────────────────
 # Pulled by the workload node's OWN containerd; must be pre-seeded or reachable
 # from a registry the workload node can reach over the kind docker network.
-docker.io/kindest/kindnetd:v20260820-69b56db7
-docker.io/kindest/kindnetd:v20260528-9350166c
-docker.io/kindest/local-path-provisioner:v20260820-69b56db7
-docker.io/kindest/local-path-helper:v20260131-7181c60a
-registry.k8s.io/coredns/coredns:v1.14.6
-registry.k8s.io/kube-apiserver:v1.37.0
-registry.k8s.io/kube-controller-manager:v1.37.0
-registry.k8s.io/kube-proxy:v1.37.0
-registry.k8s.io/etcd:3.7.1-0
-registry.k8s.io/kube-scheduler:v1.37.0
-registry.k8s.io/pause:3.10.2
+docker.io/kindest/kindnetd:v20260820-69b56db7@sha256:526969f0a1a7a788a7a96f53a4ad3b51607bde7bb2841edf52a02916e8d52650
+docker.io/kindest/kindnetd:v20260528-9350166c@sha256:92f49a1b2c9242058481fc3e13412c19a62cfeb090717dad4598719d32351f1f
+docker.io/kindest/local-path-provisioner:v20260820-69b56db7@sha256:fdb5360219dcca6acc7967326f9e04c89b038e2c1e924463b2a41cad2dc752ab
+docker.io/kindest/local-path-helper:v20260131-7181c60a@sha256:ac7c7f08e86f7bef7d2ad6dee944ed89d3d2e7de0ebc00490d7ddf6c26628a06
+registry.k8s.io/coredns/coredns:v1.14.6@sha256:900f9c109f7a33545d3c811516e8376df9019147b750f5ce3e254468769176ea
+registry.k8s.io/kube-apiserver:v1.37.0@sha256:d1045e5c6d2f016797d22143eba7502e1bb712a4681836a7c35763a9c192dd70
+registry.k8s.io/kube-controller-manager:v1.37.0@sha256:997c997924eb8574f63f204a0b0af133aaf33c10df84009c32d34037f4e0e077
+registry.k8s.io/kube-proxy:v1.37.0@sha256:77bf2b08ff8ac1a4a446cffaa85e79e87379c8cb54fcf60f2cb6c62c966829c8
+registry.k8s.io/etcd:3.7.1-0@sha256:a9983dd6d9283138ab926daa307c6c25623636703ecf5645d5df4d666ce9eba2
+registry.k8s.io/kube-scheduler:v1.37.0@sha256:a27622f132aa09cf2461ba077894a070c0186ec607366d14e805912d4804d11f
+registry.k8s.io/pause:3.10.2@sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4
 # workload cluster runs its own Flux (synced from krops-registry:5000)
-ghcr.io/controlplaneio-fluxcd/flux-operator:v0.58.0
-ghcr.io/fluxcd/helm-controller:v1.6.3
-ghcr.io/fluxcd/kustomize-controller:v1.9.4
-ghcr.io/fluxcd/notification-controller:v1.9.3
-ghcr.io/fluxcd/source-controller:v1.9.4
+ghcr.io/controlplaneio-fluxcd/flux-operator:v0.58.0@sha256:1c919ce1e28716f817ded65c06df0b7a8269542387d5a2ce50212450473c6209
+ghcr.io/fluxcd/helm-controller:v1.6.3@sha256:16ada99456385100698a5d7adf90aba8a2089d987ab541c9566b6d7b0e897038
+ghcr.io/fluxcd/kustomize-controller:v1.9.4@sha256:2b8bec54ffb6caf421bd2a6c005d27f567d5dd4db7feb55794fb51fcabd69b8f
+ghcr.io/fluxcd/notification-controller:v1.9.3@sha256:071c351a0fb163eeb6a2bb82f1e894f51b6b0734216d2e97d3d99c9ab9d710b9
+ghcr.io/fluxcd/source-controller:v1.9.4@sha256:8a8ed0a57b8b86f561d5a4309a69f65e62f0cebe4de8801593c5ff35a3bc3c23

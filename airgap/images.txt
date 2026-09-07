@@ -34,7 +34,7 @@ gcr.io/k8s-staging-cluster-api/capd-manager:v1.14.0@sha256:9b68fc45b6d564804d7a3
 registry.k8s.io/coredns/coredns:v1.14.7@sha256:7efd3c635b03efd68c4e8398fc45f0d993d0e9ab016f72c1cefb0fd6d01aa286
 registry.k8s.io/kube-apiserver:v1.37.0@sha256:d1045e5c6d2f016797d22143eba7502e1bb712a4681836a7c35763a9c192dd70
 registry.k8s.io/kube-controller-manager:v1.37.0@sha256:997c997924eb8574f63f204a0b0af133aaf33c10df84009c32d34037f4e0e077
-registry.k8s.io/kube-proxy:v1.36.1@sha256:a96b6e12863ef766d18f69afaad7a5329220c37ce21cb232bcb58362d284f3f7
+registry.k8s.io/kube-proxy:v1.37.0@sha256:77bf2b08ff8ac1a4a446cffaa85e79e87379c8cb54fcf60f2cb6c62c966829c8
 registry.k8s.io/etcd:3.7.1-0@sha256:a9983dd6d9283138ab926daa307c6c25623636703ecf5645d5df4d666ce9eba2
 registry.k8s.io/kube-scheduler:v1.37.0@sha256:a27622f132aa09cf2461ba077894a070c0186ec607366d14e805912d4804d11f
 registry.k8s.io/pause:3.10@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a

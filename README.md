@@ -3,51 +3,32 @@
 
 ![krops logo](docs/krops-logo.svg)
 
-A GitOps pattern for managing cloud infrastructure through the Kubernetes API:
-no Terraform, no DSLs, no state files, no second toolchain. This repository is
-a working reference implementation of that pattern, with three environments:
-`aws`, which runs it end-to-end on AWS EKS; `local-host`, which runs the
-same lifecycle on local clusters with no cloud account involved; and
-`local-talos`, which pivots onto a single-node Talos Linux cluster
-PXE-booted onto operator-provided bare metal. **It is not a
-product**: fork it, strip it down, and adapt the layout to your own cloud and
-clusters.
+krops is a GitOps pattern for managing infrastructure through the Kubernetes API
+with plain declarative YAML. Terraform and OpenTofu use HCL, a state file, and
+discrete plan/apply runs; krops stores desired state as Kubernetes resources in
+Git. [Flux](https://fluxcd.io/) delivers those resources, and controllers
+continuously reconcile the infrastructure to match them. Kubernetes provides
+one API, RBAC model, policy surface, and audit trail for infrastructure and
+workloads. No HCL, no `.tfstate`, no second toolchain.
 
-A disposable local [kind](https://kind.sigs.k8s.io/) cluster bootstraps
-[Flux](https://fluxcd.io/) and is then discarded: a CAPI pivot moves the
-control plane into a self-managed management cluster that reconciles itself
-and everything else from this repository. The `aws` environment reconciles:
+[Crossplane](https://www.crossplane.io/) is the closer comparison because it
+also runs infrastructure reconciliation inside Kubernetes. Its providers expose
+managed resources, while XRDs and compositions can turn them into higher-level
+platform APIs. krops introduces no krops-specific CRD or controller: it combines
+[Cluster API](https://cluster-api.sigs.k8s.io/) for clusters,
+[ACK](https://aws-controllers-k8s.github.io/docs/) for AWS resources, and Flux
+for GitOps. If those resource APIs already say what you mean, krops does not
+wrap them to say it again.
 
-- a self-managed EKS management cluster (provisioned by CAPA, reconciled from
-  Git by the Flux instance running inside it)
-- AWS EKS workload clusters provisioned via
-  [CAPA](https://cluster-api-aws.sigs.k8s.io/)
-- per-cluster Flux instances delivered through CAPI addons
-- application workloads (the [ACK](https://aws-controllers-k8s.github.io/docs/)
-  S3, RDS, and IAM operators managing secure S3 buckets, PostgreSQL instances,
-  and read-only IAM roles) running on each workload cluster
-
-The `local-host` environment walks the identical chain with the CAPD Docker
-provider instead of CAPA: a local OCI registry, a one-control-plane/one-worker
-workload cluster, a second Flux instance, and a Podinfo app reachable from
-your laptop. It covers the complete GitOps, CAPI, and pivot lifecycle without
-provisioning AWS resources.
-
-The `local-talos` environment runs the same chain onto physical hardware:
-Tinkerbell (CAPT) PXE-boots one machine with [Talos
-Linux](https://www.talos.dev/), and the single-node Talos cluster becomes
-the self-managed management plane, syncing from GitHub like `aws`. Scope
-fence: management-only, no workload cluster.
-
-The imperative part of the lifecycle (bootstrap, pivot, and teardown) is a
-single Rust CLI, [`krops-bootstrap`](docs/bootstrap-cli.md), that replaces the
-shell scripts as they complete parity runs. After the one-time bootstrap and
-pivot, **everything is declared in Git as YAML**. The `aws` environment
-declares 2 CAPI workload clusters: 4 node pools (ARM and GPU) across 2
-regions, 2 S3 buckets, 2 RDS instances, 1 reader user, and one reader role
-per workload cluster. The repository also ships a
-[Zarf](https://zarf.dev/) air-gap bundle that packages the `local-host`
-deployment for offline installs. 0 HCL, 0 state files.
+This repository demonstrates the pattern end to end on AWS EKS, local Docker
+clusters, and a Tinkerbell-provisioned [Talos Linux](https://www.talos.dev/)
+machine. A disposable [kind](https://kind.sigs.k8s.io/) cluster bootstraps Flux,
+CAPI pivots control to a self-managed management cluster, and the Rust
+[`krops-bootstrap`](docs/bootstrap-cli.md) CLI handles bootstrap, pivot, and
+teardown. After that, everything is declared in Git, with a
+[Zarf](https://zarf.dev/) bundle for air-gapped local installs. It is a working
+reference implementation, not a product, so fork it, strip it down, and adapt
+it to your own cloud and clusters.
 
 ## Who this is for
 

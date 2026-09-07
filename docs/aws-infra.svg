@@ -1,49 +1,49 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1150" viewBox="0 0 1600 1150">
   <defs>
     <marker id="arrow-teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#85c7bb"/>
+      <path d="M0,0 L10,5 L0,10 z" fill="#5CE0B4"/>
     </marker>
     <marker id="arrow-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#8f8f8f"/>
+      <path d="M0,0 L10,5 L0,10 z" fill="#859D91"/>
     </marker>
   </defs>
 
   <!-- ===== background ===== -->
-  <rect width="1600" height="1150" fill="#0f0f0f"/>
+  <rect width="1600" height="1150" fill="#0C120F"/>
 
   <!-- ===== title block ===== -->
-  <text x="800" y="60" text-anchor="middle" font-family="DejaVu Sans" font-size="40" font-weight="bold" fill="#ff78c9">krops &#183; GitOps Architecture &#183; 1 Repo &#215; 2 Lifecycles</text>
-  <text x="800" y="96" text-anchor="middle" font-family="DejaVu Sans" font-size="19" fill="#8f8f8f">Flux + CAPI/CAPA + ACK &#183; the management plane provisions clusters &#183; workload planes reconcile apps</text>
+  <text x="800" y="60" text-anchor="middle" font-family="DejaVu Sans" font-size="40" font-weight="bold" fill="#5CE0B4">krops &#183; GitOps Architecture &#183; 1 Repo &#215; 2 Lifecycles</text>
+  <text x="800" y="96" text-anchor="middle" font-family="DejaVu Sans" font-size="19" fill="#859D91">Flux + CAPI/CAPA + ACK &#183; the management plane provisions clusters &#183; workload planes reconcile apps</text>
 
   <!-- ===== section headers ===== -->
-  <text x="64" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#fafafa">TOPOLOGY (clusters and sync flows)</text>
-  <text x="1090" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#fafafa">FLOW (reconciliation order)</text>
+  <text x="64" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#FFFFFF">TOPOLOGY (clusters and sync flows)</text>
+  <text x="1090" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#FFFFFF">FLOW (reconciliation order)</text>
 
   <!-- ===== connections (drawn first, behind boxes) ===== -->
-  <line x1="508" y1="256" x2="612" y2="256" stroke="#85c7bb" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
-  <text x="561" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#fafafa">1. syncs</text>
-  <text x="561" y="244" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="16" fill="#85c7bb">mgmt/</text>
-  <path d="M284,484 V594" fill="none" stroke="#85c7bb" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-teal)"/>
-  <path d="M284,556 H815 V594" fill="none" stroke="#85c7bb" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-teal)"/>
-  <text x="560" y="530" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#d6d6d6">provisions EKS clusters &#183; installs Flux via <tspan font-family="DejaVu Sans Mono" fill="#85c7bb">flux-apps</tspan></text>
+  <line x1="508" y1="256" x2="612" y2="256" stroke="#5CE0B4" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
+  <text x="561" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#FFFFFF">1. syncs</text>
+  <text x="561" y="244" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="16" fill="#5CE0B4">mgmt/</text>
+  <path d="M284,484 V594" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-teal)"/>
+  <path d="M284,556 H815 V594" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-teal)"/>
+  <text x="560" y="530" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">provisions EKS clusters &#183; installs Flux via <tspan font-family="DejaVu Sans Mono" fill="#5CE0B4">flux-apps</tspan></text>
 
   <!-- ===== management cluster ===== -->
-  <rect x="64" y="150" width="440" height="330" rx="14" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
-  <rect x="80" y="158" width="408" height="5" rx="2.5" fill="#85c7bb"/>
-  <text x="284" y="198" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#85c7bb">Management Cluster</text>
-  <text x="284" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#8f8f8f">(self-managed EKS &#183; post-pivot)</text>
+  <rect x="64" y="150" width="440" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="80" y="158" width="408" height="5" rx="2.5" fill="#5CE0B4"/>
+  <text x="284" y="198" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#5CE0B4">Management Cluster</text>
+  <text x="284" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#859D91">(self-managed EKS &#183; post-pivot)</text>
   <!-- flux glyph -->
   <g transform="translate(122,262)">
-    <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#85c7bb"/>
-    <line x1="0" y1="-18" x2="0" y2="18" stroke="#131320" stroke-width="2.5"/>
-    <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#85c7bb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M-10,33 L0,39 L10,33" fill="none" stroke="#85c7bb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#5CE0B4"/>
+    <line x1="0" y1="-18" x2="0" y2="18" stroke="#131E18" stroke-width="2.5"/>
+    <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M-10,33 L0,39 L10,33" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
-  <text x="122" y="328" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#fafafa">Flux</text>
-  <line x1="162" y1="266" x2="230" y2="266" stroke="#8f8f8f" stroke-width="2" marker-end="url(#arrow-gray)"/>
+  <text x="122" y="328" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#FFFFFF">Flux</text>
+  <line x1="162" y1="266" x2="230" y2="266" stroke="#859D91" stroke-width="2" marker-end="url(#arrow-gray)"/>
   <!-- capi/capa chip -->
-  <rect x="238" y="230" width="250" height="72" rx="10" fill="#1d1d30" stroke="#3d3d55" stroke-width="1.2"/>
-  <g stroke="#85c7bb" stroke-width="1.6" fill="none">
+  <rect x="238" y="230" width="250" height="72" rx="10" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
+  <g stroke="#5CE0B4" stroke-width="1.6" fill="none">
     <circle cx="272" cy="258" r="9"/>
     <circle cx="272" cy="258" r="3.2"/>
     <g>
@@ -55,202 +55,202 @@
     <circle cx="290" cy="276" r="6.5"/>
     <circle cx="290" cy="276" r="2.2"/>
   </g>
-  <text x="308" y="264" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#fafafa">CAPI / CAPA</text>
-  <text x="308" y="287" font-family="DejaVu Sans" font-size="14.5" fill="#d6d6d6">controllers</text>
+  <text x="308" y="264" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#FFFFFF">CAPI / CAPA</text>
+  <text x="308" y="287" font-family="DejaVu Sans" font-size="14.5" fill="#D4E2DA">controllers</text>
   <!-- infra lifecycle sub-panel -->
-  <rect x="88" y="340" width="384" height="120" rx="10" fill="#85c7bb" fill-opacity="0.12" stroke="#85c7bb" stroke-opacity="0.5" stroke-width="1.2"/>
-  <text x="280" y="374" text-anchor="middle" font-family="DejaVu Sans" font-size="16.5" font-weight="bold" fill="#85c7bb">Manages infrastructure lifecycle</text>
-  <path d="M116,424 a9,9 0 0 1 2,-17.8 a11,11 0 0 1 21,-1.5 a8.5,8.5 0 0 1 3,17.5 z" fill="none" stroke="#d6d6d6" stroke-width="1.7" stroke-linejoin="round"/>
-  <text x="152" y="420" font-family="DejaVu Sans" font-size="15" fill="#d6d6d6">EKS clusters</text>
-  <g fill="none" stroke="#d6d6d6" stroke-width="1.7" stroke-linejoin="round">
+  <rect x="88" y="340" width="384" height="120" rx="10" fill="#5CE0B4" fill-opacity="0.12" stroke="#5CE0B4" stroke-opacity="0.5" stroke-width="1.2"/>
+  <text x="280" y="374" text-anchor="middle" font-family="DejaVu Sans" font-size="16.5" font-weight="bold" fill="#5CE0B4">Manages infrastructure lifecycle</text>
+  <path d="M116,424 a9,9 0 0 1 2,-17.8 a11,11 0 0 1 21,-1.5 a8.5,8.5 0 0 1 3,17.5 z" fill="none" stroke="#D4E2DA" stroke-width="1.7" stroke-linejoin="round"/>
+  <text x="152" y="420" font-family="DejaVu Sans" font-size="15" fill="#D4E2DA">EKS clusters</text>
+  <g fill="none" stroke="#D4E2DA" stroke-width="1.7" stroke-linejoin="round">
     <path d="M270,406 h9 a5,5 0 1 1 10,0 h9 v9 a5,5 0 1 1 0,10 v9 h-28 z"/>
   </g>
-  <text x="306" y="420" font-family="DejaVu Sans" font-size="15" fill="#d6d6d6">Flux bootstrap addon</text>
+  <text x="306" y="420" font-family="DejaVu Sans" font-size="15" fill="#D4E2DA">Flux bootstrap addon</text>
 
   <!-- ===== git repository ===== -->
-  <rect x="620" y="150" width="400" height="330" rx="14" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
-  <rect x="636" y="158" width="368" height="5" rx="2.5" fill="#ab9fd6"/>
-  <text x="820" y="198" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#ab9fd6">Git Repository</text>
-  <text x="820" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#8f8f8f">(polarsquad/krops)</text>
+  <rect x="620" y="150" width="400" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="636" y="158" width="368" height="5" rx="2.5" fill="#B0F6C0"/>
+  <text x="820" y="198" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#B0F6C0">Git Repository</text>
+  <text x="820" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#859D91">(polarsquad/krops)</text>
   <!-- folder tree -->
   <g fill="none" stroke-width="1.7">
-    <path d="M660,250 h9 l4,5 h15 v16 h-28 z" stroke="#85c7bb"/>
-    <path d="M660,288 h9 l4,5 h15 v16 h-28 z" stroke="#d693b1"/>
-    <path d="M708,326 h8 l4,4.5 h13 v14 h-25 z" stroke="#d693b1" stroke-opacity="0.85"/>
-    <path d="M708,360 h8 l4,4.5 h13 v14 h-25 z" stroke="#d693b1" stroke-opacity="0.85"/>
-    <path d="M708,394 h8 l4,4.5 h13 v14 h-25 z" stroke="#d693b1" stroke-opacity="0.85"/>
+    <path d="M660,250 h9 l4,5 h15 v16 h-28 z" stroke="#5CE0B4"/>
+    <path d="M660,288 h9 l4,5 h15 v16 h-28 z" stroke="#68C5EB"/>
+    <path d="M708,326 h8 l4,4.5 h13 v14 h-25 z" stroke="#68C5EB" stroke-opacity="0.85"/>
+    <path d="M708,360 h8 l4,4.5 h13 v14 h-25 z" stroke="#68C5EB" stroke-opacity="0.85"/>
+    <path d="M708,394 h8 l4,4.5 h13 v14 h-25 z" stroke="#68C5EB" stroke-opacity="0.85"/>
   </g>
-  <g stroke="#3d3d55" stroke-width="1.4" fill="none">
+  <g stroke="#284637" stroke-width="1.4" fill="none">
     <path d="M674,312 V403 M674,335 h28 M674,369 h28 M674,403 h28"/>
   </g>
-  <text x="700" y="268" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#85c7bb">mgmt/</text>
-  <text x="700" y="306" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#d693b1">workload/</text>
-  <text x="744" y="342" font-family="DejaVu Sans Mono" font-size="16" fill="#d693b1">base/</text>
-  <text x="744" y="376" font-family="DejaVu Sans Mono" font-size="16" fill="#d693b1">eu-north-01/</text>
-  <text x="744" y="410" font-family="DejaVu Sans Mono" font-size="16" fill="#d693b1">eu-west-01/</text>
-  <text x="820" y="442" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#8f8f8f">Flux tracks <tspan font-family="DejaVu Sans Mono" fill="#d6d6d6">main</tspan></text>
-  <text x="820" y="464" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#8f8f8f">SOPS-encrypted secrets in-repo</text>
+  <text x="700" y="268" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#5CE0B4">mgmt/</text>
+  <text x="700" y="306" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#68C5EB">workload/</text>
+  <text x="744" y="342" font-family="DejaVu Sans Mono" font-size="16" fill="#68C5EB">base/</text>
+  <text x="744" y="376" font-family="DejaVu Sans Mono" font-size="16" fill="#68C5EB">eu-north-01/</text>
+  <text x="744" y="410" font-family="DejaVu Sans Mono" font-size="16" fill="#68C5EB">eu-west-01/</text>
+  <text x="820" y="442" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">Flux tracks <tspan font-family="DejaVu Sans Mono" fill="#D4E2DA">main</tspan></text>
+  <text x="820" y="464" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">SOPS-encrypted secrets in-repo</text>
 
   <!-- ===== workload cluster 1 ===== -->
   <g>
-    <rect x="64" y="600" width="430" height="330" rx="14" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
-    <rect x="80" y="608" width="398" height="5" rx="2.5" fill="#d693b1"/>
-    <text x="279" y="648" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#d693b1">Workload Cluster</text>
-    <text x="279" y="672" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#d6d6d6">eu-north-1 (EKS)</text>
+    <rect x="64" y="600" width="430" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+    <rect x="80" y="608" width="398" height="5" rx="2.5" fill="#68C5EB"/>
+    <text x="279" y="648" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#68C5EB">Workload Cluster</text>
+    <text x="279" y="672" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">eu-north-1 (EKS)</text>
     <g transform="translate(120,712) scale(0.85)">
-      <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#d693b1"/>
-      <line x1="0" y1="-18" x2="0" y2="18" stroke="#131320" stroke-width="2.5"/>
-      <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#d693b1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M-10,33 L0,39 L10,33" fill="none" stroke="#d693b1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#68C5EB"/>
+      <line x1="0" y1="-18" x2="0" y2="18" stroke="#131E18" stroke-width="2.5"/>
+      <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#68C5EB" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M-10,33 L0,39 L10,33" fill="none" stroke="#68C5EB" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
-    <text x="156" y="712" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#fafafa">Flux</text>
-    <text x="156" y="731" font-family="DejaVu Sans" font-size="13" fill="#8f8f8f">(local)</text>
-    <rect x="218" y="680" width="254" height="62" rx="8" fill="#1d1d30" stroke="#d693b1" stroke-opacity="0.6" stroke-width="1.2"/>
-    <text x="345" y="703" text-anchor="middle" font-family="DejaVu Sans" font-size="12.5" fill="#d6d6d6">syncs</text>
-    <text x="345" y="726" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="16" fill="#d693b1">workload/eu-north-01/</text>
+    <text x="156" y="712" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#FFFFFF">Flux</text>
+    <text x="156" y="731" font-family="DejaVu Sans" font-size="13" fill="#859D91">(local)</text>
+    <rect x="218" y="680" width="254" height="62" rx="8" fill="#1B2C23" stroke="#68C5EB" stroke-opacity="0.6" stroke-width="1.2"/>
+    <text x="345" y="703" text-anchor="middle" font-family="DejaVu Sans" font-size="12.5" fill="#D4E2DA">syncs</text>
+    <text x="345" y="726" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="16" fill="#68C5EB">workload/eu-north-01/</text>
   </g>
 
   <!-- ===== workload cluster 2 ===== -->
   <g>
-    <rect x="600" y="600" width="430" height="330" rx="14" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
-    <rect x="616" y="608" width="398" height="5" rx="2.5" fill="#d693b1"/>
-    <text x="815" y="648" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#d693b1">Workload Cluster</text>
-    <text x="815" y="672" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#d6d6d6">eu-west-1 (EKS)</text>
+    <rect x="600" y="600" width="430" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+    <rect x="616" y="608" width="398" height="5" rx="2.5" fill="#68C5EB"/>
+    <text x="815" y="648" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#68C5EB">Workload Cluster</text>
+    <text x="815" y="672" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">eu-west-1 (EKS)</text>
     <g transform="translate(656,712) scale(0.85)">
-      <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#d693b1"/>
-      <line x1="0" y1="-18" x2="0" y2="18" stroke="#131320" stroke-width="2.5"/>
-      <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#d693b1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M-10,33 L0,39 L10,33" fill="none" stroke="#d693b1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#68C5EB"/>
+      <line x1="0" y1="-18" x2="0" y2="18" stroke="#131E18" stroke-width="2.5"/>
+      <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#68C5EB" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M-10,33 L0,39 L10,33" fill="none" stroke="#68C5EB" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
-    <text x="692" y="712" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#fafafa">Flux</text>
-    <text x="692" y="731" font-family="DejaVu Sans" font-size="13" fill="#8f8f8f">(local)</text>
-    <rect x="754" y="680" width="254" height="62" rx="8" fill="#1d1d30" stroke="#d693b1" stroke-opacity="0.6" stroke-width="1.2"/>
-    <text x="881" y="703" text-anchor="middle" font-family="DejaVu Sans" font-size="12.5" fill="#d6d6d6">syncs</text>
-    <text x="881" y="726" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="16" fill="#d693b1">workload/eu-west-01/</text>
+    <text x="692" y="712" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#FFFFFF">Flux</text>
+    <text x="692" y="731" font-family="DejaVu Sans" font-size="13" fill="#859D91">(local)</text>
+    <rect x="754" y="680" width="254" height="62" rx="8" fill="#1B2C23" stroke="#68C5EB" stroke-opacity="0.6" stroke-width="1.2"/>
+    <text x="881" y="703" text-anchor="middle" font-family="DejaVu Sans" font-size="12.5" fill="#D4E2DA">syncs</text>
+    <text x="881" y="726" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="16" fill="#68C5EB">workload/eu-west-01/</text>
   </g>
 
   <!-- pipelines (both clusters) -->
   <g id="pipe1">
-    <g stroke="#d6d6d6" stroke-width="1.8" fill="none">
+    <g stroke="#D4E2DA" stroke-width="1.8" fill="none">
       <circle cx="120" cy="794" r="12"/><circle cx="120" cy="794" r="4.2"/>
       <line x1="120" y1="777" x2="120" y2="782"/><line x1="120" y1="806" x2="120" y2="811"/>
       <line x1="103" y1="794" x2="108" y2="794"/><line x1="132" y1="794" x2="137" y2="794"/>
       <line x1="108" y1="782" x2="111.5" y2="785.5"/><line x1="128.5" y1="802.5" x2="132" y2="806"/>
       <line x1="108" y1="806" x2="111.5" y2="802.5"/><line x1="128.5" y1="785.5" x2="132" y2="782"/>
     </g>
-    <line x1="146" y1="794" x2="184" y2="794" stroke="#8f8f8f" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
-    <g stroke="#85c7bb" stroke-width="1.8" fill="none">
+    <line x1="146" y1="794" x2="184" y2="794" stroke="#859D91" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+    <g stroke="#5CE0B4" stroke-width="1.8" fill="none">
       <ellipse cx="215" cy="782" rx="13" ry="4.5"/>
       <path d="M202,782 L206,806 h18 L228,782"/>
     </g>
-    <line x1="241" y1="794" x2="279" y2="794" stroke="#8f8f8f" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
-    <g stroke="#ab9fd6" stroke-width="1.8" fill="none">
+    <line x1="241" y1="794" x2="279" y2="794" stroke="#859D91" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+    <g stroke="#B0F6C0" stroke-width="1.8" fill="none">
       <ellipse cx="310" cy="780" rx="13" ry="4.5"/>
       <path d="M297,780 V806 a13,4.5 0 0 0 26,0 V780"/>
       <path d="M297,793 a13,4.5 0 0 0 26,0"/>
     </g>
-    <line x1="336" y1="794" x2="374" y2="794" stroke="#8f8f8f" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
-    <g stroke="#cfa07e" stroke-width="1.8" fill="none">
+    <line x1="336" y1="794" x2="374" y2="794" stroke="#859D91" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+    <g stroke="#E8A868" stroke-width="1.8" fill="none">
       <circle cx="405" cy="783" r="6.5"/>
       <path d="M393,808 a12,12 0 0 1 24,0"/>
     </g>
-    <text x="130" y="844" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="14" fill="#d6d6d6">aws-operators</text>
-    <text x="215" y="870" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="14" fill="#d6d6d6">s3-buckets</text>
-    <text x="310" y="844" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="14" fill="#d6d6d6">rds-instances</text>
-    <text x="405" y="870" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="14" fill="#d6d6d6">iam-roles</text>
+    <text x="130" y="844" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">aws-operators</text>
+    <text x="215" y="870" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">s3-buckets</text>
+    <text x="310" y="844" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">rds-instances</text>
+    <text x="405" y="870" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">iam-roles</text>
   </g>
   <use href="#pipe1" x="536" y="0"/>
 
   <!-- lifecycle strips -->
-  <rect x="88" y="884" width="382" height="42" rx="8" fill="#d693b1" fill-opacity="0.14"/>
-  <text x="279" y="911" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#d693b1">Manages application lifecycle</text>
-  <rect x="624" y="884" width="382" height="42" rx="8" fill="#d693b1" fill-opacity="0.14"/>
-  <text x="815" y="911" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#d693b1">Manages application lifecycle</text>
+  <rect x="88" y="884" width="382" height="42" rx="8" fill="#68C5EB" fill-opacity="0.14"/>
+  <text x="279" y="911" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#68C5EB">Manages application lifecycle</text>
+  <rect x="624" y="884" width="382" height="42" rx="8" fill="#68C5EB" fill-opacity="0.14"/>
+  <text x="815" y="911" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#68C5EB">Manages application lifecycle</text>
 
   <!-- dots between clusters -->
-  <text x="547" y="780" text-anchor="middle" font-family="DejaVu Sans" font-size="24" fill="#8f8f8f">&#183; &#183; &#183;</text>
+  <text x="547" y="780" text-anchor="middle" font-family="DejaVu Sans" font-size="24" fill="#859D91">&#183; &#183; &#183;</text>
 
   <!-- aws marks -->
   <g id="awsmark">
-    <text x="270" y="964" text-anchor="middle" font-family="DejaVu Sans" font-size="21" font-weight="bold" fill="#cfa07e">aws</text>
-    <path d="M250,971 Q270,982 291,969" fill="none" stroke="#cfa07e" stroke-width="2.2" stroke-linecap="round"/>
-    <path d="M291,969 l-1,5.5 M291,969 l-5.5,-0.5" stroke="#cfa07e" stroke-width="2.2" stroke-linecap="round"/>
+    <text x="270" y="964" text-anchor="middle" font-family="DejaVu Sans" font-size="21" font-weight="bold" fill="#E8A868">aws</text>
+    <path d="M250,971 Q270,982 291,969" fill="none" stroke="#E8A868" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M291,969 l-1,5.5 M291,969 l-5.5,-0.5" stroke="#E8A868" stroke-width="2.2" stroke-linecap="round"/>
   </g>
   <use href="#awsmark" x="536" y="0"/>
 
   <!-- ===== legend strip ===== -->
-  <rect x="64" y="992" width="966" height="66" rx="12" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
-  <g stroke="#cfa07e" stroke-width="1.7" fill="none">
+  <rect x="64" y="992" width="966" height="66" rx="12" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <g stroke="#E8A868" stroke-width="1.7" fill="none">
     <circle cx="106" cy="1021" r="8"/>
     <path d="M102,1029 v4 h8 v-4 M103,1037 h6"/>
     <line x1="106" y1="1006" x2="106" y2="1009"/>
     <line x1="94" y1="1012" x2="96.5" y2="1014"/>
     <line x1="118" y1="1012" x2="115.5" y2="1014"/>
   </g>
-  <text x="134" y="1032" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#85c7bb">Management cluster</text>
-  <text x="340" y="1032" font-family="DejaVu Sans" font-size="16" fill="#d6d6d6">= infrastructure lifecycle</text>
-  <line x1="592" y1="1004" x2="592" y2="1046" stroke="#3d3d55" stroke-width="1.4"/>
-  <text x="618" y="1032" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#d693b1">Workload clusters</text>
-  <text x="806" y="1032" font-family="DejaVu Sans" font-size="16" fill="#d6d6d6">= application lifecycle</text>
+  <text x="134" y="1032" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#5CE0B4">Management cluster</text>
+  <text x="340" y="1032" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">= infrastructure lifecycle</text>
+  <line x1="592" y1="1004" x2="592" y2="1046" stroke="#284637" stroke-width="1.4"/>
+  <text x="618" y="1032" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#68C5EB">Workload clusters</text>
+  <text x="806" y="1032" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">= application lifecycle</text>
 
   <!-- ===== flow panel ===== -->
-  <rect x="1090" y="150" width="446" height="904" rx="14" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
+  <rect x="1090" y="150" width="446" height="904" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
 
   <!-- step 1 -->
-  <circle cx="1140" cy="208" r="15" fill="#85c7bb"/>
-  <text x="1140" y="214" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0f0f0f">1</text>
-  <text x="1168" y="204" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">Management cluster Flux syncs</text>
-  <text x="1168" y="230" font-family="DejaVu Sans Mono" font-size="16" fill="#85c7bb">mgmt/<tspan font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">, provisions EKS clusters,</tspan></text>
-  <text x="1168" y="256" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">and installs Flux on each workload</text>
-  <text x="1168" y="282" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">cluster via <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#85c7bb">flux-apps</tspan>.</text>
+  <circle cx="1140" cy="208" r="15" fill="#5CE0B4"/>
+  <text x="1140" y="214" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">1</text>
+  <text x="1168" y="204" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Management cluster Flux syncs</text>
+  <text x="1168" y="230" font-family="DejaVu Sans Mono" font-size="16" fill="#5CE0B4">mgmt/<tspan font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">, provisions EKS clusters,</tspan></text>
+  <text x="1168" y="256" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">and installs Flux on each workload</text>
+  <text x="1168" y="282" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">cluster via <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#5CE0B4">flux-apps</tspan>.</text>
   <g transform="translate(1140,334) scale(0.85)">
-    <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#85c7bb"/>
-    <line x1="0" y1="-18" x2="0" y2="18" stroke="#131320" stroke-width="2.5"/>
-    <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#85c7bb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#5CE0B4"/>
+    <line x1="0" y1="-18" x2="0" y2="18" stroke="#131E18" stroke-width="2.5"/>
+    <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
-  <line x1="1122" y1="384" x2="1504" y2="384" stroke="#34344a" stroke-width="1.2"/>
+  <line x1="1122" y1="384" x2="1504" y2="384" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- step 2 -->
-  <circle cx="1140" cy="432" r="15" fill="#d693b1"/>
-  <text x="1140" y="438" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0f0f0f">2</text>
-  <text x="1168" y="428" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">Each workload cluster runs its own</text>
-  <text x="1168" y="454" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">Flux instance, syncing its overlay</text>
-  <text x="1168" y="480" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">under <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#d693b1">workload/&lt;cluster&gt;/</tspan>.</text>
-  <g stroke="#d693b1" stroke-width="1.7" fill="none">
+  <circle cx="1140" cy="432" r="15" fill="#68C5EB"/>
+  <text x="1140" y="438" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">2</text>
+  <text x="1168" y="428" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Each workload cluster runs its own</text>
+  <text x="1168" y="454" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Flux instance, syncing its overlay</text>
+  <text x="1168" y="480" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">under <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#68C5EB">workload/&lt;cluster&gt;/</tspan>.</text>
+  <g stroke="#68C5EB" stroke-width="1.7" fill="none">
     <circle cx="1130" cy="530" r="5.5"/><circle cx="1152" cy="518" r="5.5"/><circle cx="1152" cy="542" r="5.5"/><circle cx="1174" cy="530" r="5.5"/>
     <line x1="1135" y1="527" x2="1147" y2="521"/><line x1="1135" y1="533" x2="1147" y2="539"/>
     <line x1="1157" y1="521" x2="1169" y2="527"/><line x1="1157" y1="539" x2="1169" y2="533"/>
   </g>
-  <line x1="1122" y1="580" x2="1504" y2="580" stroke="#34344a" stroke-width="1.2"/>
+  <line x1="1122" y1="580" x2="1504" y2="580" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- step 3 -->
-  <circle cx="1140" cy="628" r="15" fill="#d693b1"/>
-  <text x="1140" y="634" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0f0f0f">3</text>
-  <text x="1168" y="624" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">Workload Flux reconciles locally:</text>
-  <text x="1168" y="660" font-family="DejaVu Sans Mono" font-size="18" fill="#d6d6d6">1. <tspan fill="#fafafa">aws-operators</tspan> <tspan font-family="DejaVu Sans" fill="#8f8f8f">(ACK)</tspan></text>
-  <text x="1168" y="692" font-family="DejaVu Sans Mono" font-size="18" fill="#d6d6d6">2. <tspan fill="#fafafa">s3-buckets &#183; rds-instances</tspan></text>
-  <text x="1200" y="724" font-family="DejaVu Sans Mono" font-size="18" fill="#fafafa">&#183; iam-roles <tspan font-family="DejaVu Sans" fill="#d6d6d6">in parallel</tspan></text>
-  <text x="1168" y="754" font-family="DejaVu Sans Mono" font-size="14.5" fill="#8f8f8f">(each dependsOn: aws-operators)</text>
-  <line x1="1122" y1="788" x2="1504" y2="788" stroke="#34344a" stroke-width="1.2"/>
+  <circle cx="1140" cy="628" r="15" fill="#68C5EB"/>
+  <text x="1140" y="634" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">3</text>
+  <text x="1168" y="624" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Workload Flux reconciles locally:</text>
+  <text x="1168" y="660" font-family="DejaVu Sans Mono" font-size="18" fill="#D4E2DA">1. <tspan fill="#FFFFFF">aws-operators</tspan> <tspan font-family="DejaVu Sans" fill="#859D91">(ACK)</tspan></text>
+  <text x="1168" y="692" font-family="DejaVu Sans Mono" font-size="18" fill="#D4E2DA">2. <tspan fill="#FFFFFF">s3-buckets &#183; rds-instances</tspan></text>
+  <text x="1200" y="724" font-family="DejaVu Sans Mono" font-size="18" fill="#FFFFFF">&#183; iam-roles <tspan font-family="DejaVu Sans" fill="#D4E2DA">in parallel</tspan></text>
+  <text x="1168" y="754" font-family="DejaVu Sans Mono" font-size="14.5" fill="#859D91">(each dependsOn: aws-operators)</text>
+  <line x1="1122" y1="788" x2="1504" y2="788" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- golden rule -->
-  <text x="1122" y="832" font-family="DejaVu Sans" font-size="22" font-weight="bold" fill="#f2c464">Golden rule</text>
-  <text x="1122" y="866" font-family="DejaVu Sans" font-size="18" fill="#d6d6d6">Edit YAML in Git; never mutate</text>
-  <text x="1122" y="894" font-family="DejaVu Sans" font-size="18" fill="#d6d6d6">the clusters. Flux tracks <tspan font-family="DejaVu Sans Mono" font-size="17" fill="#fafafa">main</tspan>:</text>
-  <text x="1122" y="922" font-family="DejaVu Sans" font-size="18" fill="#d6d6d6">nothing reconciles until merged.</text>
-  <line x1="1122" y1="958" x2="1504" y2="958" stroke="#34344a" stroke-width="1.2"/>
+  <text x="1122" y="832" font-family="DejaVu Sans" font-size="22" font-weight="bold" fill="#E5B85C">Golden rule</text>
+  <text x="1122" y="866" font-family="DejaVu Sans" font-size="18" fill="#D4E2DA">Edit YAML in Git; never mutate</text>
+  <text x="1122" y="894" font-family="DejaVu Sans" font-size="18" fill="#D4E2DA">the clusters. Flux tracks <tspan font-family="DejaVu Sans Mono" font-size="17" fill="#FFFFFF">main</tspan>:</text>
+  <text x="1122" y="922" font-family="DejaVu Sans" font-size="18" fill="#D4E2DA">nothing reconciles until merged.</text>
+  <line x1="1122" y1="958" x2="1504" y2="958" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- color key -->
-  <circle cx="1132" cy="998" r="6" fill="#85c7bb"/>
-  <text x="1146" y="1004" font-family="DejaVu Sans Mono" font-size="14" fill="#d6d6d6">mgmt</text>
-  <circle cx="1210" cy="998" r="6" fill="#ab9fd6"/>
-  <text x="1224" y="1004" font-family="DejaVu Sans Mono" font-size="14" fill="#d6d6d6">git</text>
-  <circle cx="1282" cy="998" r="6" fill="#d693b1"/>
-  <text x="1296" y="1004" font-family="DejaVu Sans Mono" font-size="14" fill="#d6d6d6">workload</text>
-  <circle cx="1398" cy="998" r="6" fill="#cfa07e"/>
-  <text x="1412" y="1004" font-family="DejaVu Sans Mono" font-size="14" fill="#d6d6d6">aws</text>
+  <circle cx="1132" cy="998" r="6" fill="#5CE0B4"/>
+  <text x="1146" y="1004" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">mgmt</text>
+  <circle cx="1210" cy="998" r="6" fill="#B0F6C0"/>
+  <text x="1224" y="1004" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">git</text>
+  <circle cx="1282" cy="998" r="6" fill="#68C5EB"/>
+  <text x="1296" y="1004" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">workload</text>
+  <circle cx="1398" cy="998" r="6" fill="#E8A868"/>
+  <text x="1412" y="1004" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">aws</text>
 
   <!-- ===== footer ===== -->
-  <text x="800" y="1102" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#8f8f8f">Every persistent change lands in Git; Flux converges the clusters.</text>
-  <text x="800" y="1128" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#8f8f8f">No Terraform, no state files: the Kubernetes API is the only toolchain.</text>
+  <text x="800" y="1102" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">Every persistent change lands in Git; Flux converges the clusters.</text>
+  <text x="800" y="1128" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">No Terraform, no state files: the Kubernetes API is the only toolchain.</text>
 </svg>

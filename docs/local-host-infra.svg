@@ -1,53 +1,53 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1150" viewBox="0 0 1600 1150">
   <defs>
     <marker id="arrow-teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#85c7bb"/>
+      <path d="M0,0 L10,5 L0,10 z" fill="#5CE0B4"/>
     </marker>
     <marker id="arrow-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#8f8f8f"/>
+      <path d="M0,0 L10,5 L0,10 z" fill="#859D91"/>
     </marker>
     <marker id="arrow-purple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#ab9fd6"/>
+      <path d="M0,0 L10,5 L0,10 z" fill="#B0F6C0"/>
     </marker>
   </defs>
 
   <!-- ===== background ===== -->
-  <rect width="1600" height="1150" fill="#0f0f0f"/>
+  <rect width="1600" height="1150" fill="#0C120F"/>
 
   <!-- ===== title block ===== -->
-  <text x="800" y="60" text-anchor="middle" font-family="DejaVu Sans" font-size="40" font-weight="bold" fill="#ff78c9">krops &#183; local-host Environment &#183; Same Chain, Zero Cloud</text>
-  <text x="800" y="96" text-anchor="middle" font-family="DejaVu Sans" font-size="19" fill="#8f8f8f">Flux + CAPI/CAPD &#183; local OCI registry replaces GitHub &#183; the full GitOps + CAPI lifecycle on one laptop</text>
+  <text x="800" y="60" text-anchor="middle" font-family="DejaVu Sans" font-size="40" font-weight="bold" fill="#5CE0B4">krops &#183; local-host Environment &#183; Same Chain, Zero Cloud</text>
+  <text x="800" y="96" text-anchor="middle" font-family="DejaVu Sans" font-size="19" fill="#859D91">Flux + CAPI/CAPD &#183; local OCI registry replaces GitHub &#183; the full GitOps + CAPI lifecycle on one laptop</text>
 
   <!-- ===== section headers ===== -->
-  <text x="64" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#fafafa">TOPOLOGY (all containers on your laptop)</text>
-  <text x="1090" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#fafafa">FLOW (reconciliation order)</text>
+  <text x="64" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#FFFFFF">TOPOLOGY (all containers on your laptop)</text>
+  <text x="1090" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#FFFFFF">FLOW (reconciliation order)</text>
 
   <!-- ===== connections (behind boxes) ===== -->
-  <line x1="612" y1="256" x2="508" y2="256" stroke="#ab9fd6" stroke-width="2.5" marker-end="url(#arrow-purple)"/>
-  <text x="561" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#fafafa">2. syncs</text>
-  <text x="561" y="244" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="11" fill="#85c7bb">mgmt/local-host/</text>
-  <path d="M284,484 V594" fill="none" stroke="#85c7bb" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-teal)"/>
-  <text x="470" y="530" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#d6d6d6">3. provisions CAPD cluster &#183; installs Flux via <tspan font-family="DejaVu Sans Mono" fill="#85c7bb">flux-apps</tspan></text>
-  <path d="M820,484 V560 H560 V594" fill="none" stroke="#ab9fd6" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-purple)"/>
-  <text x="820" y="580" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#d6d6d6">4. workload Flux pulls same OCI artifact</text>
+  <line x1="612" y1="256" x2="508" y2="256" stroke="#B0F6C0" stroke-width="2.5" marker-end="url(#arrow-purple)"/>
+  <text x="561" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#FFFFFF">2. syncs</text>
+  <text x="561" y="244" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="11" fill="#5CE0B4">mgmt/local-host/</text>
+  <path d="M284,484 V594" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-teal)"/>
+  <text x="470" y="530" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">3. provisions CAPD cluster &#183; installs Flux via <tspan font-family="DejaVu Sans Mono" fill="#5CE0B4">flux-apps</tspan></text>
+  <path d="M820,484 V560 H560 V594" fill="none" stroke="#B0F6C0" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-purple)"/>
+  <text x="820" y="580" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">4. workload Flux pulls same OCI artifact</text>
 
   <!-- ===== management cluster ===== -->
-  <rect x="64" y="150" width="440" height="330" rx="14" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
-  <rect x="80" y="158" width="408" height="5" rx="2.5" fill="#85c7bb"/>
-  <text x="284" y="198" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#85c7bb">Management Cluster</text>
-  <text x="284" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#8f8f8f">(self-managed CAPD &#183; post-pivot)</text>
+  <rect x="64" y="150" width="440" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="80" y="158" width="408" height="5" rx="2.5" fill="#5CE0B4"/>
+  <text x="284" y="198" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#5CE0B4">Management Cluster</text>
+  <text x="284" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#859D91">(self-managed CAPD &#183; post-pivot)</text>
   <!-- flux glyph -->
   <g transform="translate(122,262)">
-    <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#85c7bb"/>
-    <line x1="0" y1="-18" x2="0" y2="18" stroke="#131320" stroke-width="2.5"/>
-    <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#85c7bb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M-10,33 L0,39 L10,33" fill="none" stroke="#85c7bb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#5CE0B4"/>
+    <line x1="0" y1="-18" x2="0" y2="18" stroke="#131E18" stroke-width="2.5"/>
+    <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M-10,33 L0,39 L10,33" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
-  <text x="122" y="328" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#fafafa">Flux</text>
-  <line x1="162" y1="266" x2="230" y2="266" stroke="#8f8f8f" stroke-width="2" marker-end="url(#arrow-gray)"/>
+  <text x="122" y="328" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#FFFFFF">Flux</text>
+  <line x1="162" y1="266" x2="230" y2="266" stroke="#859D91" stroke-width="2" marker-end="url(#arrow-gray)"/>
   <!-- capi/capd chip -->
-  <rect x="238" y="230" width="250" height="72" rx="10" fill="#1d1d30" stroke="#3d3d55" stroke-width="1.2"/>
-  <g stroke="#85c7bb" stroke-width="1.6" fill="none">
+  <rect x="238" y="230" width="250" height="72" rx="10" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
+  <g stroke="#5CE0B4" stroke-width="1.6" fill="none">
     <circle cx="272" cy="258" r="9"/>
     <circle cx="272" cy="258" r="3.2"/>
     <g>
@@ -59,147 +59,147 @@
     <circle cx="290" cy="276" r="6.5"/>
     <circle cx="290" cy="276" r="2.2"/>
   </g>
-  <text x="308" y="264" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#fafafa">CAPI / CAPD</text>
-  <text x="308" y="287" font-family="DejaVu Sans" font-size="14.5" fill="#d6d6d6">Docker provider</text>
+  <text x="308" y="264" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#FFFFFF">CAPI / CAPD</text>
+  <text x="308" y="287" font-family="DejaVu Sans" font-size="14.5" fill="#D4E2DA">Docker provider</text>
   <!-- infra lifecycle sub-panel -->
-  <rect x="88" y="340" width="384" height="120" rx="10" fill="#85c7bb" fill-opacity="0.12" stroke="#85c7bb" stroke-opacity="0.5" stroke-width="1.2"/>
-  <text x="280" y="374" text-anchor="middle" font-family="DejaVu Sans" font-size="16.5" font-weight="bold" fill="#85c7bb">Manages infrastructure lifecycle</text>
-  <path d="M116,424 a9,9 0 0 1 2,-17.8 a11,11 0 0 1 21,-1.5 a8.5,8.5 0 0 1 3,17.5 z" fill="none" stroke="#d6d6d6" stroke-width="1.7" stroke-linejoin="round"/>
-  <text x="152" y="420" font-family="DejaVu Sans" font-size="15" fill="#d6d6d6">CAPD cluster</text>
-  <g fill="none" stroke="#d6d6d6" stroke-width="1.7" stroke-linejoin="round">
+  <rect x="88" y="340" width="384" height="120" rx="10" fill="#5CE0B4" fill-opacity="0.12" stroke="#5CE0B4" stroke-opacity="0.5" stroke-width="1.2"/>
+  <text x="280" y="374" text-anchor="middle" font-family="DejaVu Sans" font-size="16.5" font-weight="bold" fill="#5CE0B4">Manages infrastructure lifecycle</text>
+  <path d="M116,424 a9,9 0 0 1 2,-17.8 a11,11 0 0 1 21,-1.5 a8.5,8.5 0 0 1 3,17.5 z" fill="none" stroke="#D4E2DA" stroke-width="1.7" stroke-linejoin="round"/>
+  <text x="152" y="420" font-family="DejaVu Sans" font-size="15" fill="#D4E2DA">CAPD cluster</text>
+  <g fill="none" stroke="#D4E2DA" stroke-width="1.7" stroke-linejoin="round">
     <path d="M270,406 h9 a5,5 0 1 1 10,0 h9 v9 a5,5 0 1 1 0,10 v9 h-28 z"/>
   </g>
-  <text x="306" y="420" font-family="DejaVu Sans" font-size="15" fill="#d6d6d6">Flux bootstrap addon</text>
+  <text x="306" y="420" font-family="DejaVu Sans" font-size="15" fill="#D4E2DA">Flux bootstrap addon</text>
 
   <!-- ===== local OCI registry ===== -->
-  <rect x="620" y="150" width="400" height="330" rx="14" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
-  <rect x="636" y="158" width="368" height="5" rx="2.5" fill="#ab9fd6"/>
-  <text x="820" y="198" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#ab9fd6">Local OCI Registry</text>
-  <text x="820" y="222" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="16" fill="#8f8f8f">krops-registry:5000</text>
+  <rect x="620" y="150" width="400" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="636" y="158" width="368" height="5" rx="2.5" fill="#B0F6C0"/>
+  <text x="820" y="198" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#B0F6C0">Local OCI Registry</text>
+  <text x="820" y="222" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="16" fill="#859D91">krops-registry:5000</text>
   <!-- artifact box -->
-  <rect x="652" y="244" width="336" height="60" rx="10" fill="#1d1d30" stroke="#ab9fd6" stroke-opacity="0.6" stroke-width="1.2"/>
-  <text x="820" y="269" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#ab9fd6">oci://krops-registry:5000/krops</text>
-  <text x="820" y="292" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#d6d6d6">krops:latest</text>
+  <rect x="652" y="244" width="336" height="60" rx="10" fill="#1B2C23" stroke="#B0F6C0" stroke-opacity="0.6" stroke-width="1.2"/>
+  <text x="820" y="269" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#B0F6C0">oci://krops-registry:5000/krops</text>
+  <text x="820" y="292" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#D4E2DA">krops:latest</text>
   <!-- folder tree -->
   <g fill="none" stroke-width="1.7">
-    <path d="M672,326 h9 l4,5 h15 v16 h-28 z" stroke="#85c7bb"/>
-    <path d="M672,368 h9 l4,5 h15 v16 h-28 z" stroke="#d693b1"/>
+    <path d="M672,326 h9 l4,5 h15 v16 h-28 z" stroke="#5CE0B4"/>
+    <path d="M672,368 h9 l4,5 h15 v16 h-28 z" stroke="#68C5EB"/>
   </g>
-  <text x="712" y="344" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#85c7bb">mgmt/local-host/</text>
-  <text x="712" y="386" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#d693b1">workload/local-host/</text>
-  <text x="820" y="428" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#8f8f8f">published from your working tree by</text>
-  <text x="820" y="452" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#d6d6d6">mise -E local-host run oci-push</text>
+  <text x="712" y="344" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#5CE0B4">mgmt/local-host/</text>
+  <text x="712" y="386" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#68C5EB">workload/local-host/</text>
+  <text x="820" y="428" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">published from your working tree by</text>
+  <text x="820" y="452" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#D4E2DA">mise -E local-host run oci-push</text>
 
   <!-- push arrow into registry (from laptop) -->
-  <line x1="1058" y1="256" x2="1028" y2="256" stroke="#8f8f8f" stroke-width="2" marker-end="url(#arrow-gray)"/>
-  <text x="1044" y="230" text-anchor="end" font-family="DejaVu Sans" font-size="15" fill="#8f8f8f">1. oci-push</text>
+  <line x1="1058" y1="256" x2="1028" y2="256" stroke="#859D91" stroke-width="2" marker-end="url(#arrow-gray)"/>
+  <text x="1044" y="230" text-anchor="end" font-family="DejaVu Sans" font-size="15" fill="#859D91">1. oci-push</text>
 
   <!-- ===== workload cluster ===== -->
-  <rect x="290" y="600" width="540" height="330" rx="14" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
-  <rect x="306" y="608" width="508" height="5" rx="2.5" fill="#d693b1"/>
-  <text x="560" y="648" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#d693b1">Workload Cluster</text>
-  <text x="560" y="672" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#d6d6d6">CAPD &#183; 1 control plane + 1 worker (Docker containers)</text>
+  <rect x="290" y="600" width="540" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="306" y="608" width="508" height="5" rx="2.5" fill="#68C5EB"/>
+  <text x="560" y="648" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#68C5EB">Workload Cluster</text>
+  <text x="560" y="672" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">CAPD &#183; 1 control plane + 1 worker (Docker containers)</text>
   <g transform="translate(370,722) scale(0.85)">
-    <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#d693b1"/>
-    <line x1="0" y1="-18" x2="0" y2="18" stroke="#131320" stroke-width="2.5"/>
-    <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#d693b1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M-10,33 L0,39 L10,33" fill="none" stroke="#d693b1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#68C5EB"/>
+    <line x1="0" y1="-18" x2="0" y2="18" stroke="#131E18" stroke-width="2.5"/>
+    <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#68C5EB" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M-10,33 L0,39 L10,33" fill="none" stroke="#68C5EB" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
-  <text x="406" y="722" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#fafafa">Flux</text>
-  <text x="406" y="741" font-family="DejaVu Sans" font-size="13" fill="#8f8f8f">(local)</text>
-  <rect x="470" y="690" width="300" height="62" rx="8" fill="#1d1d30" stroke="#d693b1" stroke-opacity="0.6" stroke-width="1.2"/>
-  <text x="620" y="713" text-anchor="middle" font-family="DejaVu Sans" font-size="12.5" fill="#d6d6d6">syncs OCI artifact path</text>
-  <text x="620" y="736" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="16" fill="#d693b1">workload/local-host/</text>
+  <text x="406" y="722" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#FFFFFF">Flux</text>
+  <text x="406" y="741" font-family="DejaVu Sans" font-size="13" fill="#859D91">(local)</text>
+  <rect x="470" y="690" width="300" height="62" rx="8" fill="#1B2C23" stroke="#68C5EB" stroke-opacity="0.6" stroke-width="1.2"/>
+  <text x="620" y="713" text-anchor="middle" font-family="DejaVu Sans" font-size="12.5" fill="#D4E2DA">syncs OCI artifact path</text>
+  <text x="620" y="736" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="16" fill="#68C5EB">workload/local-host/</text>
   <!-- podinfo app chip -->
-  <rect x="370" y="782" width="380" height="70" rx="10" fill="#1d1d30" stroke="#3d3d55" stroke-width="1.2"/>
-  <g stroke="#cfa07e" stroke-width="1.8" fill="none">
+  <rect x="370" y="782" width="380" height="70" rx="10" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
+  <g stroke="#E8A868" stroke-width="1.8" fill="none">
     <circle cx="410" cy="810" r="7"/>
     <path d="M397,838 a13,13 0 0 1 26,0"/>
   </g>
-  <text x="442" y="812" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#fafafa">podinfo</text>
-  <text x="442" y="836" font-family="DejaVu Sans" font-size="14.5" fill="#d6d6d6">demo app &#183; reachable from your laptop</text>
+  <text x="442" y="812" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#FFFFFF">podinfo</text>
+  <text x="442" y="836" font-family="DejaVu Sans" font-size="14.5" fill="#D4E2DA">demo app &#183; reachable from your laptop</text>
   <!-- lifecycle strip -->
-  <rect x="314" y="872" width="492" height="42" rx="8" fill="#d693b1" fill-opacity="0.14"/>
-  <text x="560" y="899" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#d693b1">Manages application lifecycle</text>
+  <rect x="314" y="872" width="492" height="42" rx="8" fill="#68C5EB" fill-opacity="0.14"/>
+  <text x="560" y="899" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#68C5EB">Manages application lifecycle</text>
 
   <!-- port-forward arrow -->
-  <path d="M830,817 H1000" fill="none" stroke="#8f8f8f" stroke-width="2" marker-end="url(#arrow-gray)"/>
-  <text x="915" y="795" text-anchor="middle" font-family="DejaVu Sans" font-size="15" fill="#8f8f8f">5. port-forward</text>
-  <text x="915" y="843" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#cfa07e">localhost:9898</text>
+  <path d="M830,817 H1000" fill="none" stroke="#859D91" stroke-width="2" marker-end="url(#arrow-gray)"/>
+  <text x="915" y="795" text-anchor="middle" font-family="DejaVu Sans" font-size="15" fill="#859D91">5. port-forward</text>
+  <text x="915" y="843" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#E8A868">localhost:9898</text>
 
   <!-- ===== legend strip ===== -->
-  <rect x="64" y="992" width="966" height="66" rx="12" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
-  <g stroke="#cfa07e" stroke-width="1.7" fill="none">
+  <rect x="64" y="992" width="966" height="66" rx="12" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <g stroke="#E8A868" stroke-width="1.7" fill="none">
     <circle cx="106" cy="1021" r="8"/>
     <path d="M102,1029 v4 h8 v-4 M103,1037 h6"/>
     <line x1="106" y1="1006" x2="106" y2="1009"/>
     <line x1="94" y1="1012" x2="96.5" y2="1014"/>
     <line x1="118" y1="1012" x2="115.5" y2="1014"/>
   </g>
-  <text x="134" y="1032" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#85c7bb">Management cluster</text>
-  <text x="340" y="1032" font-family="DejaVu Sans" font-size="16" fill="#d6d6d6">= infrastructure lifecycle</text>
-  <line x1="592" y1="1004" x2="592" y2="1046" stroke="#3d3d55" stroke-width="1.4"/>
-  <text x="618" y="1032" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#d693b1">Workload cluster</text>
-  <text x="796" y="1032" font-family="DejaVu Sans" font-size="16" fill="#d6d6d6">= application lifecycle</text>
+  <text x="134" y="1032" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#5CE0B4">Management cluster</text>
+  <text x="340" y="1032" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">= infrastructure lifecycle</text>
+  <line x1="592" y1="1004" x2="592" y2="1046" stroke="#284637" stroke-width="1.4"/>
+  <text x="618" y="1032" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#68C5EB">Workload cluster</text>
+  <text x="796" y="1032" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">= application lifecycle</text>
 
   <!-- ===== flow panel ===== -->
-  <rect x="1090" y="150" width="446" height="904" rx="14" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
+  <rect x="1090" y="150" width="446" height="904" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
 
   <!-- step 1 -->
-  <circle cx="1140" cy="208" r="15" fill="#ab9fd6"/>
-  <text x="1140" y="214" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0f0f0f">1</text>
-  <text x="1168" y="204" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">Toolbox creates kind + registry;</text>
-  <text x="1168" y="230" font-family="DejaVu Sans Mono" font-size="15.5" fill="#ab9fd6">oci-push publishes mgmt/ and</text>
-  <text x="1168" y="256" font-family="DejaVu Sans Mono" font-size="15.5" fill="#ab9fd6">workload/ as krops:latest.</text>
-  <text x="1168" y="282" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">No GitHub PAT, no AWS account.</text>
-  <line x1="1122" y1="316" x2="1504" y2="316" stroke="#34344a" stroke-width="1.2"/>
+  <circle cx="1140" cy="208" r="15" fill="#B0F6C0"/>
+  <text x="1140" y="214" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">1</text>
+  <text x="1168" y="204" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Toolbox creates kind + registry;</text>
+  <text x="1168" y="230" font-family="DejaVu Sans Mono" font-size="15.5" fill="#B0F6C0">oci-push publishes mgmt/ and</text>
+  <text x="1168" y="256" font-family="DejaVu Sans Mono" font-size="15.5" fill="#B0F6C0">workload/ as krops:latest.</text>
+  <text x="1168" y="282" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">No GitHub PAT, no AWS account.</text>
+  <line x1="1122" y1="316" x2="1504" y2="316" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- step 2 -->
-  <circle cx="1140" cy="364" r="15" fill="#85c7bb"/>
-  <text x="1140" y="370" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0f0f0f">2</text>
-  <text x="1168" y="360" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">Management Flux syncs the OCI</text>
-  <text x="1168" y="386" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">artifact (<tspan font-family="DejaVu Sans Mono" font-size="16" fill="#85c7bb">mgmt/local-host/</tspan>) and</text>
-  <text x="1168" y="412" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">installs CAPI with the Docker</text>
-  <text x="1168" y="438" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">provider (CAPD).</text>
-  <line x1="1122" y1="472" x2="1504" y2="472" stroke="#34344a" stroke-width="1.2"/>
+  <circle cx="1140" cy="364" r="15" fill="#5CE0B4"/>
+  <text x="1140" y="370" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">2</text>
+  <text x="1168" y="360" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Management Flux syncs the OCI</text>
+  <text x="1168" y="386" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">artifact (<tspan font-family="DejaVu Sans Mono" font-size="16" fill="#5CE0B4">mgmt/local-host/</tspan>) and</text>
+  <text x="1168" y="412" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">installs CAPI with the Docker</text>
+  <text x="1168" y="438" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">provider (CAPD).</text>
+  <line x1="1122" y1="472" x2="1504" y2="472" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- step 3 -->
-  <circle cx="1140" cy="520" r="15" fill="#85c7bb"/>
-  <text x="1140" y="526" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0f0f0f">3</text>
-  <text x="1168" y="516" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">CAPD provisions a workload cluster</text>
-  <text x="1168" y="542" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">as Docker containers (1 CP + 1</text>
-  <text x="1168" y="568" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">worker); <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#85c7bb">flux-apps</tspan> installs a</text>
-  <text x="1168" y="594" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">second Flux instance there.</text>
-  <line x1="1122" y1="628" x2="1504" y2="628" stroke="#34344a" stroke-width="1.2"/>
+  <circle cx="1140" cy="520" r="15" fill="#5CE0B4"/>
+  <text x="1140" y="526" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">3</text>
+  <text x="1168" y="516" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">CAPD provisions a workload cluster</text>
+  <text x="1168" y="542" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">as Docker containers (1 CP + 1</text>
+  <text x="1168" y="568" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">worker); <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#5CE0B4">flux-apps</tspan> installs a</text>
+  <text x="1168" y="594" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">second Flux instance there.</text>
+  <line x1="1122" y1="628" x2="1504" y2="628" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- step 4 -->
-  <circle cx="1140" cy="676" r="15" fill="#d693b1"/>
-  <text x="1140" y="682" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0f0f0f">4</text>
-  <text x="1168" y="672" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">Workload Flux syncs the same OCI</text>
-  <text x="1168" y="698" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">artifact under <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#d693b1">workload/local-host/</tspan></text>
-  <text x="1168" y="724" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">and reconciles <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#fafafa">podinfo</tspan>; verify at</text>
-  <text x="1168" y="750" font-family="DejaVu Sans Mono" font-size="16" fill="#cfa07e">http://localhost:9898<tspan font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">.</tspan></text>
-  <line x1="1122" y1="788" x2="1504" y2="788" stroke="#34344a" stroke-width="1.2"/>
+  <circle cx="1140" cy="676" r="15" fill="#68C5EB"/>
+  <text x="1140" y="682" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">4</text>
+  <text x="1168" y="672" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Workload Flux syncs the same OCI</text>
+  <text x="1168" y="698" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">artifact under <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#68C5EB">workload/local-host/</tspan></text>
+  <text x="1168" y="724" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">and reconciles <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#FFFFFF">podinfo</tspan>; verify at</text>
+  <text x="1168" y="750" font-family="DejaVu Sans Mono" font-size="16" fill="#E8A868">http://localhost:9898<tspan font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">.</tspan></text>
+  <line x1="1122" y1="788" x2="1504" y2="788" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- golden rule -->
-  <text x="1122" y="832" font-family="DejaVu Sans" font-size="22" font-weight="bold" fill="#f2c464">Golden rule</text>
-  <text x="1122" y="866" font-family="DejaVu Sans" font-size="18" fill="#d6d6d6">Edit YAML in the tree; never mutate</text>
-  <text x="1122" y="894" font-family="DejaVu Sans" font-size="18" fill="#d6d6d6">the clusters. Flux tracks the OCI</text>
-  <text x="1122" y="922" font-family="DejaVu Sans" font-size="18" fill="#d6d6d6">artifact: nothing reconciles until</text>
-  <text x="1122" y="950" font-family="DejaVu Sans" font-size="18" fill="#d6d6d6">you <tspan font-family="DejaVu Sans Mono" font-size="17" fill="#fafafa">oci-push</tspan> again.</text>
-  <line x1="1122" y1="978" x2="1504" y2="978" stroke="#34344a" stroke-width="1.2"/>
+  <text x="1122" y="832" font-family="DejaVu Sans" font-size="22" font-weight="bold" fill="#E5B85C">Golden rule</text>
+  <text x="1122" y="866" font-family="DejaVu Sans" font-size="18" fill="#D4E2DA">Edit YAML in the tree; never mutate</text>
+  <text x="1122" y="894" font-family="DejaVu Sans" font-size="18" fill="#D4E2DA">the clusters. Flux tracks the OCI</text>
+  <text x="1122" y="922" font-family="DejaVu Sans" font-size="18" fill="#D4E2DA">artifact: nothing reconciles until</text>
+  <text x="1122" y="950" font-family="DejaVu Sans" font-size="18" fill="#D4E2DA">you <tspan font-family="DejaVu Sans Mono" font-size="17" fill="#FFFFFF">oci-push</tspan> again.</text>
+  <line x1="1122" y1="978" x2="1504" y2="978" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- color key -->
-  <circle cx="1132" cy="1014" r="6" fill="#85c7bb"/>
-  <text x="1146" y="1020" font-family="DejaVu Sans Mono" font-size="14" fill="#d6d6d6">mgmt</text>
-  <circle cx="1210" cy="1014" r="6" fill="#ab9fd6"/>
-  <text x="1224" y="1020" font-family="DejaVu Sans Mono" font-size="14" fill="#d6d6d6">oci</text>
-  <circle cx="1282" cy="1014" r="6" fill="#d693b1"/>
-  <text x="1296" y="1020" font-family="DejaVu Sans Mono" font-size="14" fill="#d6d6d6">workload</text>
-  <circle cx="1398" cy="1014" r="6" fill="#cfa07e"/>
-  <text x="1412" y="1020" font-family="DejaVu Sans Mono" font-size="14" fill="#d6d6d6">app</text>
+  <circle cx="1132" cy="1014" r="6" fill="#5CE0B4"/>
+  <text x="1146" y="1020" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">mgmt</text>
+  <circle cx="1210" cy="1014" r="6" fill="#B0F6C0"/>
+  <text x="1224" y="1020" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">oci</text>
+  <circle cx="1282" cy="1014" r="6" fill="#68C5EB"/>
+  <text x="1296" y="1020" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">workload</text>
+  <circle cx="1398" cy="1014" r="6" fill="#E8A868"/>
+  <text x="1412" y="1020" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">app</text>
 
   <!-- ===== footer ===== -->
-  <text x="800" y="1102" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#8f8f8f">After workload readiness, pivot moves CAPI into local-management and deletes kind.</text>
-  <text x="800" y="1128" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#8f8f8f">Same chain as aws: CAPD and a local registry replace CAPA and GitHub.</text>
+  <text x="800" y="1102" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">After workload readiness, pivot moves CAPI into local-management and deletes kind.</text>
+  <text x="800" y="1128" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">Same chain as aws: CAPD and a local registry replace CAPA and GitHub.</text>
 </svg>

@@ -1,183 +1,183 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1150" viewBox="0 0 1600 1150">
   <defs>
     <marker id="arrow-teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#85c7bb"/>
+      <path d="M0,0 L10,5 L0,10 z" fill="#5CE0B4"/>
     </marker>
     <marker id="arrow-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#8f8f8f"/>
+      <path d="M0,0 L10,5 L0,10 z" fill="#859D91"/>
     </marker>
     <marker id="arrow-purple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#ab9fd6"/>
+      <path d="M0,0 L10,5 L0,10 z" fill="#B0F6C0"/>
     </marker>
     <marker id="arrow-tan" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#cfa07e"/>
+      <path d="M0,0 L10,5 L0,10 z" fill="#E8A868"/>
     </marker>
   </defs>
 
   <!-- ===== background ===== -->
-  <rect width="1600" height="1150" fill="#0f0f0f"/>
+  <rect width="1600" height="1150" fill="#0C120F"/>
 
   <!-- ===== title block ===== -->
-  <text x="800" y="60" text-anchor="middle" font-family="DejaVu Sans" font-size="40" font-weight="bold" fill="#ff78c9">krops &#183; Zarf Air-Gap Bundle &#183; Radio Off, Chain Intact</text>
-  <text x="800" y="96" text-anchor="middle" font-family="DejaVu Sans" font-size="19" fill="#8f8f8f">Zarf packages the local-host environment &#183; build connected, deploy with no internet &#183; two registries, one package</text>
+  <text x="800" y="60" text-anchor="middle" font-family="DejaVu Sans" font-size="40" font-weight="bold" fill="#5CE0B4">krops &#183; Zarf Air-Gap Bundle &#183; Radio Off, Chain Intact</text>
+  <text x="800" y="96" text-anchor="middle" font-family="DejaVu Sans" font-size="19" fill="#859D91">Zarf packages the local-host environment &#183; build connected, deploy with no internet &#183; two registries, one package</text>
 
   <!-- ===== section headers ===== -->
-  <text x="64" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#fafafa">CONNECTED SIDE (build)</text>
-  <text x="64" y="470" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#fafafa">AIR-GAPPED SIDE (deploy)</text>
-  <text x="1090" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#fafafa">FLOW (offline reconciliation)</text>
+  <text x="64" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#FFFFFF">CONNECTED SIDE (build)</text>
+  <text x="64" y="470" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#FFFFFF">AIR-GAPPED SIDE (deploy)</text>
+  <text x="1090" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#FFFFFF">FLOW (offline reconciliation)</text>
 
   <!-- ===== connected side: build box ===== -->
-  <rect x="64" y="150" width="440" height="256" rx="14" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
-  <rect x="80" y="158" width="408" height="5" rx="2.5" fill="#85c7bb"/>
-  <text x="284" y="198" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#85c7bb">Build Machine</text>
-  <text x="284" y="222" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#8f8f8f">airgap/scripts/build-package.sh</text>
-  <text x="100" y="262" font-family="DejaVu Sans" font-size="16" fill="#d6d6d6">&#8226; validate + render the GitOps tree</text>
-  <text x="100" y="292" font-family="DejaVu Sans" font-size="16" fill="#d6d6d6">&#8226; trim tree &#8594; OCI config artifact</text>
-  <text x="100" y="322" font-family="DejaVu Sans" font-size="16" fill="#d6d6d6">&#8226; pull node + workload images, charts</text>
-  <text x="100" y="352" font-family="DejaVu Sans Mono" font-size="16" fill="#85c7bb">&#8226; zarf package create</text>
-  <text x="284" y="388" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#8f8f8f">git tree is never modified; airgap variant generated at build</text>
+  <rect x="64" y="150" width="440" height="256" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="80" y="158" width="408" height="5" rx="2.5" fill="#5CE0B4"/>
+  <text x="284" y="198" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#5CE0B4">Build Machine</text>
+  <text x="284" y="222" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#859D91">airgap/scripts/build-package.sh</text>
+  <text x="100" y="262" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">&#8226; validate + render the GitOps tree</text>
+  <text x="100" y="292" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">&#8226; trim tree &#8594; OCI config artifact</text>
+  <text x="100" y="322" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">&#8226; pull node + workload images, charts</text>
+  <text x="100" y="352" font-family="DejaVu Sans Mono" font-size="16" fill="#5CE0B4">&#8226; zarf package create</text>
+  <text x="284" y="388" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">git tree is never modified; airgap variant generated at build</text>
 
   <!-- ===== the bundle ===== -->
-  <rect x="620" y="150" width="400" height="256" rx="14" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
-  <rect x="636" y="158" width="368" height="5" rx="2.5" fill="#ab9fd6"/>
-  <text x="820" y="198" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#ab9fd6">The Bundle</text>
-  <text x="820" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#8f8f8f">(what crosses the gap)</text>
-  <text x="656" y="258" font-family="DejaVu Sans Mono" font-size="15" fill="#d6d6d6">zarf-package-krops-airgap-*.tar.zst</text>
-  <text x="656" y="286" font-family="DejaVu Sans Mono" font-size="15" fill="#d6d6d6">zarf-init tarball + zarf CLI</text>
-  <text x="656" y="314" font-family="DejaVu Sans Mono" font-size="15" fill="#d6d6d6">archives/*.tar <tspan font-family="DejaVu Sans" fill="#8f8f8f">(kind nodes, images)</tspan></text>
-  <text x="656" y="342" font-family="DejaVu Sans Mono" font-size="15" fill="#d6d6d6">charts/*.tgz <tspan font-family="DejaVu Sans" fill="#8f8f8f">(flux-operator, podinfo)</tspan></text>
-  <text x="656" y="370" font-family="DejaVu Sans Mono" font-size="15" fill="#d6d6d6">config-artifact/ <tspan font-family="DejaVu Sans" fill="#8f8f8f">&#8594; krops:latest</tspan></text>
+  <rect x="620" y="150" width="400" height="256" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="636" y="158" width="368" height="5" rx="2.5" fill="#B0F6C0"/>
+  <text x="820" y="198" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#B0F6C0">The Bundle</text>
+  <text x="820" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#859D91">(what crosses the gap)</text>
+  <text x="656" y="258" font-family="DejaVu Sans Mono" font-size="15" fill="#D4E2DA">zarf-package-krops-airgap-*.tar.zst</text>
+  <text x="656" y="286" font-family="DejaVu Sans Mono" font-size="15" fill="#D4E2DA">zarf-init tarball + zarf CLI</text>
+  <text x="656" y="314" font-family="DejaVu Sans Mono" font-size="15" fill="#D4E2DA">archives/*.tar <tspan font-family="DejaVu Sans" fill="#859D91">(kind nodes, images)</tspan></text>
+  <text x="656" y="342" font-family="DejaVu Sans Mono" font-size="15" fill="#D4E2DA">charts/*.tgz <tspan font-family="DejaVu Sans" fill="#859D91">(flux-operator, podinfo)</tspan></text>
+  <text x="656" y="370" font-family="DejaVu Sans Mono" font-size="15" fill="#D4E2DA">config-artifact/ <tspan font-family="DejaVu Sans" fill="#859D91">&#8594; krops:latest</tspan></text>
 
   <!-- build -> bundle arrow -->
-  <line x1="508" y1="278" x2="612" y2="278" stroke="#85c7bb" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
-  <text x="561" y="258" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#fafafa">1. build</text>
+  <line x1="508" y1="278" x2="612" y2="278" stroke="#5CE0B4" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
+  <text x="561" y="258" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#FFFFFF">1. build</text>
 
   <!-- ===== the gap ===== -->
-  <line x1="64" y1="432" x2="1030" y2="432" stroke="#f2c464" stroke-width="2" stroke-dasharray="12,10"/>
-  <text x="547" y="424" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#f2c464">THE GAP &#183; no internet below this line (validated radio-off)</text>
-  <path d="M820,406 V446" fill="none" stroke="#ab9fd6" stroke-width="2.5" marker-end="url(#arrow-purple)"/>
-  <text x="852" y="440" font-family="DejaVu Sans" font-size="15" fill="#8f8f8f">2. carry across</text>
+  <line x1="64" y1="432" x2="1030" y2="432" stroke="#E5B85C" stroke-width="2" stroke-dasharray="12,10"/>
+  <text x="547" y="424" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#E5B85C">THE GAP &#183; no internet below this line (validated radio-off)</text>
+  <path d="M820,406 V446" fill="none" stroke="#B0F6C0" stroke-width="2.5" marker-end="url(#arrow-purple)"/>
+  <text x="852" y="440" font-family="DejaVu Sans" font-size="15" fill="#859D91">2. carry across</text>
 
   <!-- ===== management cluster (offline) ===== -->
-  <rect x="64" y="486" width="500" height="444" rx="14" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
-  <rect x="80" y="494" width="468" height="5" rx="2.5" fill="#85c7bb"/>
-  <text x="314" y="532" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#85c7bb">Management Cluster</text>
-  <text x="314" y="556" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#8f8f8f">(kind &#183; nodes loaded from archives)</text>
+  <rect x="64" y="486" width="500" height="444" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="80" y="494" width="468" height="5" rx="2.5" fill="#5CE0B4"/>
+  <text x="314" y="532" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#5CE0B4">Management Cluster</text>
+  <text x="314" y="556" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#859D91">(kind &#183; nodes loaded from archives)</text>
   <!-- zarf substrate chip -->
-  <rect x="88" y="576" width="452" height="128" rx="10" fill="#cfa07e" fill-opacity="0.10" stroke="#cfa07e" stroke-opacity="0.55" stroke-width="1.2"/>
-  <text x="314" y="604" text-anchor="middle" font-family="DejaVu Sans" font-size="16.5" font-weight="bold" fill="#cfa07e">Zarf owns the substrate</text>
-  <text x="106" y="632" font-family="DejaVu Sans" font-size="15" fill="#d6d6d6">&#8226; registry 127.0.0.1:31999 + rewrite agent</text>
-  <text x="106" y="658" font-family="DejaVu Sans" font-size="15" fill="#d6d6d6">&#8226; cert-manager &#183; Flux &#183; CAPI/CAPD/CAAPH</text>
-  <text x="106" y="684" font-family="DejaVu Sans" font-size="15" fill="#d6d6d6">&#8226; publishes config artifact into the internal registry</text>
+  <rect x="88" y="576" width="452" height="128" rx="10" fill="#E8A868" fill-opacity="0.10" stroke="#E8A868" stroke-opacity="0.55" stroke-width="1.2"/>
+  <text x="314" y="604" text-anchor="middle" font-family="DejaVu Sans" font-size="16.5" font-weight="bold" fill="#E8A868">Zarf owns the substrate</text>
+  <text x="106" y="632" font-family="DejaVu Sans" font-size="15" fill="#D4E2DA">&#8226; registry 127.0.0.1:31999 + rewrite agent</text>
+  <text x="106" y="658" font-family="DejaVu Sans" font-size="15" fill="#D4E2DA">&#8226; cert-manager &#183; Flux &#183; CAPI/CAPD/CAAPH</text>
+  <text x="106" y="684" font-family="DejaVu Sans" font-size="15" fill="#D4E2DA">&#8226; publishes config artifact into the internal registry</text>
   <!-- flux glyph -->
   <g transform="translate(130,760)">
-    <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#85c7bb"/>
-    <line x1="0" y1="-18" x2="0" y2="18" stroke="#131320" stroke-width="2.5"/>
-    <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#85c7bb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M-10,33 L0,39 L10,33" fill="none" stroke="#85c7bb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#5CE0B4"/>
+    <line x1="0" y1="-18" x2="0" y2="18" stroke="#131E18" stroke-width="2.5"/>
+    <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M-10,33 L0,39 L10,33" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
-  <text x="130" y="826" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#fafafa">Flux</text>
-  <rect x="188" y="726" width="352" height="70" rx="8" fill="#1d1d30" stroke="#85c7bb" stroke-opacity="0.6" stroke-width="1.2"/>
-  <text x="364" y="753" text-anchor="middle" font-family="DejaVu Sans" font-size="13" fill="#d6d6d6">FluxInstance syncs from Zarf internal registry</text>
-  <text x="364" y="778" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="13.5" fill="#85c7bb">zarf-docker-registry.zarf.svc:5000</text>
+  <text x="130" y="826" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#FFFFFF">Flux</text>
+  <rect x="188" y="726" width="352" height="70" rx="8" fill="#1B2C23" stroke="#5CE0B4" stroke-opacity="0.6" stroke-width="1.2"/>
+  <text x="364" y="753" text-anchor="middle" font-family="DejaVu Sans" font-size="13" fill="#D4E2DA">FluxInstance syncs from Zarf internal registry</text>
+  <text x="364" y="778" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="13.5" fill="#5CE0B4">zarf-docker-registry.zarf.svc:5000</text>
   <!-- flux ownership strip -->
-  <rect x="88" y="848" width="452" height="60" rx="10" fill="#85c7bb" fill-opacity="0.12" stroke="#85c7bb" stroke-opacity="0.5" stroke-width="1.2"/>
-  <text x="314" y="874" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#85c7bb">Flux owns the workload definitions</text>
-  <text x="314" y="896" text-anchor="middle" font-family="DejaVu Sans" font-size="14" fill="#d6d6d6">CAPD cluster &#183; kindnet CNI addon &#183; per-cluster Flux addon</text>
+  <rect x="88" y="848" width="452" height="60" rx="10" fill="#5CE0B4" fill-opacity="0.12" stroke="#5CE0B4" stroke-opacity="0.5" stroke-width="1.2"/>
+  <text x="314" y="874" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#5CE0B4">Flux owns the workload definitions</text>
+  <text x="314" y="896" text-anchor="middle" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">CAPD cluster &#183; kindnet CNI addon &#183; per-cluster Flux addon</text>
 
   <!-- provisions arrow -->
-  <line x1="564" y1="708" x2="668" y2="708" stroke="#85c7bb" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-teal)"/>
-  <text x="616" y="686" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#fafafa">4. provisions</text>
+  <line x1="564" y1="708" x2="668" y2="708" stroke="#5CE0B4" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-teal)"/>
+  <text x="616" y="686" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#FFFFFF">4. provisions</text>
 
   <!-- ===== workload cluster (offline) ===== -->
-  <rect x="676" y="486" width="354" height="444" rx="14" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
-  <rect x="692" y="494" width="322" height="5" rx="2.5" fill="#d693b1"/>
-  <text x="853" y="532" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#d693b1">Workload Cluster</text>
-  <text x="853" y="556" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#d6d6d6">CAPD &#183; k8s images pre-baked in node</text>
+  <rect x="676" y="486" width="354" height="444" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="692" y="494" width="322" height="5" rx="2.5" fill="#68C5EB"/>
+  <text x="853" y="532" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#68C5EB">Workload Cluster</text>
+  <text x="853" y="556" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">CAPD &#183; k8s images pre-baked in node</text>
   <g transform="translate(740,616) scale(0.85)">
-    <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#d693b1"/>
-    <line x1="0" y1="-18" x2="0" y2="18" stroke="#131320" stroke-width="2.5"/>
-    <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#d693b1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M-10,33 L0,39 L10,33" fill="none" stroke="#d693b1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#68C5EB"/>
+    <line x1="0" y1="-18" x2="0" y2="18" stroke="#131E18" stroke-width="2.5"/>
+    <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#68C5EB" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M-10,33 L0,39 L10,33" fill="none" stroke="#68C5EB" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
-  <text x="776" y="616" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#fafafa">Flux</text>
-  <text x="776" y="635" font-family="DejaVu Sans" font-size="13" fill="#8f8f8f">(local)</text>
-  <rect x="700" y="672" width="306" height="66" rx="8" fill="#1d1d30" stroke="#d693b1" stroke-opacity="0.6" stroke-width="1.2"/>
-  <text x="853" y="697" text-anchor="middle" font-family="DejaVu Sans" font-size="12.5" fill="#d6d6d6">syncs config + charts from</text>
-  <text x="853" y="721" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#d693b1">krops-registry:5000</text>
+  <text x="776" y="616" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#FFFFFF">Flux</text>
+  <text x="776" y="635" font-family="DejaVu Sans" font-size="13" fill="#859D91">(local)</text>
+  <rect x="700" y="672" width="306" height="66" rx="8" fill="#1B2C23" stroke="#68C5EB" stroke-opacity="0.6" stroke-width="1.2"/>
+  <text x="853" y="697" text-anchor="middle" font-family="DejaVu Sans" font-size="12.5" fill="#D4E2DA">syncs config + charts from</text>
+  <text x="853" y="721" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#68C5EB">krops-registry:5000</text>
   <!-- podinfo chip -->
-  <rect x="700" y="762" width="306" height="70" rx="10" fill="#1d1d30" stroke="#3d3d55" stroke-width="1.2"/>
-  <g stroke="#cfa07e" stroke-width="1.8" fill="none">
+  <rect x="700" y="762" width="306" height="70" rx="10" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
+  <g stroke="#E8A868" stroke-width="1.8" fill="none">
     <circle cx="736" cy="790" r="7"/>
     <path d="M723,818 a13,13 0 0 1 26,0"/>
   </g>
-  <text x="766" y="792" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#fafafa">podinfo</text>
-  <text x="766" y="816" font-family="DejaVu Sans" font-size="14" fill="#d6d6d6">via preLoadImages, zero pulls</text>
+  <text x="766" y="792" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#FFFFFF">podinfo</text>
+  <text x="766" y="816" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">via preLoadImages, zero pulls</text>
   <!-- lifecycle strip -->
-  <rect x="700" y="856" width="306" height="42" rx="8" fill="#d693b1" fill-opacity="0.14"/>
-  <text x="853" y="883" text-anchor="middle" font-family="DejaVu Sans" font-size="15.5" font-weight="bold" fill="#d693b1">Manages application lifecycle</text>
+  <rect x="700" y="856" width="306" height="42" rx="8" fill="#68C5EB" fill-opacity="0.14"/>
+  <text x="853" y="883" text-anchor="middle" font-family="DejaVu Sans" font-size="15.5" font-weight="bold" fill="#68C5EB">Manages application lifecycle</text>
 
   <!-- ===== legend strip ===== -->
-  <rect x="64" y="962" width="966" height="96" rx="12" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
-  <text x="88" y="998" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#cfa07e">Zarf</text>
-  <text x="140" y="998" font-family="DejaVu Sans" font-size="16" fill="#d6d6d6">= substrate: registry, agent, cert-manager, flux-operator, CAPI/CAPD/CAAPH, config artifact</text>
-  <text x="88" y="1034" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#85c7bb">Flux</text>
-  <text x="140" y="1034" font-family="DejaVu Sans" font-size="16" fill="#d6d6d6">= workload definitions: CAPD cluster, CNI addon, per-cluster Flux addon, apps</text>
+  <rect x="64" y="962" width="966" height="96" rx="12" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <text x="88" y="998" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#E8A868">Zarf</text>
+  <text x="140" y="998" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">= substrate: registry, agent, cert-manager, flux-operator, CAPI/CAPD/CAAPH, config artifact</text>
+  <text x="88" y="1034" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#5CE0B4">Flux</text>
+  <text x="140" y="1034" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">= workload definitions: CAPD cluster, CNI addon, per-cluster Flux addon, apps</text>
 
   <!-- ===== flow panel ===== -->
-  <rect x="1090" y="150" width="446" height="904" rx="14" fill="#131320" stroke="#3d3d55" stroke-width="1.5"/>
+  <rect x="1090" y="150" width="446" height="904" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
 
   <!-- step 1 -->
-  <circle cx="1140" cy="208" r="15" fill="#85c7bb"/>
-  <text x="1140" y="214" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0f0f0f">1</text>
-  <text x="1168" y="204" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">Connected: <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#85c7bb">build-package.sh</tspan></text>
-  <text x="1168" y="230" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">renders the tree, pulls every image</text>
-  <text x="1168" y="256" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">and chart, creates the Zarf package.</text>
-  <line x1="1122" y1="290" x2="1504" y2="290" stroke="#34344a" stroke-width="1.2"/>
+  <circle cx="1140" cy="208" r="15" fill="#5CE0B4"/>
+  <text x="1140" y="214" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">1</text>
+  <text x="1168" y="204" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Connected: <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#5CE0B4">build-package.sh</tspan></text>
+  <text x="1168" y="230" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">renders the tree, pulls every image</text>
+  <text x="1168" y="256" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">and chart, creates the Zarf package.</text>
+  <line x1="1122" y1="290" x2="1504" y2="290" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- step 2 -->
-  <circle cx="1140" cy="338" r="15" fill="#ab9fd6"/>
-  <text x="1140" y="344" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0f0f0f">2</text>
-  <text x="1168" y="334" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">The bundle crosses the gap. Offline:</text>
-  <text x="1168" y="360" font-family="DejaVu Sans Mono" font-size="15.5" fill="#ab9fd6">docker load archives; create kind</text>
-  <text x="1168" y="386" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">mgmt cluster, seed krops-registry.</text>
-  <line x1="1122" y1="420" x2="1504" y2="420" stroke="#34344a" stroke-width="1.2"/>
+  <circle cx="1140" cy="338" r="15" fill="#B0F6C0"/>
+  <text x="1140" y="344" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">2</text>
+  <text x="1168" y="334" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">The bundle crosses the gap. Offline:</text>
+  <text x="1168" y="360" font-family="DejaVu Sans Mono" font-size="15.5" fill="#B0F6C0">docker load archives; create kind</text>
+  <text x="1168" y="386" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">mgmt cluster, seed krops-registry.</text>
+  <line x1="1122" y1="420" x2="1504" y2="420" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- step 3 -->
-  <circle cx="1140" cy="468" r="15" fill="#cfa07e"/>
-  <text x="1140" y="474" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0f0f0f">3</text>
-  <text x="1168" y="464" font-family="DejaVu Sans Mono" font-size="16" fill="#cfa07e">zarf init + zarf package deploy:</text>
-  <text x="1168" y="490" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">internal registry + agent, substrate</text>
-  <text x="1168" y="516" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">components; agent rewrites every</text>
-  <text x="1168" y="542" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">image ref to the internal registry.</text>
-  <line x1="1122" y1="576" x2="1504" y2="576" stroke="#34344a" stroke-width="1.2"/>
+  <circle cx="1140" cy="468" r="15" fill="#E8A868"/>
+  <text x="1140" y="474" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">3</text>
+  <text x="1168" y="464" font-family="DejaVu Sans Mono" font-size="16" fill="#E8A868">zarf init + zarf package deploy:</text>
+  <text x="1168" y="490" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">internal registry + agent, substrate</text>
+  <text x="1168" y="516" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">components; agent rewrites every</text>
+  <text x="1168" y="542" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">image ref to the internal registry.</text>
+  <line x1="1122" y1="576" x2="1504" y2="576" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- step 4 -->
-  <circle cx="1140" cy="624" r="15" fill="#85c7bb"/>
-  <text x="1140" y="630" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0f0f0f">4</text>
-  <text x="1168" y="620" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">FluxInstance syncs the config</text>
-  <text x="1168" y="646" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">artifact from Zarf's registry; Flux</text>
-  <text x="1168" y="672" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">reconciles the CAPD cluster and</text>
-  <text x="1168" y="698" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">installs workload Flux.</text>
-  <line x1="1122" y1="732" x2="1504" y2="732" stroke="#34344a" stroke-width="1.2"/>
+  <circle cx="1140" cy="624" r="15" fill="#5CE0B4"/>
+  <text x="1140" y="630" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">4</text>
+  <text x="1168" y="620" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">FluxInstance syncs the config</text>
+  <text x="1168" y="646" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">artifact from Zarf's registry; Flux</text>
+  <text x="1168" y="672" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">reconciles the CAPD cluster and</text>
+  <text x="1168" y="698" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">installs workload Flux.</text>
+  <line x1="1122" y1="732" x2="1504" y2="732" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- step 5 -->
-  <circle cx="1140" cy="780" r="15" fill="#d693b1"/>
-  <text x="1140" y="786" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0f0f0f">5</text>
-  <text x="1168" y="776" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">Workload Flux pulls config + charts</text>
-  <text x="1168" y="802" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">from krops-registry; podinfo runs</text>
-  <text x="1168" y="828" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">from pre-loaded images. Zero pulls,</text>
-  <text x="1168" y="854" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">zero public packets.</text>
-  <line x1="1122" y1="888" x2="1504" y2="888" stroke="#34344a" stroke-width="1.2"/>
+  <circle cx="1140" cy="780" r="15" fill="#68C5EB"/>
+  <text x="1140" y="786" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">5</text>
+  <text x="1168" y="776" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Workload Flux pulls config + charts</text>
+  <text x="1168" y="802" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">from krops-registry; podinfo runs</text>
+  <text x="1168" y="828" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">from pre-loaded images. Zero pulls,</text>
+  <text x="1168" y="854" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">zero public packets.</text>
+  <line x1="1122" y1="888" x2="1504" y2="888" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- update drill -->
-  <text x="1122" y="930" font-family="DejaVu Sans" font-size="22" font-weight="bold" fill="#f2c464">Update drill</text>
-  <text x="1122" y="962" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">Config-only change: rebuild + re-push</text>
-  <text x="1122" y="988" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6"><tspan font-family="DejaVu Sans Mono" font-size="16" fill="#fafafa">krops:latest</tspan>, no package rebuild.</text>
-  <text x="1122" y="1014" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">Substrate change: new package +</text>
-  <text x="1122" y="1040" font-family="DejaVu Sans" font-size="17" fill="#d6d6d6">fresh <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#fafafa">zarf package deploy</tspan>.</text>
+  <text x="1122" y="930" font-family="DejaVu Sans" font-size="22" font-weight="bold" fill="#E5B85C">Update drill</text>
+  <text x="1122" y="962" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Config-only change: rebuild + re-push</text>
+  <text x="1122" y="988" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA"><tspan font-family="DejaVu Sans Mono" font-size="16" fill="#FFFFFF">krops:latest</tspan>, no package rebuild.</text>
+  <text x="1122" y="1014" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Substrate change: new package +</text>
+  <text x="1122" y="1040" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">fresh <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#FFFFFF">zarf package deploy</tspan>.</text>
 
   <!-- ===== footer ===== -->
-  <text x="800" y="1102" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#8f8f8f">Validated end-to-end with the radio off: CI captures public traffic and fails on any packet.</text>
-  <text x="800" y="1128" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#8f8f8f">Same GitOps chain as local-host: only the delivery vehicle changes.</text>
+  <text x="800" y="1102" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">Validated end-to-end with the radio off: CI captures public traffic and fails on any packet.</text>
+  <text x="800" y="1128" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">Same GitOps chain as local-host: only the delivery vehicle changes.</text>
 </svg>

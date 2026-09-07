@@ -40,7 +40,7 @@ ARG TARGETARCH
 # exec (CONTAINER_ENGINE=podman); it talks to the host socket the run
 # invocation mounts.
 # renovate: datasource=github-releases depName=containers/podman extractVersion=^v(?<version>.+) versioning=semver
-ARG PODMAN_VERSION=5.5.2
+ARG PODMAN_VERSION=6.1.1
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates curl git jq findutils gnupg \

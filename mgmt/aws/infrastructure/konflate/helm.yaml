@@ -34,7 +34,7 @@ spec:
   interval: 1h
   url: oci://ghcr.io/home-operations/charts/konflate
   ref:
-    tag: "0.6.2"
+    tag: "0.6.3"
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease

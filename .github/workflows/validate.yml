@@ -60,7 +60,7 @@ jobs:
           node-version: 24
 
       - name: Install Renovate
-        run: npm install --global renovate@44.50.1
+        run: npm install --global renovate@44.69.8
 
       - name: Verify airgap digest pinning
         env:

@@ -37,7 +37,7 @@ jobs:
         working-directory: bootstrap-rs
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       # rustup respects bootstrap-rs/rust-toolchain.toml, so the pinned
       # toolchain (channel, clippy, rustfmt) installs on first cargo use.
@@ -45,7 +45,7 @@ jobs:
         run: rustup show active-toolchain
 
       - name: Cache cargo
-        uses: actions/cache@v6
+        uses: actions/cache@v6.1.0
         with:
           path: |
             ~/.cargo/registry

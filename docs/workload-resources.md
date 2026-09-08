@@ -18,13 +18,13 @@ see [AWS authentication & IAM](./aws-iam.md).
 ## RDS instances
 
 `workload/base/rds-instances/dbinstance.yaml` creates one PostgreSQL 17 instance
-per cluster (`krops-<cluster>-db`) in that cluster's own region — the ACK
+per cluster (`krops-<cluster>-db`) in that cluster's own region; the ACK
 RDS controller runs with `aws.region: ${AWS_REGION}`:
 
 - `db.t4g.micro`, 20 GiB gp3, single-AZ (smallest footprint)
 - not publicly accessible, storage encrypted
 - master password managed by RDS (`manageMasterUserPassword: true`) and stored
-  in Secrets Manager — workload clusters have no SOPS key, so an in-Git
+  in Secrets Manager; workload clusters have no SOPS key, so an in-Git
   password secret is not an option
 
 > **Known limitation**: the `DBInstance` sets no `dbSubnetGroupName`, so the

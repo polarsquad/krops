@@ -151,7 +151,7 @@ verifies that the declared air-gap inventory remains available and complete.
 Fork and default-branch guards prevent fork or non-default-branch manual
 dispatches from consuming the ARM64 runners.
 
-Gap (deploy) — from `airgap/`:
+Gap (deploy): from `airgap/`:
 
 ```sh
 # CI keyless-signed package (default trusted workflow identity)

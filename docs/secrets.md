@@ -64,13 +64,13 @@ docker run --rm --user "$(id -u):$(id -g)" \
 ## Setting / rotating AWS credentials
 
 ```sh
-# CAPA — generate the base64 profile (requires AWS creds in your shell env):
+# CAPA: generate the base64 profile (requires AWS creds in your shell env):
 clusterawsadm bootstrap credentials encode-as-profile
 # Put the value into stringData.AWS_B64ENCODED_CREDENTIALS, then encrypt:
 $EDITOR mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml
 mise run sops-encrypt mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml
 
-# ACK — standard AWS shared-credentials-file format under stringData.credentials:
+# ACK: standard AWS shared-credentials-file format under stringData.credentials:
 $EDITOR mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml
 mise run sops-encrypt mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml
 ```
@@ -84,7 +84,7 @@ mise run sops-decrypt <file>.sops.yaml
 ## Setting / rotating the GitHub PAT
 
 The management cluster's own `flux-github-pat` secret is created imperatively
-at bootstrap (from `GITHUB_TOKEN` in `.env`) and is **not** in Git — Flux
+at bootstrap (from `GITHUB_TOKEN` in `.env`) and is **not** in Git; Flux
 needs it to clone the repo before it could ever decrypt anything (a
 chicken-and-egg constraint). The workload clusters' copy *is* in Git
 (`flux-pull-secret.sops.yaml`) because the management cluster's Flux decrypts
@@ -104,7 +104,7 @@ mise run sops-encrypt mgmt/aws/addons/flux-apps/flux-pull-secret.sops.yaml
 Remember to also update `GITHUB_TOKEN` in `.env` so the next bootstrap uses
 the new token.
 
-## Setting / rotating the konflate tokens
+## Setting and rotating the konflate tokens
 
 What each token does is covered in [PR review: konflate](./konflate.md).
 

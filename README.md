@@ -1,5 +1,5 @@
 # krops
-## kubernetes-native resource operations
+## kubernetes resource operations
 
 ![krops logo](docs/krops-logo.svg)
 
@@ -144,7 +144,7 @@ Dependency versions are managed by Renovate
 in their native consumer files and update PRs open weekly. See
 [Dependencies](docs/dependencies.md).
 
-### Environments (formerly profiles)
+### Environments
 
 The shared toolchain is defined in `mise.toml`. AWS-specific tools are layered
 through `mise.aws.toml`; use the `aws` environment when those tools are
@@ -260,10 +260,18 @@ teardown controls, toolbox release, and current parity status.
 │                                  (ARM + GPU MachinePools); eu-north-1 also
 │                                  carries the self-managed management cluster
 ├── mgmt/local-host/              OCI-synced CAPI/CAPD local workload cluster
-│                                  and its management cluster definition
+│   │                              and its management cluster definition
+│   ├── infrastructure/           capi-operator, cert-manager
+│   ├── capi-providers/           caaph-system, capd-system, capi-system
+│   ├── addons/                   kindnet CNI, flux-apps
+│   └── clusters/                 docker (workload), management (self-managed)
 ├── mgmt/local-talos/             Single-node Talos management cluster on
-│                                  bare metal via Tinkerbell (CAPT);
-│                                  GitHub-synced like mgmt/aws
+│   │                              bare metal via Tinkerbell (CAPT);
+│   │                              GitHub-synced like mgmt/aws
+│   ├── infrastructure/           capi-operator, cert-manager
+│   ├── capi-providers/           cabpt-system, cacppt-system, capi-system,
+│   │                              capt-system (Tinkerbell)
+│   └── clusters/                 management (self-managed)
 └── workload/                     Synced by each WORKLOAD cluster's Flux
     ├── base/                     ACK S3/RDS/IAM controllers, Bucket CRs,
     │                              DBInstance CRs, reader Role CRs

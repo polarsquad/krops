@@ -175,7 +175,7 @@ You also need:
   `secretsmanager:CreateSecret`/`TagResource`/`RotateSecret` permissions
   (managed master passwords) used by the workload clusters' ACK RDS
   controllers are granted through the Git-declared
-  `krops-ack-rds-controller` pod-identity role — no extra static
+  `krops-ack-rds-controller` pod-identity role; no extra static
   credentials are required for them.
 - The `clusterawsadm` IAM CloudFormation stack provisioned before bootstrap and
   removed by a full AWS teardown:
@@ -266,8 +266,8 @@ This initial imperative phase performs these steps:
 5. Pivots: moves the CAPI inventory into the self-managed management cluster
    and deletes the kind cluster (see [Pivot recovery](#pivot-recovery)).
 
-Everything downstream — providers, EKS clusters, workload Flux instances, the
-ACK operator, IAM role, pod identity bindings, and S3 buckets — reconciles
+Everything downstream (providers, EKS clusters, workload Flux instances, the
+ACK operator, IAM role, pod identity bindings, and S3 buckets) reconciles
 from Git with no further manual steps.
 
 The local-host environment performs the cluster, Flux Operator, and FluxInstance

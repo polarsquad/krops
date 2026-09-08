@@ -5,7 +5,7 @@ platform. A disposable local [kind](https://kind.sigs.k8s.io/) cluster
 bootstraps [Flux](https://fluxcd.io/), provisions the self-managed management
 cluster through CAPI, and is deleted after a `clusterctl move` pivot: the
 management cluster then reconciles itself and everything else from this
-repository — AWS EKS workload clusters provisioned via
+repository: AWS EKS workload clusters provisioned via
 [CAPA](https://cluster-api-aws.sigs.k8s.io/), per-cluster Flux instances
 delivered through CAPI addons, and application workloads (the
 [ACK](https://aws-controllers-k8s.github.io/docs/) S3, RDS, and IAM operators
@@ -158,7 +158,7 @@ The management cluster also runs a single
 (`mgmt/aws/infrastructure/konflate/`), pointed at this repo
 (`github://polarsquad/krops`, rendering from the repo root). It renders each
 open PR at its merge-base and head and shows the diff of the *rendered* Flux
-output — blast radius, image changes, render failures, and danger lint —
+output (blast radius, image changes, render failures, and danger lint)
 instead of the raw file diff. Results reach the PR two ways: a GitHub Actions
 workflow (`.github/workflows/konflate.yml`) runs a one-shot konflate service
 container on each PR push and gates the `konflate / Rendered Flux diff` check
@@ -183,7 +183,7 @@ aws-operators (ACK S3 + RDS + IAM controllers) ▶ s3-buckets (Bucket CRs)
 2. `flux-apps` matches those labels: a **HelmChartProxy** installs the Flux
    Operator on every workload cluster, and per-region **ClusterResourceSets**
    apply a `FluxInstance` (syncing `workload/<region>-01/`), a `cluster-vars`
-   ConfigMap (`AWS_REGION`, `CLUSTER_NAME`, `AWS_ACCOUNT_ID` — used by Flux
+   ConfigMap (`AWS_REGION`, `CLUSTER_NAME`, `AWS_ACCOUNT_ID`, used by Flux
    `postBuild` substitution), and the Git pull secret.
 3. The workload cluster's Flux reconciles `workload/`: first `aws-operators`
    (ACK S3 + RDS + IAM controllers, `wait: true`), then `s3-buckets`,
@@ -192,3 +192,11 @@ aws-operators (ACK S3 + RDS + IAM controllers) ▶ s3-buckets (Bucket CRs)
 See [AWS authentication & IAM](./aws-iam.md) for how the ACK controllers
 authenticate, and [Workload resources](./workload-resources.md) for what they
 create.
+
+## Other deployment environments
+
+While the diagram above details the `aws` reference environment, the repository includes two other deployment targets walking the same GitOps and CAPI lifecycle:
+
+- **`local-host`**: replaces AWS with local Docker containers (CAPD) and GitHub with a local OCI registry (`krops-registry:5000`). It provisions a one-control-plane/one-worker workload cluster and reconciles Podinfo end to end on a single host. See the architecture diagram in [docs/local-host-infra.svg](local-host-infra.svg).
+- **`local-talos`**: pivots onto bare metal via Tinkerbell (CAPT) and Talos Linux (CABPT and CACPPT), syncing directly from GitHub.
+- **Air-gap bundle**: packages `local-host` with Zarf for completely disconnected deployment with verified SBOMs and signed artifacts. See the air-gap architecture diagram in [docs/air-gap-infra.svg](air-gap-infra.svg) and [Air-gapped krops](./airgap.md).

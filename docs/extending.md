@@ -4,7 +4,7 @@
 
 1. Create `mgmt/aws/clusters/<region>/<env>/` with a `cluster.yaml`,
    `kustomization.yaml` (set `namePrefix`), and `capi-nameref.yaml` (so CAPI
-   cross-references get the prefix applied — see the existing regions).
+   cross-references get the prefix applied; see the existing regions).
 2. Label the `Cluster` with `fluxcd: enabled` **and** `region: <region>`, and
    include the `eks-pod-identity-agent` addon in the `AWSManagedControlPlane`.
 3. Register it in `mgmt/aws/clusters/<region>/kustomization.yaml` and add a
@@ -29,16 +29,18 @@ Follow the `aws-operators` / `s3-buckets` pattern in `workload/base/`:
    use `postBuild.substituteFrom: cluster-vars` for per-cluster values like
    `${AWS_REGION}` and `${CLUSTER_NAME}`).
 2. Register the `flux-ks.yaml` in `workload/base/kustomization.yaml`.
-3. Run `mise run validate`, commit, and push — every workload cluster picks it
+3. Run `mise run validate`, commit, and push. Every workload cluster picks it
    up on its next sync.
 
 ## Using other providers
 
 The management cluster is not AWS-only. Providers are declared as CAPI
 operator CRs (`operator.cluster.x-k8s.io/v1alpha2`) under
-`mgmt/aws/capi-providers/`, one directory per provider namespace, and
-registered in `mgmt/aws/capi-providers/flux-ks.yaml`. The operator resolves
-the well-known provider names (`aws`, `azure`, `talos`,
+`mgmt/<environment>/capi-providers/` (for example `mgmt/aws/capi-providers/` for
+AWS EKS, `mgmt/local-host/capi-providers/` for local Docker, and
+`mgmt/local-talos/capi-providers/` for Talos and Tinkerbell), one directory per
+provider namespace, and registered in that environment's `capi-providers/flux-ks.yaml`.
+The operator resolves the well-known provider names (`aws`, `azure`, `talos`,
 `k0sproject-k0smotron`) from the same built-in registry `clusterctl` uses, so
 a provider is just a typed CR with a pinned version:
 

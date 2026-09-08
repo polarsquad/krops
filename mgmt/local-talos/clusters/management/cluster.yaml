@@ -60,7 +60,7 @@ metadata:
 spec:
   replicas: 1
   # renovate: datasource=github-releases depName=kubernetes/kubernetes
-  version: "v1.36.0"
+  version: "v1.37.0"
   infrastructureTemplate:
     apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
     kind: TinkerbellMachineTemplate

@@ -10,10 +10,10 @@ profile resolution), or when the file does not parse.
 Requires Python 3.11+ (tomllib); mise and CI both provide it.
 """
 
+from pathlib import Path
 import re
 import sys
 import tomllib
-from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -77,7 +77,9 @@ def main() -> int:
             )
         sync = REPO_ROOT / env.get("sync-path", "")
         if not sync.is_dir():
-            failures.append(f"environments.{name}.sync-path '{env.get('sync-path')}' is not a directory")
+            failures.append(
+                f"environments.{name}.sync-path '{env.get('sync-path')}' is not a directory"
+            )
         # The sync source drives the FluxInstance seeding (issue #105):
         # 'github' (GitRepository + PAT secret, aws and local-talos) or
         # 'oci' (local registry artifact, local-host). The Rust enum must
@@ -104,7 +106,9 @@ def main() -> int:
             region = workload.get("region", "")
             prefix_dir = REPO_ROOT / "mgmt/aws/clusters" / region
             if not prefix_dir.is_dir():
-                failures.append(f"environments.{name} teardown region {region!r} has no cluster directory")
+                failures.append(
+                    f"environments.{name} teardown region {region!r} has no cluster directory"
+                )
             # The K8s cluster name must equal the Kustomization namePrefix
             # + 'workload' (the staged cluster.yaml names Cluster 'workload').
             kustomization = prefix_dir / "staging/kustomization.yaml"

@@ -7,8 +7,8 @@ a bump cannot silently stop being proposed for the non-manifest surfaces
 depNames Renovate must extract from it via custom.regex managers.
 """
 
-import sys
 from pathlib import Path
+import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from renovate_harness import run_renovate

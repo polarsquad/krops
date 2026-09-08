@@ -6,6 +6,20 @@ on:
   pull_request:
 
 jobs:
+  lint-python:
+    name: Lint Python
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      # renovate: datasource=github-releases depName=jdx/mise
+      - name: Install mise
+        uses: jdx/mise-action@v2.2.3
+
+      - name: Run Ruff
+        run: mise run lint-python
+
   airgap-image-pins:
     name: Air-gap image digest pins
     runs-on: ubuntu-latest

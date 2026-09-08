@@ -93,6 +93,9 @@ resources. There is no app source code here, only declarative infrastructure.
 4. Run `mise run validate` before pushing. PRs are reviewed as rendered Flux
    diffs by the konflate GitHub Actions workflow (backed by an in-cluster
    instance), so what you push is what gets reviewed.
+5. Run `mise run lint-python` before pushing any Python change. Ruff
+   (`ruff check` + `ruff format --check`) is a required CI gate. Apply
+   safe fixes with `ruff check --fix . && ruff format .`.
 
 ## Keeping this file current
 
@@ -125,8 +128,9 @@ Each component pairs a plain kustomize root with a Flux `Kustomization`:
 ## Common tasks (mise)
 
 ```sh
-mise install            # install pinned tools (kubectl, kind, flux, sops, age, ...)
+mise install            # install pinned tools (kubectl, kind, flux, sops, age, ruff, ...)
 mise run validate       # build every kustomize overlay; mirrors CI
+mise run lint-python    # Ruff lint + format check on all Python files; mirrors CI
 mise run bootstrap      # toolbox container: kind cluster + Flux handoff + pivot to self-managed mgmt
 mise -E aws run kubeconfigs  # export AWS workload-cluster kubeconfigs
 mise run teardown       # toolbox container: full teardown (EKS, AWS resources, kind)

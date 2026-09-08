@@ -1,0 +1,11 @@
+target-version = "py311"
+line-length = 99
+
+[lint]
+select = ["E", "F", "I", "UP", "W", "B"]
+
+[lint.per-file-ignores]
+# sys.path manipulation before the local-package import is intentional in
+# both files: the harness lives in tests/ and there is no package install.
+"tests/test-renovate-coverage.py" = ["E402"]
+"airgap/tests/test-renovate-digest-pinning.py" = ["E402"]

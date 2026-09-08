@@ -124,7 +124,7 @@ components:
         files:
           - manifests/core-cluster-api.components.yaml
     images:
-      - registry.k8s.io/cluster-api/cluster-api-controller:v1.14.0@sha256:4f57cf35b7de52e568eb85295f2a505268f29f1c7b76e7b12ce7cf6d2034f8f4
+      - registry.k8s.io/cluster-api/cluster-api-controller:v1.14.1@sha256:47b6eb088b584690a5ac2218a5b5014bf9a0fbe5cd0ef2999347176b5fdedb69
     healthChecks:
       - apiVersion: apps/v1
         kind: Deployment

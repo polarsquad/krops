@@ -26,7 +26,7 @@ quay.io/jetstack/cert-manager-cainjector:v1.21.1@sha256:ccf6b919ec0500745a47a910
 quay.io/jetstack/cert-manager-webhook:v1.21.1@sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42
 quay.io/jetstack/cert-manager-startupapicheck:v1.21.1@sha256:d8ab6416e6e7303a86fa0a8daa82c94a8001f21c9d78eb2e7db20534e5d07ae8
 registry.k8s.io/capi-operator/cluster-api-operator:v0.29.0@sha256:465e72f8b06ae96de7c142d552f898fb4d0d92ab5d71c8691e431a19d1b4955c
-registry.k8s.io/cluster-api/cluster-api-controller:v1.14.0@sha256:4f57cf35b7de52e568eb85295f2a505268f29f1c7b76e7b12ce7cf6d2034f8f4
+registry.k8s.io/cluster-api/cluster-api-controller:v1.14.1@sha256:47b6eb088b584690a5ac2218a5b5014bf9a0fbe5cd0ef2999347176b5fdedb69
 registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.14.1@sha256:ffb7a4abd84a16d8fd22640f459621cf5aae9f74918a33aae85bc92e0a9cb55c
 registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.14.1@sha256:4e2bb4a833a46c52b1c1ccd533c09b70bfa1cbcb22e765da778c66ab68a43617
 registry.k8s.io/cluster-api-helm/cluster-api-helm-controller:v0.6.4@sha256:97d2a86f8e35d23bb4656b26f4564b35f109e47a0dc4860b71089e52eb6e6a24

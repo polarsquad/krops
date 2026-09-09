@@ -122,7 +122,18 @@ else
 fi
 
 step "3. zarf init"
-if ( cd "$AIRGAP_DIR" && "$ZARF" init "$ARCHIVES/zarf-init-arm64-v0.83.0.tar.zst" \
+# The init package filename embeds the zarf CLI version (it is produced by
+# `zarf tools download-init` in build-package.sh), so it tracks the mise pin
+# in mise.toml. Resolve by glob instead of hardcoding a version that
+# Renovate bumps out from under this script.
+shopt -s nullglob
+init_packages=("$ARCHIVES"/zarf-init-arm64-v*.tar.zst)
+shopt -u nullglob
+if [ "${#init_packages[@]}" -ne 1 ]; then
+  fail "expected exactly one zarf init package matching $ARCHIVES/zarf-init-arm64-v*.tar.zst, found ${#init_packages[@]}"
+  exit 1
+fi
+if ( cd "$AIRGAP_DIR" && "$ZARF" init "${init_packages[0]}" \
        --registry-mode=nodeport --components="" --confirm ); then
   pass "zarf init"
 else

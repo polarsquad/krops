@@ -10,6 +10,7 @@ clusterctl = "1.14.1"
 flux2 = "2.9.4"
 sops = "3.13.3"
 age = "1.3.2"
+uv = "0.12.1"
 
 # Zarf CLI (airgap prototype). The mise github backend downloads the raw
 # release asset and keeps its original filename, so we select the native
@@ -129,3 +130,21 @@ run = "clusterawsadm bootstrap credentials encode-as-profile"
 [tasks.teardown]
 description = "Tear down all infrastructure created by bootstrap (toolbox container; native path: ./teardown.sh)"
 run = "scripts/toolbox-run.sh teardown"
+
+[tasks.docs-assemble]
+description = "Copy README.md + docs/ into build/docs with rewritten links"
+run = "uv run python tools/assemble_docs.py"
+
+[tasks.docs-test]
+description = "Unit tests for the docs assembler"
+run = "uv run pytest -q"
+
+[tasks.docs-build]
+description = "Assemble and strict-build the static site into build/site"
+depends = ["docs-assemble"]
+run = "uv run mkdocs build --strict"
+
+[tasks.docs-serve]
+description = "Assemble and serve the docs site with live reload"
+depends = ["docs-assemble"]
+run = "uv run mkdocs serve"

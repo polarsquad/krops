@@ -25,3 +25,6 @@ airgap/*.tar.zst
 # Hermes agent workspace (local plans, never part of the repo)
 .hermes/
 __pycache__/
+build/
+.venv/
+.pytest_cache/

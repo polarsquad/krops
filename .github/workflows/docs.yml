@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: docs
+
+on:
+  pull_request:
+    paths:
+      - README.md
+      - docs/**
+      - website/**
+      - mkdocs.yml
+      - pyproject.toml
+      - uv.lock
+      - tools/assemble_docs.py
+      - tests/test_assemble_docs.py
+      - .github/workflows/docs.yml
+  push:
+    # renovate/**: Renovate branches must go green before automerge.
+    branches: [main, "renovate/**"]
+    paths:
+      - README.md
+      - docs/**
+      - website/**
+      - mkdocs.yml
+      - pyproject.toml
+      - uv.lock
+      - tools/assemble_docs.py
+      - tests/test_assemble_docs.py
+      - .github/workflows/docs.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Assembler tests and strict site build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          version: "0.12.11"
+      - name: Sync
+        run: uv sync --locked
+      - name: Test
+        run: uv run pytest -q
+      - name: Strict site build
+        run: uv run python tools/assemble_docs.py && uv run mkdocs build --strict

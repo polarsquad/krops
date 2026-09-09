@@ -1,0 +1,20 @@
+[project]
+name = "krops-site"
+version = "0.0.0"
+description = "Documentation website build for krops (GitHub Pages)"
+requires-python = ">=3.13"
+dependencies = [
+  "mkdocs-material==9.7.7",
+]
+
+[dependency-groups]
+dev = [
+  "pytest==9.1.1",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["tools"]
+testpaths = ["tests"]

@@ -1,0 +1,82 @@
+# Build settings. strict fails the build on any warning (broken links, missing nav pages).
+strict: true
+docs_dir: build/docs
+site_dir: build/site
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+site_name: krops docs
+site_url: https://krops.build
+site_description: Documentation for krops, kubernetes resource operations.
+
+repo_name: polarsquad/krops
+repo_url: https://github.com/polarsquad/krops
+
+theme:
+  name: material
+  logo: krops-logo.svg
+  favicon: krops-logo.svg
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    # Dark first: it is the default when the browser expresses no preference
+    # and it matches the architecture diagrams.
+    - media: "(prefers-color-scheme: dark)"
+      scheme: krops
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+  features:
+    - navigation.prune
+    - navigation.top
+    - navigation.footer
+    - navigation.instant
+    - toc.follow
+    - content.code.copy
+
+extra_css:
+  - assets/css/krops.css
+
+markdown_extensions:
+  - meta
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Operations: operations.md
+  - Bootstrap CLI: bootstrap-cli.md
+  - Extending: extending.md
+  - Secrets: secrets.md
+  - AWS authentication and IAM: aws-iam.md
+  - Workload resources: workload-resources.md
+  - PR review with konflate: konflate.md
+  - Dependencies: dependencies.md
+  - Air-gapped krops: airgap.md

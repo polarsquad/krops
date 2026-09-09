@@ -1,0 +1,102 @@
+/* Palette sampled from polarsquad/krops docs/{aws,local-host,air-gap}-infra.svg and krops-logo.svg. */
+:root {
+  --krops-bg: #0c120f;
+  --krops-panel: #131e18;
+  --krops-panel-2: #1b2c23;
+  --krops-panel-3: #1f362a;
+  --krops-border: #284637;
+  --krops-green: #336952;
+  --krops-text: #d4e2da;
+  --krops-muted: #859d91;
+  --krops-teal: #5ce0b4;
+  --krops-blue: #68c5eb;
+  --krops-mint: #b0f6c0;
+  --krops-orange: #e8a868;
+  --krops-yellow: #e5b85c;
+}
+
+/* Dark scheme: the diagrams' look. Selected via palette.scheme: krops in mkdocs.yml. */
+[data-md-color-scheme="krops"] {
+  color-scheme: dark;
+  --md-hue: 150;
+  --md-default-bg-color: var(--krops-bg);
+  --md-default-bg-color--light: var(--krops-panel);
+  --md-default-bg-color--lighter: var(--krops-panel-2);
+  --md-default-bg-color--lightest: var(--krops-panel-3);
+  --md-default-fg-color: var(--krops-text);
+  --md-default-fg-color--light: var(--krops-text);
+  --md-default-fg-color--lighter: var(--krops-muted);
+  --md-default-fg-color--lightest: rgba(212, 226, 218, 0.12);
+  --md-primary-fg-color: var(--krops-panel);
+  --md-primary-fg-color--light: var(--krops-panel-2);
+  --md-primary-fg-color--dark: var(--krops-bg);
+  --md-primary-bg-color: var(--krops-text);
+  --md-primary-bg-color--light: var(--krops-muted);
+  --md-accent-fg-color: var(--krops-teal);
+  --md-accent-fg-color--transparent: rgba(92, 224, 180, 0.12);
+  --md-accent-bg-color: var(--krops-bg);
+  --md-typeset-color: var(--krops-text);
+  --md-typeset-a-color: var(--krops-teal);
+  --md-typeset-mark-color: rgba(229, 184, 92, 0.35);
+  --md-typeset-kbd-color: var(--krops-panel-2);
+  --md-typeset-kbd-accent-color: var(--krops-panel-3);
+  --md-typeset-kbd-border-color: var(--krops-border);
+  --md-typeset-table-color: rgba(212, 226, 218, 0.12);
+  --md-typeset-table-color--light: rgba(212, 226, 218, 0.04);
+  --md-code-bg-color: var(--krops-panel);
+  --md-code-fg-color: var(--krops-text);
+  --md-code-hl-color: rgba(92, 224, 180, 0.18);
+  --md-code-hl-color--light: rgba(92, 224, 180, 0.08);
+  --md-code-hl-number-color: var(--krops-orange);
+  --md-code-hl-special-color: var(--krops-orange);
+  --md-code-hl-function-color: var(--krops-yellow);
+  --md-code-hl-constant-color: var(--krops-blue);
+  --md-code-hl-keyword-color: var(--krops-blue);
+  --md-code-hl-string-color: var(--krops-mint);
+  --md-code-hl-name-color: var(--krops-text);
+  --md-code-hl-operator-color: var(--krops-muted);
+  --md-code-hl-punctuation-color: var(--krops-muted);
+  --md-code-hl-comment-color: var(--krops-muted);
+  --md-code-hl-generic-color: var(--krops-muted);
+  --md-code-hl-variable-color: var(--krops-text);
+  --md-admonition-fg-color: var(--krops-text);
+  --md-admonition-bg-color: var(--krops-panel);
+  --md-footer-bg-color: var(--krops-panel);
+  --md-footer-bg-color--dark: var(--krops-bg);
+  --md-footer-fg-color: var(--krops-text);
+  --md-footer-fg-color--light: var(--krops-muted);
+  --md-footer-fg-color--lighter: var(--krops-border);
+  --md-shadow-z1: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.3), 0 0 0.05rem rgba(0, 0, 0, 0.2);
+  --md-shadow-z2: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.4), 0 0 0.05rem rgba(0, 0, 0, 0.3);
+  --md-shadow-z3: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.5), 0 0 0.05rem rgba(0, 0, 0, 0.4);
+}
+
+[data-md-color-scheme="krops"] .md-header,
+[data-md-color-scheme="krops"] .md-tabs {
+  border-bottom: 1px solid var(--krops-border);
+}
+
+[data-md-color-scheme="krops"] .md-typeset h1,
+[data-md-color-scheme="krops"] .md-typeset h2 {
+  color: #ffffff;
+}
+
+/* Light scheme: Material default with the krops greens as primary/accent. */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: var(--krops-green);
+  --md-primary-fg-color--light: var(--krops-teal);
+  --md-primary-fg-color--dark: var(--krops-border);
+  --md-accent-fg-color: #1f8f68;
+  --md-accent-fg-color--transparent: rgba(31, 143, 104, 0.1);
+  --md-typeset-a-color: #1f8f68;
+}
+
+/* Diagrams have a dark background baked in; give them breathing room on both schemes. */
+.md-typeset img[src$="-infra.svg"] {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--krops-border);
+  border-radius: 0.2rem;
+  padding: 0.4rem;
+  background: var(--krops-bg);
+}

@@ -10,7 +10,7 @@ clusterctl = "1.14.1"
 flux2 = "2.9.4"
 sops = "3.13.3"
 age = "1.3.2"
-uv = "0.12.1"
+uv = "0.12.11"
 
 # Zarf CLI (airgap prototype). The mise github backend downloads the raw
 # release asset and keeps its original filename, so we select the native

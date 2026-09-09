@@ -97,7 +97,7 @@ The verification linchpin is the agent's **image rewrite** plus a Ready
 | Item | Purpose |
 |---|---|
 | `zarf` CLI binary | runs the deploy |
-| `archives/zarf-init-arm64-v<version>.tar.zst` | `zarf init` (registry + agent); `<version>` matches the zarf CLI pin in `mise.toml` (`zarf tools download-init` names the file after the CLI) |
+| `archives/zarf-init-arm64.tar.zst` | `zarf init` (registry + agent); built by `zarf tools download-init` from the zarf CLI pinned in `mise.toml` and renamed at build time, so `mise.toml` stays the sole version declaration |
 | `zarf-package-krops-airgap-arm64-0.1.0.tar.zst` | signed package, including per-component Syft JSON/HTML SBOMs and the Sigstore signature bundle |
 | `archives/kindest_node_v1.37.0_mgmt.tar` | mgmt kind node (host daemon) |
 | `archives/kindest_node_v1.37.0.tar` | CAPD workload and management nodes (host daemon) |

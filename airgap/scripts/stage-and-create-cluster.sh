@@ -114,7 +114,5 @@ helm push "$ARCHIVES/charts/flux-operator-0.58.0.tgz" "oci://localhost:${REGISTR
 helm push "$ARCHIVES/charts/podinfo-6.14.0.tgz" "oci://localhost:${REGISTRY_PORT}/stefanprodan/charts" --plain-http
 
 echo ">>> Staged. Next:"
-# The init package filename embeds the zarf CLI version (see the mise pin in
-# mise.toml); the shell expands the glob when this command is run manually.
-echo "      zarf init archives/zarf-init-arm64-v*.tar.zst --registry-mode=nodeport --components=\"\" --confirm"
+echo "      zarf init archives/zarf-init-arm64.tar.zst --registry-mode=nodeport --components=\"\" --confirm"
 echo "      zarf package deploy zarf-package-krops-airgap-arm64-0.1.0.tar.zst --confirm"

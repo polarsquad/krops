@@ -63,9 +63,19 @@ fi
 echo "==> 3/5 offline host assets, workload-node images, and OCI charts"
 mkdir -p airgap/archives
 
+INIT_STAGING=$(mktemp -d "${TMPDIR:-/tmp}/krops-zarf-init.XXXXXX")
 mise x -- zarf tools download-init \
   --architecture arm64 \
-  --output-directory airgap/archives
+  --output-directory "$INIT_STAGING"
+shopt -s nullglob
+init_outputs=("$INIT_STAGING"/*)
+shopt -u nullglob
+if [ "${#init_outputs[@]}" -ne 1 ]; then
+  echo "ERROR: expected exactly one init package from zarf tools download-init, found ${#init_outputs[@]}" >&2
+  exit 1
+fi
+mv "${init_outputs[0]}" airgap/archives/zarf-init-arm64.tar.zst
+rm -rf "$INIT_STAGING"
 
 HOST_IMAGES=(
   kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5

@@ -17,6 +17,8 @@ Renovate discovers and updates versions in:
   `mise.local-talos.toml`: tool pins and the Zarf CLI pin. Explicit per-tool
   custom managers replace the native mise manager so each pin resolves against
   the intended upstream project.
+- `pyproject.toml` and `uv.lock`: documentation site dependencies (mkdocs-material,
+  pytest) through the native Python managers.
 - `bootstrap-rs/Cargo.toml` and `bootstrap-rs/Cargo.lock`: Rust crate
   dependencies through Renovate's Cargo manager.
 - `bootstrap.toml`: the Flux Operator, cert-manager, and CAPI Operator chart

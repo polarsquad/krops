@@ -45,6 +45,7 @@ EXPECTED = {
         "siderolabs/talos",
     },
     "mise.local-talos.toml": {"siderolabs/talos"},
+    "mise.toml": {"astral-sh/uv"},
 }
 
 REQUIRED_SINGLE_REGISTRY = {

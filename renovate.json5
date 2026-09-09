@@ -68,6 +68,15 @@
     },
     {
       "customType": "regex",
+      "description": "mise: uv pin (docs site build)",
+      "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
+      "matchStrings": ["uv = \"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "astral-sh/uv",
+      "datasourceTemplate": "github-releases",
+      "autoReplaceStringTemplate": "uv = \"{{newValue}}\""
+    },
+    {
+      "customType": "regex",
       "description": "mise: kubectl version pin",
       "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
       "matchStrings": ["kubectl = \"(?<currentValue>[^\"]+)\""],

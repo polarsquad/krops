@@ -2794,7 +2794,7 @@ mod tests {
         let err = resolve_environment(Some("bogus"), None, &repo).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "unsupported profile 'bogus' (expected 'local-host' or 'aws' or 'local-talos')"
+            "unsupported profile 'bogus' (expected 'local-host' or 'aws' or 'local-talos' or 'azure')"
         );
     }
 
@@ -2844,7 +2844,7 @@ mod tests {
             resolve_environment(Some("bogus"), Some("local-host"), &repo)
                 .unwrap_err()
                 .to_string(),
-            "unsupported profile 'bogus' (expected 'local-host' or 'aws' or 'local-talos')"
+            "unsupported profile 'bogus' (expected 'local-host' or 'aws' or 'local-talos' or 'azure')"
         );
     }
 

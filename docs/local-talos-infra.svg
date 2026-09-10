@@ -130,19 +130,19 @@
 
   <!-- scope fence box -->
   <rect x="584" y="658" width="412" height="114" rx="8" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
-  <text x="604" y="684" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#E5B85C">Management-only scope:</text>
-  <text x="604" y="708" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; <tspan font-weight="bold">No workload clusters:</tspan> local-talos owns no workloads</text>
-  <text x="604" y="730" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; <tspan font-weight="bold">No addons:</tspan> Talos ships CNI (no HCP consumers)</text>
-  <text x="604" y="752" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; Self-contained control plane (single host)</text>
+  <text x="602" y="684" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#E5B85C">Management-only scope:</text>
+  <text x="602" y="708" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; <tspan font-weight="bold">No workload clusters:</tspan> local-talos owns no workloads</text>
+  <text x="602" y="730" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; <tspan font-weight="bold">No addons:</tspan> Talos ships CNI (no HCP consumers)</text>
+  <text x="602" y="752" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; Self-contained control plane (single host)</text>
 
   <!-- teardown box -->
   <rect x="584" y="784" width="412" height="160" rx="8" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
-  <text x="604" y="810" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#E5B85C">Hardware-release teardown:</text>
-  <text x="604" y="834" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; Suspend Flux, delete CAPI Cluster objects</text>
-  <text x="604" y="856" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; CAPT releases Hardware back to Tinkerbell pool</text>
-  <text x="604" y="878" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; Physical host is <tspan font-weight="bold" fill="#FFFFFF">NEVER wiped or reclaimed</tspan></text>
-  <text x="604" y="900" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; Host left running Talos for operator reuse</text>
-  <text x="604" y="922" font-family="DejaVu Sans" font-size="13.5" fill="#859D91">&#8226; Zero container or AWS sweep (hardware-release = true)</text>
+  <text x="602" y="810" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#E5B85C">Hardware-release teardown:</text>
+  <text x="602" y="834" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; Suspend Flux, delete CAPI Cluster objects</text>
+  <text x="602" y="856" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; CAPT releases Hardware back to Tinkerbell pool</text>
+  <text x="602" y="878" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; Physical host is <tspan font-weight="bold" fill="#FFFFFF">NEVER wiped or reclaimed</tspan></text>
+  <text x="602" y="900" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; Host left running Talos for operator reuse</text>
+  <text x="602" y="922" font-family="DejaVu Sans" font-size="13.5" fill="#859D91">&#8226; Zero container or AWS sweep (hardware-release = true)</text>
 
   <!-- ===== legend strip ===== -->
   <rect x="64" y="982" width="966" height="66" rx="12" fill="#131E18" stroke="#284637" stroke-width="1.5"/>

@@ -218,7 +218,6 @@ You also need:
 | Quota | Code | Needed | Why |
 |---|---|---|---|
 | EC2-VPC Elastic IPs (per region) | `L-0263D0A3` | ≥ 3 free | One EIP per NAT gateway (3 AZs) |
-| Running On-Demand G and VT instances | `L-DB2E81BA` | ≥ 4 vCPUs | GPU node pool (g4dn.xlarge); some regions default to **0** |
 
 Request increases with
 `aws service-quotas request-service-quota-increase --service-code ec2 --quota-code <code> --desired-value <n> --region <region>`.
@@ -253,7 +252,13 @@ mise -E local-host run bootstrap   # local-host environment
 mise -E local-talos run bootstrap  # local-talos environment
 ```
 
-Azure: see [azure.md](./azure.md) for the subscription prep step that precedes `mise -E azure run bootstrap`.
+Azure: see [azure.md](./azure.md) for the subscription prep step that
+precedes `mise -E azure run bootstrap` (`azure-bootstrap` registers the
+providers — including the Arc ones — and creates the shared resource group
+and the `krops-capz` / `krops-aso` user-assigned identities with their role
+grants; nothing it prints is secret). After the kind cluster is created,
+bootstrap-rs runs the `arc-federate` mise task, which Arc-connects kind with
+an OIDC issuer for CAPZ/ASO workload identity (issue #236).
 
 > Before the first AWS bootstrap, generate an age key for SOPS. See
 > [Secret management](./secrets.md) for native and toolbox-only setup.

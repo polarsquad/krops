@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - identity.yaml
   - swedencentral-workload.yaml
+  - swedencentral-management.yaml

@@ -1,18 +1,24 @@
 ---
 # ══════════════════════════════════════════════════════════════════════════════
-# Identity for the ASO controllers on the WORKLOAD clusters (the Azure
-# counterpart of mgmt/aws/infrastructure/ack-pod-identity/).
+# Identity for the ASO controllers and CAPZ (the Azure counterpart of
+# mgmt/aws/infrastructure/ack-pod-identity/).
 #
 # Reconciled by the ASO bundled with CAPZ on this (management) cluster:
-#   - the shared resource group and the user-assigned identity are created
+#   - the shared resource group and BOTH user-assigned identities are created
 #     imperatively by `mise -E azure run azure-bootstrap` so their IDs can be
 #     committed ahead of cluster creation; ASO adopts them here (same name,
 #     same location) and owns them from then on;
-#   - the identity exports its principalId into a ConfigMap that the
-#     RoleAssignments below reference, so no ID has to be pasted twice.
+#   - krops-aso serves the workload-cluster ASO (its principalId is exported
+#     to a ConfigMap the RoleAssignments below reference, so no ID has to be
+#     pasted twice);
+#   - krops-capz serves CAPZ and the management-side bundled ASO (adopted
+#     here so ASO owns it; the RoleAssignments for krops-capz stay in
+#     azure-bootstrap, not Git — nothing reads their IDs);
+#   - the FICs trust the cluster OIDC issuers (workload and, post-pivot,
+#     management), so no client secret exists anywhere (issue #236).
 #
 # Authentication of the resources here: the `credential-from` annotation
-# points at the same SOPS-managed service principal CAPZ uses.
+# points at the aso-credentials Secret (plain, secret-free).
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: resources.azure.com/v1api20200601
 kind: ResourceGroup
@@ -45,5 +51,23 @@ spec:
       clientId:
         name: krops-aso-identity
         key: clientId
+  tags:
+    managed-by: flux-aso
+---
+# The krops-capz identity serves CAPZ (AzureClusterIdentity, type
+# WorkloadIdentity) and the management-side bundled ASO (credential-from
+# aso-credentials). No configMaps exports: nothing in Git reads its IDs
+# (issue #236).
+apiVersion: managedidentity.azure.com/v1api20230131
+kind: UserAssignedIdentity
+metadata:
+  name: krops-capz
+  namespace: default
+  annotations:
+    serviceoperator.azure.com/credential-from: aso-credentials
+spec:
+  location: ${AZURE_LOCATION}
+  owner:
+    name: krops-shared
   tags:
     managed-by: flux-aso

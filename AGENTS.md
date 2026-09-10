@@ -45,13 +45,16 @@ resources. There is no app source code here, only declarative infrastructure.
   bundles Azure Service Operator (ASO) into `capz-system`; clusters are
   `AzureASOManaged*` (AKS) with the ASO resources inline. The bundled ASO also
   reconciles the identity plumbing in `infrastructure/aso-workload-identity/`
-  (user-assigned identity, per-cluster data resource group, role assignment,
-  federated credential), which replaces ACK pod identity. Credentials: one
-  service principal in `infrastructure/azure-identity/aso-credentials.sops.yaml`,
-  read by CAPZ (`AzureClusterIdentity`) and by ASO (`credential-from`
-  annotation). Non-secret IDs live in `azure-vars` (flux-system) and in the
-  workload `cluster-vars`. Upgrade CAPZ one minor at a time (ASO CRD
-  migrations). Teardown is manual until the live acceptance run.
+  (user-assigned identities, per-cluster data resource group, role assignment,
+  federated credentials), which replaces ACK pod identity. Credentials: none at
+  rest; workload identity via the `krops-capz` UAMI (AzureClusterIdentity
+  `type: WorkloadIdentity` + `credential-from` aso-credentials, a plain
+  Secret). Federation is set up by the `arc-federate` mise task
+  (`post-kind-create-task`): Arc OIDC issuer for kind, then the management
+  cluster's own OIDC issuer post-pivot (issue #236). Non-secret IDs live in
+  `azure-vars` (flux-system) and in the workload `cluster-vars`. Upgrade CAPZ
+  one minor at a time (ASO CRD migrations). Teardown is manual until the live
+  acceptance run.
 - `workload/`: synced by each WORKLOAD cluster's Flux.
   - `base/`: ACK controllers and S3/RDS/IAM custom resources.
   - `azure-base/`: cert-manager, ASO (workload identity), and the Azure
@@ -82,9 +85,11 @@ resources. There is no app source code here, only declarative infrastructure.
   rerun-safe-by-default semantics. Chart versions it installs imperatively
   are Renovate-annotated constants in `src/main.rs`. CI (bootstrap-rs
   workflow) runs fmt/clippy/build/test; the toolchain is pinned in
-  `rust-toolchain.toml`. Two config-driven knobs added for azure:
+  `rust-toolchain.toml`. Four config-driven knobs added for azure:
   `pivot-sops-secrets` (SOPS manifests applied in the pivot target before
-  the move) and `teardown.manual` (refuse with operator text).
+  the move), `teardown.manual` (refuse with operator text),
+  `post-kind-create-task` (mise task run after kind creation) and
+  `pivot-manifests` (plain manifests applied in the target before the move).
 - `bootstrap.sh` / `pivot.sh` / `teardown.sh`: the shell equivalents of the
   CLI's phases. Kept until the binary completes full parity runs per
   environment, then retired (issues #92/#95/#100). The lifecycle mise tasks

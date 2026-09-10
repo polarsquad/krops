@@ -64,6 +64,21 @@ spec:
           type: SystemAssigned
         servicePrincipalProfile:
           clientId: msi
+        # OIDC issuer + workload identity for the post-pivot phase (issue #236):
+        # CAPZ and the bundled ASO authenticate against this issuer once they
+        # run on this cluster. The issuer URL is exported to a ConfigMap the
+        # FederatedIdentityCredentials in
+        # mgmt/azure/infrastructure/aso-workload-identity/ read.
+        oidcIssuerProfile:
+          enabled: true
+        securityProfile:
+          workloadIdentity:
+            enabled: true
+        operatorSpec:
+          configMaps:
+            oidcIssuerProfile:
+              name: swedencentral-management-oidc
+              key: issuer
         networkProfile:
           networkPlugin: azure
         tags:

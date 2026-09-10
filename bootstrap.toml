@@ -187,13 +187,14 @@ provider-manifests = [
   "mgmt/azure/capi-providers/caaph-system/namespace.yaml",
   "mgmt/azure/capi-providers/caaph-system/addon-provider.yaml",
 ]
-# SOPS-encrypted manifests decrypted with the operator's age key and applied
-# to the pivot target before `clusterctl move` (issue #71): the moved ASO
-# resources reference the aso-credentials Secret by annotation and the
-# AzureClusterIdentity references it by name; neither is moved by clusterctl
-# (the Secret carries no owner reference into the Cluster hierarchy).
-pivot-sops-secrets = [
-  "mgmt/azure/infrastructure/azure-identity/aso-credentials.sops.yaml",
+# Post-kind hook (issue #236): Arc-connect the kind cluster and federate
+# CAPZ/ASO via workload identity before Flux installs anything.
+post-kind-create-task = "arc-federate"
+# Plain manifests applied to the pivot target before `clusterctl move`
+# (issue #236): the secret-free aso-credentials Secret that the moved ASO
+# resources reference by name (replaces pivot-sops-secrets).
+pivot-manifests = [
+  "mgmt/azure/infrastructure/azure-identity/aso-credentials.yaml",
 ]
 
 [environments.azure.teardown]
@@ -205,4 +206,6 @@ manual = """Azure teardown is not automated yet.
   2. Delete the workload Cluster objects and wait for CAPZ to remove AKS
   3. Delete the resource groups: az group delete --yes --name <rg>
      (krops-swedencentral-workload-data, swedencentral-workload,
-      swedencentral-management, krops-shared, and every MC_* node group)"""
+      swedencentral-management, krops-shared, and every MC_* node group)
+  4. Delete the Arc resource: az connectedk8s delete --name krops-azure-bootstrap --resource-group krops-shared
+(the kind-issuer FICs krops-capz-kind-capz / krops-capz-kind-aso on the krops-capz identity may also be deleted; they are upserted on the next bootstrap)"""

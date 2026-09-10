@@ -1,9 +1,10 @@
 # azure environment task layer (issue #71).
 #
 # Like aws, this environment syncs mgmt/azure from GitHub and pivots into an
-# AKS management cluster built by CAPZ. The Azure CLI is only needed for the
-# one-time subscription preparation (azure-bootstrap) and for debugging;
-# nothing in bootstrap/pivot shells out to it.
+# AKS management cluster built by CAPZ. The Azure CLI is needed for the
+# one-time subscription preparation (azure-bootstrap), for the arc-federate
+# hook bootstrap-rs runs right after kind creation (issue #236), and for
+# debugging.
 
 [env]
 KROPS_PROFILE = "azure"
@@ -12,7 +13,7 @@ KROPS_PROFILE = "azure"
 "pipx:azure-cli" = "2.90.0"
 
 [tasks.azure-bootstrap]
-description = "One-time subscription prep: register providers, create the CAPZ/ASO service principal, the shared resource group and the krops-aso identity; prints the values to commit"
+description = "One-time subscription prep: register providers (incl. Arc), create the shared resource group and the krops-capz / krops-aso user-assigned identities with their role grants; prints the values to commit. No service principal (issue #236)."
 run = '''
 set -eu
 : "${AZURE_SUBSCRIPTION_ID:?set AZURE_SUBSCRIPTION_ID in .env or the shell}"
@@ -20,24 +21,35 @@ AZURE_LOCATION="${AZURE_LOCATION:-swedencentral}"
 az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 for ns in Microsoft.Compute Microsoft.Network Microsoft.ContainerService \
           Microsoft.ManagedIdentity Microsoft.Authorization Microsoft.Storage \
-          Microsoft.DBforPostgreSQL; do
+          Microsoft.DBforPostgreSQL \
+          Microsoft.Kubernetes Microsoft.KubernetesConfiguration \
+          Microsoft.ExtendedLocation; do
   echo "==> register $ns"
   az provider register --namespace "$ns" --wait >/dev/null
 done
 echo "==> resource group krops-shared"
 az group create --name krops-shared --location "$AZURE_LOCATION" --output none
-echo "==> user-assigned identity krops-aso (adopted by ASO from Git)"
+
+echo "==> user-assigned identity krops-aso (workload-cluster ASO; adopted from Git)"
 az identity create --name krops-aso --resource-group krops-shared \
   --location "$AZURE_LOCATION" --output none
-CLIENT_ID=$(az identity show -g krops-shared -n krops-aso --query clientId -o tsv)
-PRINCIPAL_ID=$(az identity show -g krops-shared -n krops-aso --query principalId -o tsv)
-echo "==> service principal krops-capz (Contributor + RBAC Administrator on the subscription)"
-SP_JSON=$(az ad sp create-for-rbac --name krops-capz --role Contributor \
-  --scopes "/subscriptions/${AZURE_SUBSCRIPTION_ID}" --output json)
-SP_APP_ID=$(printf '%s' "$SP_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["appId"])')
-az role assignment create --assignee "$SP_APP_ID" \
+ASO_CLIENT_ID=$(az identity show -g krops-shared -n krops-aso --query clientId -o tsv)
+ASO_PRINCIPAL_ID=$(az identity show -g krops-shared -n krops-aso --query principalId -o tsv)
+
+echo "==> user-assigned identity krops-capz (CAPZ + management-side ASO; adopted from Git)"
+az identity create --name krops-capz --resource-group krops-shared \
+  --location "$AZURE_LOCATION" --output none
+CAPZ_CLIENT_ID=$(az identity show -g krops-shared -n krops-capz --query clientId -o tsv)
+CAPZ_PRINCIPAL_ID=$(az identity show -g krops-shared -n krops-capz --query principalId -o tsv)
+echo "==> role grants for krops-capz (Contributor + RBAC Administrator on the subscription)"
+az role assignment create --assignee-object-id "$CAPZ_PRINCIPAL_ID" \
+  --assignee-principal-type ServicePrincipal \
+  --role Contributor --scope "/subscriptions/${AZURE_SUBSCRIPTION_ID}" --output none
+az role assignment create --assignee-object-id "$CAPZ_PRINCIPAL_ID" \
+  --assignee-principal-type ServicePrincipal \
   --role "Role Based Access Control Administrator" \
   --scope "/subscriptions/${AZURE_SUBSCRIPTION_ID}" --output none
+
 TENANT_ID=$(az account show --query tenantId -o tsv)
 cat <<EOF
 
@@ -45,16 +57,84 @@ Commit these (non-secret) values:
   mgmt/azure/infrastructure/azure-identity/azure-vars.yaml
     AZURE_SUBSCRIPTION_ID: "${AZURE_SUBSCRIPTION_ID}"
     AZURE_TENANT_ID:       "${TENANT_ID}"
+    AZURE_CLIENT_ID:       "${CAPZ_CLIENT_ID}"   # krops-capz UAMI client ID
   mgmt/azure/addons/flux-apps/flux-instance.yaml (cluster-vars)
-    AZURE_ASO_CLIENT_ID:    "${CLIENT_ID}"
-    AZURE_ASO_PRINCIPAL_ID: "${PRINCIPAL_ID}"
-
-Put the service principal into the SOPS secret (docs/secrets.md, "Azure"):
-  mgmt/azure/infrastructure/azure-identity/aso-credentials.sops.yaml
-    AZURE_SUBSCRIPTION_ID, AZURE_TENANT_ID, AZURE_CLIENT_ID (appId), AZURE_CLIENT_SECRET (password)
-The password is printed ONCE below; store it, then run: mise run sops-encrypt <file>
+    AZURE_ASO_CLIENT_ID:    "${ASO_CLIENT_ID}"
+    AZURE_ASO_PRINCIPAL_ID: "${ASO_PRINCIPAL_ID}"
+Nothing is secret: no service principal exists (issue #236).
 EOF
-printf '%s\n' "$SP_JSON"
+'''
+
+# Idempotent: re-running `connectedk8s connect` against the same Arc resource
+# is an update; `az identity federated-credential create` with an existing
+# name is an upsert, so a recreated Arc resource (new issuer uuid) self-heals
+# on the next run.
+[tasks.arc-federate]
+description = "Federate the kind bootstrap cluster (issue #236): Arc OIDC issuer, apiserver issuer patch, FICs for CAPZ/ASO workload identity. Idempotent; run by bootstrap-rs (post-kind-create-task), safe to run by hand for debugging."
+run = '''
+set -eu
+: "${AZURE_SUBSCRIPTION_ID:?set AZURE_SUBSCRIPTION_ID in .env or the shell}"
+ARC_NAME="${ARC_NAME:-krops-azure-bootstrap}"
+ARC_RG="${ARC_RG:-krops-shared}"
+ARC_LOCATION="${AZURE_LOCATION:-swedencentral}"
+KIND_NODE="${KIND_NODE:-mgmt-control-plane}"
+# Pin the context: the hook's kubectl must target the kind bootstrap cluster
+# regardless of the ambient current context (healthy-reuse path).
+KIND_CONTEXT="${KIND_CONTEXT:-kind-mgmt}"
+kubectl config use-context "$KIND_CONTEXT"
+
+az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+if ! az account show >/dev/null 2>&1; then
+  echo "==> no Azure session; starting device-code login"
+  az login --use-device-code --output none
+  az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+fi
+if ! az extension show --name connectedk8s >/dev/null 2>&1; then
+  # renovate does not track az CLI extensions; version pinned at authoring time.
+  az extension add --name connectedk8s --version 1.11.3 --yes --output none
+fi
+
+echo "==> Arc connect kind cluster as $ARC_NAME (--enable-oidc-issuer)"
+az connectedk8s connect --name "$ARC_NAME" --resource-group "$ARC_RG" \
+  --location "$ARC_LOCATION" --enable-oidc-issuer --output none
+
+ISSUER=""
+for i in $(seq 1 30); do
+  ISSUER=$(az connectedk8s show --name "$ARC_NAME" --resource-group "$ARC_RG" \
+    --query oidcIssuerProfile.issuerUrl -o tsv 2>/dev/null || true)
+  [ -n "$ISSUER" ] && break
+  sleep 10
+done
+: "${ISSUER:?oidcIssuerProfile.issuerUrl did not populate within 5 minutes}"
+echo "==> issuer: $ISSUER"
+
+echo "==> waiting for Arc agents"
+kubectl -n azure-arc wait --for=condition=Available deploy --all --timeout=300s
+
+echo "==> patch kind apiserver to mint tokens with the Arc issuer"
+if docker exec "$KIND_NODE" grep -q -- "--service-account-issuer=$ISSUER" \
+     /etc/kubernetes/manifests/kube-apiserver.yaml; then
+  echo "    already patched"
+else
+  docker exec "$KIND_NODE" sed -i -E \
+    "s|^(\\s*)- --service-account-issuer=.*$|\\1- --service-account-issuer=$ISSUER\\n\\1- --service-account-issuer=https://kubernetes.default.svc.cluster.local|" \
+    /etc/kubernetes/manifests/kube-apiserver.yaml
+  echo "    waiting for the apiserver static pod to come back healthy"
+  for i in $(seq 1 60); do
+    kubectl get --raw=/healthz >/dev/null 2>&1 && break
+    sleep 2
+  done
+  kubectl get --raw=/healthz >/dev/null
+fi
+
+fic() { # <fic-name> <subject>
+  echo "==> FIC $1 on krops-capz ($2)"
+  az identity federated-credential create --name "$1" --identity-name krops-capz \
+    --resource-group "$ARC_RG" --issuer "$ISSUER" --subject "$2" \
+    --audiences api://AzureADTokenExchange --output none
+}
+fic krops-capz-kind-capz system:serviceaccount:capz-system:capz-manager
+fic krops-capz-kind-aso  system:serviceaccount:capz-system:azureserviceoperator-default
 '''
 
 [tasks.kubeconfigs]

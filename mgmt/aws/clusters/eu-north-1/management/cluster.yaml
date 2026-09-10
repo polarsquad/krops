@@ -81,6 +81,8 @@ metadata:
   name: management-pool
   namespace: default
 spec:
+  # Cheapest offered on-demand Linux ARM (Graviton2) at 2 vCPU / 4 GiB;
+  # AL2023 requires Graviton2+ (Graviton1 a1 excluded).
   instanceType: t4g.medium
   scaling:
     minSize: 2

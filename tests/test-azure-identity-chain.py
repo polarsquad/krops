@@ -21,6 +21,18 @@ CLUSTERS = REPO_ROOT / "mgmt/azure/clusters"
 ASO_NAMESPACE = "azureserviceoperator-system"
 ASO_SERVICE_ACCOUNT = "azureserviceoperator-default"
 
+# The full set of FederatedIdentityCredentials the identity directory must
+# carry, and the exact service-account subject each one federates. The
+# workload FIC authenticates the workload-cluster ASO; the two management
+# FICs authenticate CAPZ and the bundled ASO once they run on the management
+# cluster (post-pivot, against the management cluster's OIDC issuer)
+# (issue #236).
+FIC_SUBJECTS = {
+    "krops-aso-swedencentral-workload": "system:serviceaccount:azureserviceoperator-system:azureserviceoperator-default",
+    "krops-capz-mgmt-capz": "system:serviceaccount:capz-system:capz-manager",
+    "krops-capz-mgmt-aso": "system:serviceaccount:capz-system:azureserviceoperator-default",
+}
+
 
 def docs(path: Path):
     return [d for d in yaml.safe_load_all(path.read_text()) if d]
@@ -59,13 +71,27 @@ def main() -> int:
             ref = doc["spec"].get("issuerFromConfig", {})
             if (ref.get("name"), ref.get("key")) not in exported_oidc:
                 failures.append(f"{path}: issuerFromConfig {ref} is not exported by any ManagedCluster")
-            expected = f"system:serviceaccount:{ASO_NAMESPACE}:{ASO_SERVICE_ACCOUNT}"
-            if doc["spec"].get("subject") != expected:
+            expected = FIC_SUBJECTS.get(doc["metadata"]["name"])
+            if expected is None:
+                failures.append(f"{path}: unknown FederatedIdentityCredential {doc['metadata']['name']}")
+            elif doc["spec"].get("subject") != expected:
                 failures.append(f"{path}: subject must be {expected}")
         if kind == "RoleAssignment":
             ref = doc["spec"].get("principalIdFromConfig", {})
             if (ref.get("name"), ref.get("key")) not in exported_principal:
                 failures.append(f"{path}: principalIdFromConfig {ref} is not exported by any UserAssignedIdentity")
+
+    # Every whitelisted FIC must actually exist in the identity directory
+    # (the post-pivot management FICs are pre-created by kind's bundled ASO
+    # before the pivot, issue #236).
+    found_fics = {
+        doc["metadata"]["name"]
+        for _, doc in all_docs(IDENTITY)
+        if doc.get("kind") == "FederatedIdentityCredential"
+    }
+    for name in FIC_SUBJECTS:
+        if name not in found_fics:
+            failures.append(f"{IDENTITY.relative_to(REPO_ROOT)}: missing FederatedIdentityCredential {name}")
 
     ns_doc = docs(REPO_ROOT / "workload/azure-base/aso/namespace.yaml")[0]
     if ns_doc["metadata"]["name"] != ASO_NAMESPACE:

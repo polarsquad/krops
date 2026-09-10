@@ -112,6 +112,21 @@ def main() -> int:
                 failures.append(f"environments.{name} pivot-sops-secret missing: {manifest}")
             if not manifest.endswith(".sops.yaml"):
                 failures.append(f"environments.{name} pivot-sops-secret is not a *.sops.yaml: {manifest}")
+        # Plain manifests the pivot applies in the target before the move
+        # (issue #236): the workload-identity replacement for
+        # pivot-sops-secrets, so the naming must be plain, not *.sops.yaml.
+        for manifest in env.get("pivot-manifests", []):
+            if not (REPO_ROOT / manifest).is_file():
+                failures.append(f"environments.{name} pivot-manifest missing: {manifest}")
+            elif manifest.endswith(".sops.yaml"):
+                failures.append(f"environments.{name} pivot-manifest must be plain, not *.sops.yaml: {manifest}")
+        hook = env.get("post-kind-create-task")
+        if hook:
+            mise_toml = REPO_ROOT / f"mise.{name}.toml"
+            if not mise_toml.is_file():
+                failures.append(f"environments.{name} post-kind-create-task but no {mise_toml.name}")
+            elif f"[tasks.{hook}]" not in mise_toml.read_text():
+                failures.append(f"environments.{name} post-kind-create-task '{hook}' has no [tasks.{hook}] in {mise_toml.name}")
 
         # ── teardown constants (issue #100) ─────────────────────────────
         td = env.get("teardown", {})

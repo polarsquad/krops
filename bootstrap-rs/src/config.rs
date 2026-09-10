@@ -78,6 +78,18 @@ pub struct Environment {
     /// Cluster hierarchy. Relative to the repository root.
     #[serde(default)]
     pub pivot_sops_secrets: Vec<String>,
+    /// Mise task run once the kind bootstrap cluster exists (issue #236):
+    /// provider-specific setup that must be in place before Flux installs
+    /// anything (azure: Arc OIDC federation so CAPZ/ASO can use workload
+    /// identity instead of a service-principal secret).
+    #[serde(default)]
+    pub post_kind_create_task: Option<String>,
+    /// Plain (unencrypted) manifests applied to the pivot target before
+    /// `clusterctl move` (issue #236): non-secret objects the moved resources
+    /// reference by name that clusterctl does not carry (the workload-identity
+    /// replacement for pivot-sops-secrets). Relative to the repository root.
+    #[serde(default)]
+    pub pivot_manifests: Vec<String>,
     /// Teardown constants for this environment (issue #100).
     #[serde(default)]
     pub teardown: TeardownEnv,
@@ -386,6 +398,29 @@ manifest = "mgmt/aws/infrastructure/aws-identity/identity.yaml"
         let aws = config.environment("aws").unwrap();
         assert!(aws.pivot_sops_secrets.is_empty());
         assert!(aws.teardown.manual.is_none());
+    }
+
+    #[test]
+    fn parses_post_kind_create_task_and_pivot_manifests() {
+        let text = format!(
+            "{MINIMAL}\n[environments.azure]\nkind = \"azure\"\nsync = \"github\"\n\
+             sync-path = \"mgmt/azure\"\nmgmt-cluster = \"swedencentral-management\"\n\
+             mgmt-ready-timeout = \"40m\"\ninfra-provider-namespace = \"capz-system\"\n\
+             infra-provider-name = \"azure\"\nprovider-manifests = []\n\
+             post-kind-create-task = \"arc-federate\"\n\
+             pivot-manifests = [\"mgmt/azure/infrastructure/azure-identity/aso-credentials.yaml\"]\n"
+        );
+        let config = parse(&text).unwrap();
+        let azure = config.environment("azure").unwrap();
+        assert_eq!(azure.post_kind_create_task.as_deref(), Some("arc-federate"));
+        assert_eq!(
+            azure.pivot_manifests,
+            vec!["mgmt/azure/infrastructure/azure-identity/aso-credentials.yaml"]
+        );
+        // Existing environments default to no hook and no plain manifests.
+        let aws = config.environment("aws").unwrap();
+        assert!(aws.post_kind_create_task.is_none());
+        assert!(aws.pivot_manifests.is_empty());
     }
 
     #[test]

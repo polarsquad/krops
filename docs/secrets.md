@@ -81,18 +81,13 @@ View a decrypted secret without changing it:
 mise run sops-decrypt <file>.sops.yaml
 ```
 
-## Setting / rotating the Azure service principal
+## Azure credentials
 
-```sh
-# Rotate: az ad sp credential reset --id <appId> --years 1
-mise run sops-decrypt mgmt/azure/infrastructure/azure-identity/aso-credentials.sops.yaml > /tmp/aso.yaml
-# Set stringData.AZURE_CLIENT_SECRET (and the IDs on first setup), then:
-mv /tmp/aso.yaml mgmt/azure/infrastructure/azure-identity/aso-credentials.sops.yaml
-mise run sops-encrypt mgmt/azure/infrastructure/azure-identity/aso-credentials.sops.yaml
-```
-
-Both CAPZ and the bundled ASO read this one Secret; workload clusters use
-workload identity and hold no Azure secret ([azure.md](./azure.md)).
+Azure holds no secret at rest (issue #236): CAPZ and the bundled ASO
+authenticate with workload identity, so there is nothing to rotate here. The
+only Azure credentials involved are the operator's own `az login` session and
+the age key used for the remaining SOPS-encrypted files above
+([azure.md](./azure.md) covers the identity flow).
 
 ## Setting / rotating the GitHub PAT
 

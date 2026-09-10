@@ -75,6 +75,7 @@ nav:
   - Bootstrap CLI: bootstrap-cli.md
   - Extending: extending.md
   - Secrets: secrets.md
+  - Azure environment: azure.md
   - AWS authentication and IAM: aws-iam.md
   - Workload resources: workload-resources.md
   - PR review with konflate: konflate.md

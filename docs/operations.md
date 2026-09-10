@@ -253,6 +253,8 @@ mise -E local-host run bootstrap   # local-host environment
 mise -E local-talos run bootstrap  # local-talos environment
 ```
 
+Azure: see [azure.md](./azure.md) for the subscription prep step that precedes `mise -E azure run bootstrap`.
+
 > Before the first AWS bootstrap, generate an age key for SOPS. See
 > [Secret management](./secrets.md) for native and toolbox-only setup.
 
@@ -460,6 +462,8 @@ mise run teardown                 # aws
 mise -E local-host run teardown   # local-host
 mise -E local-talos run teardown  # local-talos
 ```
+
+Azure teardown is manual; the CLI prints the steps.
 
 Native equivalents are `krops-bootstrap teardown [PROFILE]` and the retained
 `./teardown.sh` reference path. The positional profile selects an environment

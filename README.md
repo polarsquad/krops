@@ -201,6 +201,16 @@ mise -E local-talos run kubeconfigs
 mise -E local-talos run teardown  # releases the Hardware; never wipes the machine
 ```
 
+The `azure` environment builds an AKS management cluster with CAPZ and
+manages Azure resources with Azure Service Operator on the workload
+clusters; see [docs/azure.md](docs/azure.md):
+
+```sh
+mise -E azure install            # adds az
+mise -E azure run azure-bootstrap
+mise -E azure run bootstrap
+```
+
 ## The bootstrap CLI
 
 The single `krops-bootstrap` binary implements bootstrap, the default pivot, and
@@ -230,6 +240,7 @@ teardown controls, toolbox release, and current parity status.
 | [docs/secrets.md](docs/secrets.md) | SOPS + age secret management, key setup, credential rotation |
 | [docs/operations.md](docs/operations.md) | Toolbox runtime, prerequisites, quotas, bootstrap, pivot recovery, teardown, validation |
 | [docs/extending.md](docs/extending.md) | Adding a workload cluster, adding apps to the workload clusters, adding other providers (Azure, Talos, k0smotron) |
+| [docs/azure.md](docs/azure.md) | Azure environment: subscription prep, credentials, AKS clusters, ASO on workload clusters, upgrades |
 | [docs/airgap.md](docs/airgap.md) | Zarf air-gap bundle: package build, offline deploy, verification checklist, update drill |
 
 ## Repository layout
@@ -250,7 +261,7 @@ teardown controls, toolbox release, and current parity status.
 ├── website/                       Docs site assets: colour scheme CSS, CNAME
 ├── docs/                          Detailed documentation (see table above)
 ├── mise.toml / mise.*.toml        Pinned toolchain and per-environment
-│                                  task layers (aws, local-host, local-talos)
+│                                  task layers (aws, azure, local-host, local-talos)
 ├── renovate.json5                 Hosted Renovate discovery and grouping rules
 ├── mgmt/aws/                      Synced by the MANAGEMENT cluster's Flux
 │   ├── infrastructure/           cert-manager, CAPI operator, CAPA identity,
@@ -277,9 +288,12 @@ teardown controls, toolbox release, and current parity status.
 │   ├── capi-providers/           cabpt-system, cacppt-system, capi-system,
 │   │                              capt-system (Tinkerbell)
 │   └── clusters/                 management (self-managed)
+├── mgmt/azure/                    AKS management cluster (CAPZ + ASO)
 └── workload/                     Synced by each WORKLOAD cluster's Flux
     ├── base/                     ACK S3/RDS/IAM controllers, Bucket CRs,
     │                              DBInstance CRs, reader Role CRs
+    ├── azure-base/               cert-manager, ASO, and the Azure workload
+    │                              resources (VNet, storage, PostgreSQL)
     ├── local-host/               OCI-synced Podinfo workload overlay
     ├── eu-north-01/              Per-cluster overlay (sync target)
     └── eu-west-01/               Per-cluster overlay (sync target)

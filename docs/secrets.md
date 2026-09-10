@@ -81,6 +81,19 @@ View a decrypted secret without changing it:
 mise run sops-decrypt <file>.sops.yaml
 ```
 
+## Setting / rotating the Azure service principal
+
+```sh
+# Rotate: az ad sp credential reset --id <appId> --years 1
+mise run sops-decrypt mgmt/azure/infrastructure/azure-identity/aso-credentials.sops.yaml > /tmp/aso.yaml
+# Set stringData.AZURE_CLIENT_SECRET (and the IDs on first setup), then:
+mv /tmp/aso.yaml mgmt/azure/infrastructure/azure-identity/aso-credentials.sops.yaml
+mise run sops-encrypt mgmt/azure/infrastructure/azure-identity/aso-credentials.sops.yaml
+```
+
+Both CAPZ and the bundled ASO read this one Secret; workload clusters use
+workload identity and hold no Azure secret ([azure.md](./azure.md)).
+
 ## Setting / rotating the GitHub PAT
 
 The management cluster's own `flux-github-pat` secret is created imperatively

@@ -80,41 +80,18 @@ CAPA is the provider this repo already runs; use it as the template:
 
 ### Azure (CAPZ)
 
-CAPZ v1.26.0 speaks v1beta2 and bundles Azure Service Operator (ASO) v2.18.0,
-which backs the managed-AKS path.
+CAPZ v1.27.0 speaks the v1beta1 contract (accepted by CAPI v1.14 until the v1beta1 removal) and bundles Azure Service Operator (ASO) v2.19.0, which backs the managed-AKS path.
 
-1. Create a service principal (`az ad sp create-for-rbac`) and store two
-   SOPS secrets in `mgmt/aws/capi-providers/capz-system/`:
-   - the SP client secret, referenced by an `AzureClusterIdentity` CR
-     (environment-variable auth is deprecated upstream; see the CAPZ
-     multitenancy docs);
-   - `aso-credentials.sops.yaml` with `AZURE_SUBSCRIPTION_ID`,
-     `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` for the
-     bundled ASO controller.
-2. Declare the provider in `capz-system/providers.yaml`:
-
-   ```yaml
-   apiVersion: operator.cluster.x-k8s.io/v1alpha2
-   kind: InfrastructureProvider
-   metadata:
-     name: azure
-     namespace: capz-system
-   spec:
-     version: "v1.26.0"
-   ```
-
-   No feature gates are needed for the ASO managed-cluster path.
-3. Register a `capz-system` Kustomization in `flux-ks.yaml` with SOPS
-   decryption and a healthCheck on
-   `azureclusters.infrastructure.cluster.x-k8s.io` (add the
-   `azureasomanagedclusters...` CRD when using the AKS path).
-4. Define AKS clusters in `mgmt/aws/clusters/<location>/<env>/` with the
-   `AzureASOManagedCluster` / `AzureASOManagedControlPlane` /
-   `AzureASOManagedMachinePool` types, keeping the repo conventions:
-   `namePrefix` kustomization, `capi-nameref.yaml`, the `fluxcd: enabled` and
-   region labels, and `cluster-vars` substitutions for the Azure location in
-   place of `${AWS_REGION}`. The AWS-only steps (Pod Identity associations,
-   ACK controllers) have no Azure equivalent; skip them.
+The `azure` environment is the worked example: `mgmt/azure/` (see
+[azure.md](./azure.md)). Reuse it rather than adding CAPZ to `mgmt/aws/`:
+the provider is `capi-providers/capz-system/providers.yaml`
+(`InfrastructureProvider azure` v1.27.0 with `configSecret: capz-variables`
+carrying `ADDITIONAL_ASO_CRDS`), credentials are one SOPS Secret read by
+both `AzureClusterIdentity` and ASO's `credential-from` annotation, and
+clusters use `AzureASOManagedCluster` / `AzureASOManagedControlPlane` /
+`AzureASOManagedMachinePool` with the ASO resources inline (their names are
+literal final names: kustomize's `namePrefix` does not descend into
+`spec.resources`).
 
 ### Talos (CABPT + CACPPT)
 

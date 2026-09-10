@@ -98,7 +98,10 @@ pins together with their declarative counterparts. See
 - `pivot-manifests` (optional, list): plain (unencrypted) manifests applied to
   the target before `clusterctl move`, after the provider CRs. The
   workload-identity replacement for `pivot-sops-secrets`; used by `azure` for
-  the secret-free `aso-credentials` Secret (issue #236).
+  the secret-free `aso-credentials` Secret (issue #236). `${VAR}` placeholders
+  are substituted from the ConfigMaps in the Flux namespace of the bootstrap
+  cluster (the values its Flux reconciled, e.g. `azure-vars`); the pivot fails
+  naming any placeholder no ConfigMap provides.
 - `post-kind-create-task` (optional, string): name of a mise task in the
   active profile (`mise.<env>.toml`) run once the kind bootstrap cluster
   exists, on both the create and healthy-reuse paths; a non-zero exit aborts

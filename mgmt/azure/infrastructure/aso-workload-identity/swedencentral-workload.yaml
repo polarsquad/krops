@@ -1,0 +1,66 @@
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# Per-cluster resources for swedencentral-workload:
+#   - the data resource group the workload ASO manages its resources in
+#     (the S3/RDS "account" boundary in AWS terms);
+#   - Contributor on that group for the krops-aso identity (least scope that
+#     covers storage, networking and PostgreSQL create/update/delete);
+#   - a federated credential trusting the workload cluster's OIDC issuer for
+#     the ASO service account (workload identity; no client secret leaves the
+#     management cluster). The issuer URL is exported by the ManagedCluster
+#     (clusters/swedencentral/staging/cluster.yaml, operatorSpec.configMaps)
+#     into the swedencentral-workload-oidc ConfigMap, so this file can be
+#     committed before the cluster exists: ASO retries until the ConfigMap
+#     appears, the same way ACK retries PodIdentityAssociations.
+# ══════════════════════════════════════════════════════════════════════════════
+apiVersion: resources.azure.com/v1api20200601
+kind: ResourceGroup
+metadata:
+  name: krops-swedencentral-workload-data
+  namespace: default
+  annotations:
+    serviceoperator.azure.com/credential-from: aso-credentials
+spec:
+  location: ${AZURE_LOCATION}
+  tags:
+    managed-by: flux-aso
+    cluster: swedencentral-workload
+---
+apiVersion: authorization.azure.com/v1api20220401
+kind: RoleAssignment
+metadata:
+  name: krops-aso-swedencentral-workload-contributor
+  namespace: default
+  annotations:
+    serviceoperator.azure.com/credential-from: aso-credentials
+spec:
+  owner:
+    group: resources.azure.com
+    kind: ResourceGroup
+    name: krops-swedencentral-workload-data
+  principalIdFromConfig:
+    name: krops-aso-identity
+    key: principalId
+  principalType: ServicePrincipal
+  # Built-in Contributor role.
+  roleDefinitionReference:
+    armId: /subscriptions/${AZURE_SUBSCRIPTION_ID}/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c
+---
+apiVersion: managedidentity.azure.com/v1api20230131
+kind: FederatedIdentityCredential
+metadata:
+  name: krops-aso-swedencentral-workload
+  namespace: default
+  annotations:
+    serviceoperator.azure.com/credential-from: aso-credentials
+spec:
+  owner:
+    name: krops-aso
+  audiences:
+    - api://AzureADTokenExchange
+  issuerFromConfig:
+    name: swedencentral-workload-oidc
+    key: issuer
+  # ASO chart default service account on the workload cluster
+  # (workload/azure-base/aso/helm.yaml).
+  subject: system:serviceaccount:azureserviceoperator-system:azureserviceoperator-default

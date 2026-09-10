@@ -1,0 +1,49 @@
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# Identity for the ASO controllers on the WORKLOAD clusters (the Azure
+# counterpart of mgmt/aws/infrastructure/ack-pod-identity/).
+#
+# Reconciled by the ASO bundled with CAPZ on this (management) cluster:
+#   - the shared resource group and the user-assigned identity are created
+#     imperatively by `mise -E azure run azure-bootstrap` so their IDs can be
+#     committed ahead of cluster creation; ASO adopts them here (same name,
+#     same location) and owns them from then on;
+#   - the identity exports its principalId into a ConfigMap that the
+#     RoleAssignments below reference, so no ID has to be pasted twice.
+#
+# Authentication of the resources here: the `credential-from` annotation
+# points at the same SOPS-managed service principal CAPZ uses.
+# ══════════════════════════════════════════════════════════════════════════════
+apiVersion: resources.azure.com/v1api20200601
+kind: ResourceGroup
+metadata:
+  name: krops-shared
+  namespace: default
+  annotations:
+    serviceoperator.azure.com/credential-from: aso-credentials
+spec:
+  location: ${AZURE_LOCATION}
+  tags:
+    managed-by: flux-aso
+---
+apiVersion: managedidentity.azure.com/v1api20230131
+kind: UserAssignedIdentity
+metadata:
+  name: krops-aso
+  namespace: default
+  annotations:
+    serviceoperator.azure.com/credential-from: aso-credentials
+spec:
+  location: ${AZURE_LOCATION}
+  owner:
+    name: krops-shared
+  operatorSpec:
+    configMaps:
+      principalId:
+        name: krops-aso-identity
+        key: principalId
+      clientId:
+        name: krops-aso-identity
+        key: clientId
+  tags:
+    managed-by: flux-aso

@@ -51,10 +51,6 @@ spec:
   # The AzureClusterIdentity CRD ships with CAPZ.
   dependsOn:
     - name: capz-system
-  decryption:
-    provider: sops
-    secretRef:
-      name: sops-age
   postBuild:
     substituteFrom:
       - kind: ConfigMap

@@ -1,0 +1,82 @@
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# Per-cluster FluxInstance ConfigMaps for the Azure workload clusters, applied
+# by the ClusterResourceSets below (same mechanism as mgmt/aws/addons/).
+#
+# cluster-vars feeds postBuild substitution on the workload cluster:
+#   AZURE_* IDs and the ASO identity come from `mise -E azure run
+#   azure-bootstrap`; STORAGE_ACCOUNT_NAME is a globally unique literal.
+# ══════════════════════════════════════════════════════════════════════════════
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flux-instance-swedencentral
+  namespace: default
+data:
+  flux-instance.yaml: |
+    apiVersion: v1
+    kind: Namespace
+    metadata:
+      name: flux-system
+    ---
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: cluster-vars
+      namespace: flux-system
+    data:
+      AZURE_LOCATION: "swedencentral"
+      CLUSTER_NAME: "swedencentral-workload"
+      AZURE_SUBSCRIPTION_ID: "00000000-0000-0000-0000-000000000000"
+      AZURE_TENANT_ID: "00000000-0000-0000-0000-000000000000"
+      AZURE_ASO_CLIENT_ID: "00000000-0000-0000-0000-000000000000"
+      AZURE_ASO_PRINCIPAL_ID: "00000000-0000-0000-0000-000000000000"
+      STORAGE_ACCOUNT_NAME: "kropsswcworkloadsksimc"
+    ---
+    apiVersion: fluxcd.controlplane.io/v1
+    kind: FluxInstance
+    metadata:
+      name: flux
+      namespace: flux-system
+      annotations:
+        fluxcd.controlplane.io/reconcileEvery: "1h"
+        fluxcd.controlplane.io/reconcileTimeout: "5m"
+    spec:
+      distribution:
+        version: "2.x"
+        registry: "ghcr.io/fluxcd"
+        artifact: "oci://ghcr.io/controlplaneio-fluxcd/flux-operator-manifests"
+      components:
+        - source-controller
+        - kustomize-controller
+        - helm-controller
+        - notification-controller
+      cluster:
+        type: kubernetes
+        size: small
+        multitenant: false
+        networkPolicy: true
+        domain: "cluster.local"
+      sync:
+        kind: GitRepository
+        url: "https://github.com/polarsquad/krops"
+        ref: "refs/heads/main"
+        path: "workload/swedencentral-01"
+        pullSecret: "flux-github-pat"
+---
+apiVersion: addons.cluster.x-k8s.io/v1beta1
+kind: ClusterResourceSet
+metadata:
+  name: flux-instance-swedencentral
+  namespace: default
+spec:
+  clusterSelector:
+    matchLabels:
+      fluxcd: enabled
+      region: swedencentral
+  strategy: ApplyOnce
+  resources:
+    - kind: ConfigMap
+      name: flux-instance-swedencentral
+    - kind: Secret
+      name: flux-pull-secret

@@ -1,0 +1,31 @@
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# HelmChartProxy: install the Flux Operator on every CAPI workload cluster
+# that carries the label fluxcd=enabled. CAAPH (AddonProvider helm) watches
+# for matching Cluster resources and installs the chart automatically.
+# ══════════════════════════════════════════════════════════════════════════════
+apiVersion: addons.cluster.x-k8s.io/v1alpha1
+kind: HelmChartProxy
+metadata:
+  name: flux-operator
+  namespace: default
+spec:
+  clusterSelector:
+    matchLabels:
+      fluxcd: enabled
+  repoURL: oci://ghcr.io/controlplaneio-fluxcd/charts
+  chartName: flux-operator
+  version: "0.58.0"
+  # Pin the Helm release name. Without it CAAPH generates
+  # "flux-operator-<epoch>" per HelmReleaseProxy, and the chart's
+  # keep-policy CRDs/ClusterRoles on a recreated workload cluster carry
+  # the previous generated name, so every subsequent install fails helm's
+  # ownership validation ("cannot be imported into the current release").
+  releaseName: flux-operator
+  namespace: flux-system
+  options:
+    waitForJobs: true
+    wait: true
+    timeout: 5m
+    install:
+      createNamespace: true

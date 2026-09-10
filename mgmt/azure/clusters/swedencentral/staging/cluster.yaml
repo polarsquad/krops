@@ -1,0 +1,163 @@
+---
+# ── AKS workload Cluster ────────────────────────────────────────────────────
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: workload
+  namespace: default
+  labels:
+    fluxcd: enabled
+    region: swedencentral
+spec:
+  controlPlaneRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: AzureASOManagedControlPlane
+    name: workload
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: AzureASOManagedCluster
+    name: workload
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AzureASOManagedCluster
+metadata:
+  name: workload
+  namespace: default
+spec:
+  resources:
+    - apiVersion: resources.azure.com/v1api20200601
+      kind: ResourceGroup
+      metadata:
+        name: swedencentral-workload
+        annotations:
+          serviceoperator.azure.com/credential-from: aso-credentials
+      spec:
+        location: swedencentral
+        tags:
+          managed-by: flux-capz
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AzureASOManagedControlPlane
+metadata:
+  name: workload
+  namespace: default
+spec:
+  version: v1.33.4
+  resources:
+    - apiVersion: containerservice.azure.com/v1api20240901
+      kind: ManagedCluster
+      metadata:
+        name: swedencentral-workload
+        annotations:
+          serviceoperator.azure.com/credential-from: aso-credentials
+      spec:
+        owner:
+          name: swedencentral-workload
+        location: swedencentral
+        dnsPrefix: krops-swedencentral-workload
+        identity:
+          type: SystemAssigned
+        servicePrincipalProfile:
+          clientId: msi
+        networkProfile:
+          networkPlugin: azure
+        # Workload identity for the ASO controller on this cluster
+        # (mgmt/azure/infrastructure/aso-workload-identity/). The issuer URL
+        # is exported to a ConfigMap the FederatedIdentityCredential reads.
+        oidcIssuerProfile:
+          enabled: true
+        securityProfile:
+          workloadIdentity:
+            enabled: true
+        operatorSpec:
+          configMaps:
+            oidcIssuerProfile:
+              name: swedencentral-workload-oidc
+              key: issuer
+        tags:
+          managed-by: flux-capz
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachinePool
+metadata:
+  name: workload-system
+  namespace: default
+spec:
+  clusterName: workload
+  replicas: 1
+  template:
+    spec:
+      clusterName: workload
+      bootstrap:
+        dataSecretName: ""
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        kind: AzureASOManagedMachinePool
+        name: workload-system
+      version: v1.33.4
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AzureASOManagedMachinePool
+metadata:
+  name: workload-system
+  namespace: default
+spec:
+  resources:
+    - apiVersion: containerservice.azure.com/v1api20240901
+      kind: ManagedClustersAgentPool
+      metadata:
+        name: swedencentral-workload-system
+        annotations:
+          serviceoperator.azure.com/credential-from: aso-credentials
+      spec:
+        owner:
+          name: swedencentral-workload
+        azureName: system
+        mode: System
+        type: VirtualMachineScaleSets
+        vmSize: Standard_D2s_v5
+        osDiskSizeGB: 64
+---
+# ── ARM user pool (Ampere Altra), the Graviton pool's counterpart ───────────
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachinePool
+metadata:
+  name: workload-arm
+  namespace: default
+spec:
+  clusterName: workload
+  replicas: 2
+  template:
+    spec:
+      clusterName: workload
+      bootstrap:
+        dataSecretName: ""
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        kind: AzureASOManagedMachinePool
+        name: workload-arm
+      version: v1.33.4
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AzureASOManagedMachinePool
+metadata:
+  name: workload-arm
+  namespace: default
+spec:
+  resources:
+    - apiVersion: containerservice.azure.com/v1api20240901
+      kind: ManagedClustersAgentPool
+      metadata:
+        name: swedencentral-workload-arm
+        annotations:
+          serviceoperator.azure.com/credential-from: aso-credentials
+      spec:
+        owner:
+          name: swedencentral-workload
+        azureName: arm
+        mode: User
+        type: VirtualMachineScaleSets
+        vmSize: Standard_D2pls_v5
+        osDiskSizeGB: 64
+        nodeLabels:
+          node.kubernetes.io/arch: arm64

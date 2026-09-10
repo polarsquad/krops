@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# aso-credentials.sops.yaml is SOPS-encrypted and decrypted in-cluster by
+# Flux's kustomize-controller (docs/secrets.md). azure-vars.yaml carries the
+# non-secret IDs used by postBuild substitution (like AWS_ACCOUNT_ID in aws).
+resources:
+  - azure-vars.yaml
+  - cluster-identity.yaml
+  - aso-credentials.sops.yaml

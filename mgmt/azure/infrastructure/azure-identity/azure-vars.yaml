@@ -1,0 +1,17 @@
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# Non-secret Azure identifiers substituted into management-side manifests
+# (Flux postBuild.substituteFrom). Lives in flux-system because a
+# Kustomization can only substitute from ConfigMaps in its own namespace.
+# Values come from `mise -E azure run azure-bootstrap`.
+# ══════════════════════════════════════════════════════════════════════════════
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: azure-vars
+  namespace: flux-system
+data:
+  AZURE_SUBSCRIPTION_ID: "00000000-0000-0000-0000-000000000000"
+  AZURE_TENANT_ID: "00000000-0000-0000-0000-000000000000"
+  AZURE_CLIENT_ID: "00000000-0000-0000-0000-000000000000"
+  AZURE_LOCATION: "swedencentral"

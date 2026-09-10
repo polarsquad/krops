@@ -418,6 +418,10 @@ fn required_tools(env: &Environment) -> Vec<&'static str> {
     if env.sync == SyncSource::Oci {
         tools.extend(["flux", "curl"]);
     }
+    if !env.pivot_sops_secrets.is_empty() {
+        // The pivot decrypts these with the operator's age key (Phase 3).
+        tools.push("sops");
+    }
     tools
 }
 
@@ -1862,6 +1866,37 @@ async fn pivot_install_capi_in_target(
         .await?;
     }
 
+    // Config-driven pivot secrets (issue #71): decrypt each declared
+    // *.sops.yaml with the operator's age key and apply it to the target
+    // over stdin. On the bootstrap cluster Flux decrypts these; the target
+    // has no Flux yet and the moved objects reference them by name.
+    if !cfg.environment.pivot_sops_secrets.is_empty() {
+        println!(">>> Applying pivot SOPS secrets in the target...");
+        if std::env::var_os("SOPS_AGE_KEY_FILE").is_none() {
+            std::env::set_var("SOPS_AGE_KEY_FILE", cfg.age_key_file.as_os_str());
+        }
+        for manifest in &cfg.environment.pivot_sops_secrets {
+            let plaintext = capture(
+                "sops",
+                &[
+                    "--decrypt",
+                    "--input-type",
+                    "yaml",
+                    "--output-type",
+                    "yaml",
+                    manifest,
+                ],
+            )
+            .await?;
+            run_with_stdin(
+                "kubectl",
+                &kubectl_cmd(Some(kc), &["apply", "-f", "-"]),
+                &plaintext,
+            )
+            .await?;
+        }
+    }
+
     println!(">>> Waiting for providers in the target...");
     let infra_ns = &cfg.environment.infra_provider_namespace;
     let infra_name = &cfg.environment.infra_provider_name;
@@ -2951,6 +2986,18 @@ mod tests {
                 "curl"
             ]
         );
+    }
+
+    #[test]
+    fn sops_required_when_pivot_secrets_declared() {
+        // Environments declaring pivot-sops-secrets need sops on PATH (the
+        // pivot decrypts them with the operator's age key); the others
+        // don't.
+        let repo = repo_config();
+        let azure = required_tools(repo.environment("azure").unwrap());
+        assert!(azure.contains(&"sops"));
+        let aws = required_tools(repo.environment("aws").unwrap());
+        assert!(!aws.contains(&"sops"));
     }
 
     #[test]

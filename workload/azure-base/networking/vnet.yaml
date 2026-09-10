@@ -1,0 +1,69 @@
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# Networking baseline for the workload resources, reconciled by this
+# cluster's ASO in the per-cluster data resource group (created by the
+# management cluster; referenced by ARM ID so no cross-namespace owner).
+#
+# The subnet is delegated to PostgreSQL Flexible Server (private access);
+# the private DNS zone + link give the server a resolvable private name.
+# ══════════════════════════════════════════════════════════════════════════════
+apiVersion: network.azure.com/v1api20240301
+kind: VirtualNetwork
+metadata:
+  name: vnet
+  namespace: default
+spec:
+  azureName: krops-${CLUSTER_NAME}-vnet
+  location: ${AZURE_LOCATION}
+  owner:
+    armId: /subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/krops-${CLUSTER_NAME}-data
+  addressSpace:
+    addressPrefixes:
+      - 10.60.0.0/16
+  tags:
+    managed-by: flux-aso
+    cluster: ${CLUSTER_NAME}
+---
+apiVersion: network.azure.com/v1api20240301
+kind: VirtualNetworksSubnet
+metadata:
+  name: postgres
+  namespace: default
+spec:
+  azureName: postgres
+  owner:
+    name: vnet
+  addressPrefix: 10.60.1.0/24
+  delegations:
+    - name: postgres
+      serviceName: Microsoft.DBforPostgreSQL/flexibleServers
+---
+apiVersion: network.azure.com/v1api20240601
+kind: PrivateDnsZone
+metadata:
+  name: postgres-dns
+  namespace: default
+spec:
+  azureName: ${CLUSTER_NAME}.private.postgres.database.azure.com
+  location: global
+  owner:
+    armId: /subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/krops-${CLUSTER_NAME}-data
+  tags:
+    managed-by: flux-aso
+---
+apiVersion: network.azure.com/v1api20240601
+kind: PrivateDnsZonesVirtualNetworkLink
+metadata:
+  name: postgres-dns-vnet
+  namespace: default
+spec:
+  azureName: krops-${CLUSTER_NAME}-vnet
+  location: global
+  owner:
+    name: postgres-dns
+  virtualNetwork:
+    reference:
+      group: network.azure.com
+      kind: VirtualNetwork
+      name: vnet
+  registrationEnabled: false

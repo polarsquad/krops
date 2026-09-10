@@ -115,7 +115,9 @@ spec:
         azureName: system
         mode: System
         type: VirtualMachineScaleSets
-        vmSize: Standard_D2s_v5
+        # Cheapest AKS-eligible system-pool SKU in swedencentral (on-demand
+        # Linux): >= 2 vCPU and >= 4 GiB, no B series (AKS system-pool rules).
+        vmSize: Standard_D2as_v5
         osDiskSizeGB: 64
 ---
 # ── ARM user pool (Ampere Altra), the Graviton pool's counterpart ───────────
@@ -157,6 +159,10 @@ spec:
         azureName: arm
         mode: User
         type: VirtualMachineScaleSets
+        # Cheapest AKS-supported Arm64 SKU in swedencentral (on-demand Linux);
+        # Dplsv5 is the lowest-cost of the Dpsv5/Dplsv5/Epsv5 series AKS
+        # accepts for Arm64 pools. Cheaper ARM SKUs (Bpsv2, Dplsv6) are not
+        # AKS-supported.
         vmSize: Standard_D2pls_v5
         osDiskSizeGB: 64
         nodeLabels:

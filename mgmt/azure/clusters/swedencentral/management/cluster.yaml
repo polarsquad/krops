@@ -107,6 +107,8 @@ spec:
         azureName: system
         mode: System
         type: VirtualMachineScaleSets
-        vmSize: Standard_D2s_v5
+        # Cheapest AKS-eligible system-pool SKU in swedencentral (on-demand
+        # Linux): >= 2 vCPU and >= 4 GiB, no B series (AKS system-pool rules).
+        vmSize: Standard_D2as_v5
         osDiskSizeGB: 64
         # count is set by CAPZ from MachinePool.spec.replicas.

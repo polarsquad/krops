@@ -1,0 +1,19 @@
+nameReference:
+  - kind: AzureASOManagedCluster
+    fieldSpecs:
+      - path: spec/infrastructureRef/name
+        kind: Cluster
+  - kind: AzureASOManagedControlPlane
+    fieldSpecs:
+      - path: spec/controlPlaneRef/name
+        kind: Cluster
+  - kind: AzureASOManagedMachinePool
+    fieldSpecs:
+      - path: spec/template/spec/infrastructureRef/name
+        kind: MachinePool
+  - kind: Cluster
+    fieldSpecs:
+      - path: spec/clusterName
+        kind: MachinePool
+      - path: spec/template/spec/clusterName
+        kind: MachinePool

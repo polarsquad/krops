@@ -1,0 +1,112 @@
+---
+# ── AKS management Cluster ──────────────────────────────────────────────────
+# Created by CAPZ in the kind bootstrap cluster, moved by `clusterctl move`
+# (pivot), then reconciled from Git by the Flux instance inside it. Same
+# lifecycle as mgmt/aws/clusters/eu-north-1/management/.
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: management
+  namespace: default
+  labels:
+    region: swedencentral
+    # Deliberately NOT `fluxcd: enabled` (see the aws management cluster).
+spec:
+  controlPlaneRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: AzureASOManagedControlPlane
+    name: management
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: AzureASOManagedCluster
+    name: management
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AzureASOManagedCluster
+metadata:
+  name: management
+  namespace: default
+spec:
+  resources:
+    - apiVersion: resources.azure.com/v1api20200601
+      kind: ResourceGroup
+      metadata:
+        name: swedencentral-management
+        annotations:
+          serviceoperator.azure.com/credential-from: aso-credentials
+      spec:
+        location: swedencentral
+        tags:
+          managed-by: flux-capz
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AzureASOManagedControlPlane
+metadata:
+  name: management
+  namespace: default
+spec:
+  # Placeholder until `az aks get-versions --location swedencentral` is run
+  # against the real subscription (issue #71 follow-up).
+  version: v1.33.4
+  resources:
+    - apiVersion: containerservice.azure.com/v1api20240901
+      kind: ManagedCluster
+      metadata:
+        name: swedencentral-management
+        annotations:
+          serviceoperator.azure.com/credential-from: aso-credentials
+      spec:
+        owner:
+          name: swedencentral-management
+        location: swedencentral
+        dnsPrefix: krops-swedencentral-management
+        identity:
+          type: SystemAssigned
+        servicePrincipalProfile:
+          clientId: msi
+        networkProfile:
+          networkPlugin: azure
+        tags:
+          managed-by: flux-capz
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachinePool
+metadata:
+  name: management-pool
+  namespace: default
+spec:
+  clusterName: management
+  replicas: 2
+  template:
+    spec:
+      clusterName: management
+      bootstrap:
+        dataSecretName: ""
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        kind: AzureASOManagedMachinePool
+        name: management-pool
+      version: v1.33.4
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AzureASOManagedMachinePool
+metadata:
+  name: management-pool
+  namespace: default
+spec:
+  resources:
+    - apiVersion: containerservice.azure.com/v1api20240901
+      kind: ManagedClustersAgentPool
+      metadata:
+        name: swedencentral-management-pool
+        annotations:
+          serviceoperator.azure.com/credential-from: aso-credentials
+      spec:
+        owner:
+          name: swedencentral-management
+        azureName: system
+        mode: System
+        type: VirtualMachineScaleSets
+        vmSize: Standard_D2s_v5
+        osDiskSizeGB: 64
+        # count is set by CAPZ from MachinePool.spec.replicas.

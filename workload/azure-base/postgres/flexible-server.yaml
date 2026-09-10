@@ -1,0 +1,65 @@
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# Smallest-footprint PostgreSQL Flexible Server (the RDS instance's
+# counterpart in workload/base/rds-instances/). Private access through the
+# delegated subnet + private DNS zone (workload/azure-base/networking/).
+#
+# Authentication: Entra ID only, password auth disabled, so no master
+# password has to exist anywhere (RDS uses Secrets Manager for the same
+# reason). The krops-aso identity is the first Entra administrator so an
+# operator can grant further principals through it.
+#
+# API version: v20250801, the only ASO v2.19.0 group version that has the
+# FlexibleServersAdministrator kind (verified in v2/api/dbforpostgresql/).
+# ══════════════════════════════════════════════════════════════════════════════
+apiVersion: dbforpostgresql.azure.com/v20250801
+kind: FlexibleServer
+metadata:
+  name: db
+  namespace: default
+spec:
+  azureName: krops-${CLUSTER_NAME}-db
+  location: ${AZURE_LOCATION}
+  owner:
+    armId: /subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/krops-${CLUSTER_NAME}-data
+  version: "16"
+  sku:
+    name: Standard_B1ms
+    tier: Burstable
+  storage:
+    storageSizeGB: 32
+  backup:
+    backupRetentionDays: 7
+    geoRedundantBackup: Disabled
+  highAvailability:
+    mode: Disabled
+  authConfig:
+    activeDirectoryAuth: Enabled
+    passwordAuth: Disabled
+    tenantId: ${AZURE_TENANT_ID}
+  network:
+    delegatedSubnetResourceReference:
+      group: network.azure.com
+      kind: VirtualNetworksSubnet
+      name: postgres
+    privateDnsZoneArmResourceReference:
+      group: network.azure.com
+      kind: PrivateDnsZone
+      name: postgres-dns
+  tags:
+    managed-by: flux-aso
+    cluster: ${CLUSTER_NAME}
+---
+apiVersion: dbforpostgresql.azure.com/v20250801
+kind: FlexibleServersAdministrator
+metadata:
+  name: db-admin-krops-aso
+  namespace: default
+spec:
+  # The Entra object ID of the administrator is the resource name in ARM.
+  azureName: ${AZURE_ASO_PRINCIPAL_ID}
+  owner:
+    name: db
+  principalName: krops-aso
+  principalType: ServicePrincipal
+  tenantId: ${AZURE_TENANT_ID}

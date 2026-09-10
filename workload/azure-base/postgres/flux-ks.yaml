@@ -1,0 +1,31 @@
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# Flux Kustomization: PostgreSQL Flexible Server managed by this cluster's
+# ASO.
+#
+# dependsOn: networking — the delegated subnet and private DNS zone must be
+# Ready (networking has wait: true) before the server is created; the server
+# references them by name. timeout: 30m because server creation takes
+# 10-20 min.
+# ══════════════════════════════════════════════════════════════════════════════
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: postgres
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 2m
+  timeout: 30m
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./workload/azure-base/postgres
+  dependsOn:
+    - name: networking
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-vars

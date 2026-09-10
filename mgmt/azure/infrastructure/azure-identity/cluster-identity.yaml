@@ -6,8 +6,10 @@
 # each ASO resource (see clusters/). Both point at the aso-credentials Secret
 # in `default`; CAPZ reads its `AZURE_CLIENT_SECRET` key.
 #
-# move-hierarchy: clusterctl move carries the identity (and the Secret it
-# references) to the pivot target with the Cluster.
+# move-hierarchy: clusterctl move carries the identity to the pivot target
+# with the Cluster. The aso-credentials Secret does NOT move (no
+# move-hierarchy label, no owner reference); the pivot applies it from
+# pivot-sops-secrets (bootstrap.toml) before the move.
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: AzureClusterIdentity

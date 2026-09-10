@@ -1,0 +1,8 @@
+# Helm add-on provider: HelmChartProxy / HelmReleaseProxy APIs for workload clusters.
+apiVersion: operator.cluster.x-k8s.io/v1alpha2
+kind: AddonProvider
+metadata:
+  name: helm
+  namespace: caaph-system
+spec:
+  version: "v0.6.4"

@@ -1,0 +1,12 @@
+# CAPZ bundles Azure Service Operator (v2.19.0 in v1.27.0) into capz-system;
+# the AzureASOManaged* API drives AKS through inline ASO resources. Upgrade
+# ONE minor version at a time (ASO CRD migrations), see docs/azure.md.
+apiVersion: operator.cluster.x-k8s.io/v1alpha2
+kind: InfrastructureProvider
+metadata:
+  name: azure
+  namespace: capz-system
+spec:
+  version: "v1.27.0"
+  configSecret:
+    name: capz-variables

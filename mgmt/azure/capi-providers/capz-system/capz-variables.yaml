@@ -1,0 +1,23 @@
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# Variables the CAPI operator substitutes into the CAPZ manifest (configSecret).
+# Nothing here is secret (the operator requires a Secret, not a ConfigMap):
+# the Azure credential lives in an AzureClusterIdentity + SOPS Secret
+# (infrastructure/azure-identity/), never in environment variables.
+#
+# ASOAPI and MachinePool are GA defaults in CAPZ v1.27.0 (feature/feature.go:
+# ASOAPI {Default: true, GA}; MachinePool is in the main API), so no
+# feature-gate flags are needed here.
+#
+# ADDITIONAL_ASO_CRDS extends the ASO CRD set CAPZ installs beyond its own
+# needs (';'-separated patterns) so the bundled ASO can also reconcile the
+# identity resources in infrastructure/aso-workload-identity/.
+# ══════════════════════════════════════════════════════════════════════════════
+apiVersion: v1
+kind: Secret
+metadata:
+  name: capz-variables
+  namespace: capz-system
+type: Opaque
+stringData:
+  ADDITIONAL_ASO_CRDS: "managedidentity.azure.com/*;authorization.azure.com/RoleAssignment"

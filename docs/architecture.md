@@ -207,11 +207,15 @@ the pivot moves the management objects into it, and each AKS workload cluster
 runs its own Azure Service Operator (ASO 2.19.0) reconciling Azure resources from
 `workload/azure-base/`.
 
-Workload clusters store no Azure credentials. Instead, the bundled ASO on the
-management cluster reconciles identity resources (`krops-aso` User-Assigned
-Identity, resource group Contributor role assignment, and Federated Identity
-Credential), enabling the workload ASO to authenticate with Entra ID Workload
-Identity.
+No Azure secret exists at rest: the management cluster authenticates CAPZ and
+the bundled ASO with workload identity against the `krops-capz`
+User-Assigned Identity (federated to the kind cluster's Arc OIDC issuer at
+bootstrap, and to the management cluster's own OIDC issuer post-pivot), while
+workload clusters hold no credentials at all. The bundled ASO on the
+management cluster reconciles identity resources (`krops-aso` and `krops-capz`
+identities, resource group role assignments, and Federated Identity
+Credentials), enabling the workload ASO to authenticate with Entra ID
+Workload Identity.
 
 See the architecture diagram in [docs/azure-infra.svg](azure-infra.svg) and
 the [Azure environment guide](./azure.md).
@@ -241,8 +245,8 @@ flowchart TD
         CAPIS[capi-system]
         CAPZS["capz-system (CAPZ v1.27.0 + bundled ASO)"]
         CAAPH[caaph-system]
-        AZID["azure-identity (SOPS aso-credentials)<br/>AzureClusterIdentity"]
-        ASOWI["aso-workload-identity<br/>krops-aso identity + FIC + role"]
+        AZID["azure-identity (secret-free)<br/>AzureClusterIdentity: WorkloadIdentity"]
+        ASOWI["aso-workload-identity<br/>krops-aso + krops-capz identities + FICs + roles"]
         SWEDENC["swedencentral cluster def<br/>swedencentral-management (self-hosted)<br/>swedencentral-workload"]
         FA["flux-apps (SOPS pull secret)<br/>HelmChartProxy + ClusterResourceSets"]
 

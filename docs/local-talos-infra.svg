@@ -71,9 +71,9 @@
   <!-- providers subpanel -->
   <rect x="88" y="334" width="452" height="130" rx="10" fill="#5CE0B4" fill-opacity="0.12" stroke="#5CE0B4" stroke-opacity="0.5" stroke-width="1.2"/>
   <text x="314" y="358" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#5CE0B4">Installed CAPI providers (mgmt/local-talos/)</text>
-  <text x="106" y="382" font-family="DejaVu Sans Mono" font-size="13.5" fill="#D4E2DA">&#8226; <tspan fill="#FFFFFF">capt-system:</tspan> Tinkerbell CAPT v0.7.1 (installer-image fork)</text>
+  <text x="106" y="382" font-family="DejaVu Sans Mono" font-size="13.5" fill="#D4E2DA">&#8226; <tspan fill="#FFFFFF">capt-system:</tspan> Tinkerbell CAPT v0.7.1 (fork)</text>
   <text x="106" y="404" font-family="DejaVu Sans Mono" font-size="13.5" fill="#D4E2DA">&#8226; <tspan fill="#FFFFFF">cabpt-system:</tspan> Talos bootstrap provider (v0.7.8)</text>
-  <text x="106" y="426" font-family="DejaVu Sans Mono" font-size="13.5" fill="#D4E2DA">&#8226; <tspan fill="#FFFFFF">cacppt-system:</tspan> Talos control plane provider (v0.6.5)</text>
+  <text x="106" y="426" font-family="DejaVu Sans Mono" font-size="13.5" fill="#D4E2DA">&#8226; <tspan fill="#FFFFFF">cacppt-system:</tspan> Talos control plane (v0.6.5)</text>
   <text x="106" y="448" font-family="DejaVu Sans Mono" font-size="13.5" fill="#859D91">&#8226; <tspan fill="#D4E2DA">capi-system:</tspan> CAPI core operator (v1.14.1)</text>
 
   <!-- ===== git repository ===== -->
@@ -120,7 +120,7 @@
 
   <!-- talos os chip -->
   <rect x="88" y="892" width="412" height="52" rx="8" fill="#5CE0B4" fill-opacity="0.12" stroke="#5CE0B4" stroke-opacity="0.5" stroke-width="1.2"/>
-  <text x="294" y="923" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#5CE0B4">Talos Linux: immutable rootfs &#183; API-managed &#183; zero SSH</text>
+  <text x="294" y="923" text-anchor="middle" font-family="DejaVu Sans" font-size="14" font-weight="bold" fill="#5CE0B4">Talos: immutable rootfs &#183; API-managed &#183; zero SSH</text>
 
   <!-- ===== scope fence and teardown ===== -->
   <rect x="560" y="570" width="460" height="390" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
@@ -133,7 +133,7 @@
   <text x="604" y="684" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#E5B85C">Management-only scope:</text>
   <text x="604" y="708" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; <tspan font-weight="bold">No workload clusters:</tspan> local-talos owns no workloads</text>
   <text x="604" y="730" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; <tspan font-weight="bold">No addons:</tspan> Talos ships CNI (no HCP consumers)</text>
-  <text x="604" y="752" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; Self-contained control plane on single bare-metal host</text>
+  <text x="604" y="752" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; Self-contained control plane (single host)</text>
 
   <!-- teardown box -->
   <rect x="584" y="784" width="412" height="160" rx="8" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>

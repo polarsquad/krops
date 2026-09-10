@@ -74,9 +74,9 @@
   <rect x="88" y="336" width="392" height="136" rx="10" fill="#5CE0B4" fill-opacity="0.12" stroke="#5CE0B4" stroke-opacity="0.5" stroke-width="1.2"/>
   <text x="284" y="360" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#5CE0B4">Manages infrastructure &amp; identity</text>
   <text x="106" y="386" font-family="DejaVu Sans" font-size="14.5" fill="#D4E2DA">&#8226; <tspan font-weight="bold">AKS cluster:</tspan> AzureASOManaged* (inline ASO)</text>
-  <text x="106" y="410" font-family="DejaVu Sans" font-size="14.5" fill="#D4E2DA">&#8226; <tspan font-weight="bold">Identity:</tspan> krops-aso user identity + FIC + role</text>
+  <text x="106" y="410" font-family="DejaVu Sans" font-size="14.5" fill="#D4E2DA">&#8226; <tspan font-weight="bold">Identity:</tspan> krops-capz + krops-aso UAMIs, FICs, roles</text>
   <text x="106" y="434" font-family="DejaVu Sans" font-size="14.5" fill="#D4E2DA">&#8226; <tspan font-weight="bold">flux-apps:</tspan> HelmChartProxy + ClusterResourceSets</text>
-  <text x="106" y="458" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">&#8226; <tspan font-family="DejaVu Sans Mono">aso-credentials.sops.yaml</tspan> (one SP for mgmt)</text>
+  <text x="106" y="458" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">&#8226; <tspan font-family="DejaVu Sans Mono">aso-credentials</tspan> Secret (plain, secret-free)</text>
 
   <!-- ===== git repository ===== -->
   <rect x="620" y="150" width="400" height="340" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
@@ -99,7 +99,7 @@
   <text x="744" y="342" font-family="DejaVu Sans Mono" font-size="16" fill="#68C5EB">azure-base/</text>
   <text x="744" y="376" font-family="DejaVu Sans Mono" font-size="16" fill="#68C5EB">swedencentral-01/</text>
   <text x="820" y="426" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">Flux tracks <tspan font-family="DejaVu Sans Mono" fill="#D4E2DA">main</tspan></text>
-  <text x="820" y="450" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">SOPS-encrypted SP secret in-repo</text>
+  <text x="820" y="450" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">No SOPS secrets: identity in plain manifests</text>
 
   <!-- ===== workload cluster ===== -->
   <rect x="64" y="600" width="460" height="350" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
@@ -163,15 +163,15 @@
   <!-- resource boxes -->
   <rect x="584" y="690" width="412" height="60" rx="8" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
   <text x="604" y="715" font-family="DejaVu Sans Mono" font-size="15" font-weight="bold" fill="#E8A868">Virtual Network &amp; Private DNS</text>
-  <text x="604" y="736" font-family="DejaVu Sans" font-size="13.5" fill="#D4E2DA">vnet-swedencentral-workload &#183; delegated subnet &#183; private zone</text>
+  <text x="604" y="736" font-family="DejaVu Sans" font-size="13.5" fill="#D4E2DA">vnet-swedencentral-workload &#183; delegated subnet</text>
 
   <rect x="584" y="760" width="412" height="60" rx="8" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
   <text x="604" y="785" font-family="DejaVu Sans Mono" font-size="15" font-weight="bold" fill="#E8A868">Storage Account &amp; Blob</text>
-  <text x="604" y="806" font-family="DejaVu Sans" font-size="13.5" fill="#D4E2DA">${STORAGE_ACCOUNT_NAME} in data RG &#183; container "data"</text>
+  <text x="604" y="806" font-family="DejaVu Sans" font-size="13.5" fill="#D4E2DA">${STORAGE_ACCOUNT_NAME} in data RG</text>
 
   <rect x="584" y="830" width="412" height="60" rx="8" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
   <text x="604" y="855" font-family="DejaVu Sans Mono" font-size="15" font-weight="bold" fill="#E8A868">PostgreSQL Flexible Server</text>
-  <text x="604" y="876" font-family="DejaVu Sans" font-size="13.5" fill="#D4E2DA">psql-swedencentral-workload &#183; private VNet access &#183; Entra-only auth</text>
+  <text x="604" y="876" font-family="DejaVu Sans" font-size="13.5" fill="#D4E2DA">psql-swedencentral-workload &#183; private VNet access</text>
 
   <!-- azure logo glyph -->
   <g transform="translate(930, 915)">
@@ -213,9 +213,9 @@
   <circle cx="1140" cy="354" r="15" fill="#B0F6C0"/>
   <text x="1140" y="360" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">2</text>
   <text x="1168" y="350" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Bundled ASO reconciles identity:</text>
-  <text x="1168" y="376" font-family="DejaVu Sans Mono" font-size="15.5" fill="#B0F6C0">krops-aso <tspan font-family="DejaVu Sans" fill="#D4E2DA">user identity, data RG,</tspan></text>
-  <text x="1168" y="402" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Contributor role, and federated</text>
-  <text x="1168" y="428" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">credential (FIC) for workload SA.</text>
+  <text x="1168" y="376" font-family="DejaVu Sans Mono" font-size="15.5" fill="#B0F6C0">krops-capz + krops-aso UAMIs, data RG,</text>
+  <text x="1168" y="402" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Contributor roles, and FICs for the</text>
+  <text x="1168" y="428" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">CAPZ/ASO SAs and the workload SA.</text>
   <line x1="1122" y1="462" x2="1504" y2="462" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- step 3 -->
@@ -223,7 +223,7 @@
   <text x="1140" y="516" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">3</text>
   <text x="1168" y="506" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Workload cluster runs local Flux:</text>
   <text x="1168" y="540" font-family="DejaVu Sans Mono" font-size="17" fill="#D4E2DA">1. <tspan fill="#FFFFFF">cert-manager</tspan></text>
-  <text x="1168" y="568" font-family="DejaVu Sans Mono" font-size="17" fill="#D4E2DA">2. <tspan fill="#FFFFFF">aso</tspan> <tspan font-family="DejaVu Sans" font-size="15" fill="#859D91">(2.19.0 via Workload Identity)</tspan></text>
+  <text x="1168" y="568" font-family="DejaVu Sans Mono" font-size="17" fill="#D4E2DA">2. <tspan fill="#FFFFFF">aso</tspan> <tspan font-family="DejaVu Sans" font-size="15" fill="#859D91">(Workload Identity)</tspan></text>
   <text x="1168" y="596" font-family="DejaVu Sans Mono" font-size="17" fill="#D4E2DA">3. <tspan fill="#FFFFFF">networking &#183; storage</tspan></text>
   <text x="1168" y="624" font-family="DejaVu Sans Mono" font-size="17" fill="#D4E2DA">4. <tspan fill="#FFFFFF">postgres</tspan> <tspan font-family="DejaVu Sans" font-size="14.5" fill="#859D91">(dependsOn: networking)</tspan></text>
   <line x1="1122" y1="658" x2="1504" y2="658" stroke="#1F362A" stroke-width="1.2"/>
@@ -255,6 +255,6 @@
   <text x="1412" y="1012" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">azure</text>
 
   <!-- ===== footer ===== -->
-  <text x="800" y="1102" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">Single service principal on mgmt; workload clusters authenticate via Workload Identity.</text>
+  <text x="800" y="1102" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">No secrets at rest: management CAPZ/ASO and workload ASO all authenticate via Workload Identity.</text>
   <text x="800" y="1128" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">No Terraform, no state files: CAPI and ASO manage Azure entirely through Kubernetes CRDs.</text>
 </svg>

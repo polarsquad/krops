@@ -431,6 +431,70 @@ fn post_kind_create_hook_args<'a>(profile: &'a str, task: &'a str) -> Vec<&'a st
     vec!["-E", profile, "run", task]
 }
 
+/// Replace `${VAR}` placeholders in a pivot manifest from `vars` (the
+/// ConfigMap data the bootstrap cluster's Flux already reconciled). Unknown
+/// placeholders are left literal so `remaining_manifest_vars` can name them.
+fn substitute_manifest_vars(
+    manifest: &str,
+    vars: &std::collections::HashMap<String, String>,
+) -> String {
+    let mut out = manifest.to_string();
+    for (key, value) in vars {
+        out = out.replace(&format!("${{{key}}}"), value);
+    }
+    out
+}
+
+/// The `${VAR}` placeholder names still present in a manifest.
+fn remaining_manifest_vars(manifest: &str) -> Vec<String> {
+    let mut names: Vec<String> = Vec::new();
+    let mut rest = manifest;
+    while let Some(start) = rest.find("${") {
+        rest = &rest[start + 2..];
+        let Some(end) = rest.find('}') else { break };
+        let name = rest[..end].to_string();
+        if !names.contains(&name) {
+            names.push(name);
+        }
+        rest = &rest[end + 1..];
+    }
+    names
+}
+
+/// Merge the `data` of every ConfigMap in the Flux namespace (the values
+/// the bootstrap cluster's Flux reconciled) into one substitution map for
+/// pivot manifests (issue #236): the Git file carries `${VAR}` placeholders
+/// until the target's own Flux runs postBuild substitution.
+async fn flux_namespace_vars(flux_ns: &str) -> Result<std::collections::HashMap<String, String>> {
+    let json_text = capture(
+        "kubectl",
+        &[
+            "get",
+            "configmaps",
+            "--namespace",
+            flux_ns,
+            "--output",
+            "json",
+        ],
+    )
+    .await?;
+    let parsed: serde_json::Value =
+        serde_json::from_str(&json_text).context("failed to parse kubectl configmaps output")?;
+    let mut vars = std::collections::HashMap::new();
+    if let Some(items) = parsed.get("items").and_then(|v| v.as_array()) {
+        for item in items {
+            if let Some(data) = item.get("data").and_then(|d| d.as_object()) {
+                for (key, value) in data {
+                    if let Some(s) = value.as_str() {
+                        vars.insert(key.clone(), s.to_string());
+                    }
+                }
+            }
+        }
+    }
+    Ok(vars)
+}
+
 /// Whether the GitHub/age preflight (PAT, repo branch probe, sops age
 /// key) must run: gated on the sync source (issue #105 scope item 6),
 /// not the profile name. AWS-only credential steps stay profile-gated.
@@ -1852,12 +1916,29 @@ async fn pivot_install_capi_in_target(
     // resources reference by name that clusterctl does not carry (the
     // workload-identity aso-credentials Secret). Applied pre-move for the
     // same reason as pivot-sops-secrets below, minus the decryption.
+    // The Git file carries ${VAR} placeholders (Flux postBuild substitutes
+    // them on the source side); the target has no Flux yet, so substitute
+    // here from the ConfigMaps the bootstrap cluster's Flux reconciled
+    // (azure-vars) before applying, and fail naming any variable that has
+    // no source value.
     if !cfg.environment.pivot_manifests.is_empty() {
         println!(">>> Applying pivot manifests in the target...");
+        let vars = flux_namespace_vars(&cfg.repo.bootstrap.flux_namespace).await?;
         for manifest in &cfg.environment.pivot_manifests {
-            run(
+            let raw = std::fs::read_to_string(manifest)
+                .with_context(|| format!("failed to read pivot manifest '{manifest}'"))?;
+            let substituted = substitute_manifest_vars(&raw, &vars);
+            let missing = remaining_manifest_vars(&substituted);
+            ensure!(
+                missing.is_empty(),
+                "pivot manifest '{manifest}' has unsubstituted placeholders (no ConfigMap data in {} provides them): {}",
+                cfg.repo.bootstrap.flux_namespace,
+                missing.join(", ")
+            );
+            run_with_stdin(
                 "kubectl",
-                &kubectl_cmd(Some(kc), &["apply", "-f", manifest]),
+                &kubectl_cmd(Some(kc), &["apply", "-f", "-"]),
+                &substituted,
             )
             .await?;
         }
@@ -2749,6 +2830,25 @@ mod tests {
     }
 
     #[test]
+    fn substitute_manifest_vars_replaces_known_and_leaves_unknown() {
+        let mut vars = std::collections::HashMap::new();
+        vars.insert(
+            "AZURE_SUBSCRIPTION_ID".to_string(),
+            "11111111-1111-1111-1111-111111111111".to_string(),
+        );
+        vars.insert(
+            "AZURE_TENANT_ID".to_string(),
+            "22222222-2222-2222-2222-222222222222".to_string(),
+        );
+        let manifest = "AZURE_SUBSCRIPTION_ID: \"${AZURE_SUBSCRIPTION_ID}\"\nAZURE_TENANT_ID: \"${AZURE_TENANT_ID}\"\nAZURE_CLIENT_ID: \"${AZURE_CLIENT_ID}\"\n";
+        let out = substitute_manifest_vars(manifest, &vars);
+        assert!(out.contains("11111111-1111-1111-1111-111111111111"));
+        assert!(out.contains("22222222-2222-2222-2222-222222222222"));
+        // Unknown placeholders stay literal so the error below names them.
+        assert!(out.contains("${AZURE_CLIENT_ID}"));
+    }
+
+    #[test]
     fn pivot_manifests_apply_after_provider_manifests() {
         // Guard the Phase 3 ordering contract: pivot-manifests are applied
         // after provider CRs (CAPZ must exist before its identity Secret is
@@ -3056,12 +3156,27 @@ mod tests {
     fn sops_required_when_pivot_secrets_declared() {
         // Environments declaring pivot-sops-secrets need sops on PATH (the
         // pivot decrypts them with the operator's age key); the others
-        // don't.
+        // don't. Azure moved to pivot-manifests (issue #236), so it no
+        // longer declares SOPS secrets; build a synthetic environment to
+        // keep proving the rule against the shipped config.
         let repo = repo_config();
         let azure = required_tools(repo.environment("azure").unwrap());
-        assert!(azure.contains(&"sops"));
+        assert!(!azure.contains(&"sops"));
         let aws = required_tools(repo.environment("aws").unwrap());
         assert!(!aws.contains(&"sops"));
+
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let raw = std::fs::read_to_string(root.join("../bootstrap.toml")).unwrap();
+        let with_sops = format!(
+            "{raw}\n[environments.sops-demo]\nkind = \"sops-demo\"\nsync = \"github\"\n\
+             sync-path = \"mgmt/aws\"\nmgmt-cluster = \"demo-mgmt\"\nmgmt-ready-timeout = \"5m\"\n\
+             infra-provider-namespace = \"capa-system\"\ninfra-provider-name = \"aws\"\n\
+             provider-manifests = []\n\
+             pivot-sops-secrets = [\"mgmt/aws/infrastructure/aws-identity/identity.yaml\"]\n"
+        );
+        let config: BootstrapConfig = toml::from_str(&with_sops).unwrap();
+        let demo = required_tools(config.environment("sops-demo").unwrap());
+        assert!(demo.contains(&"sops"));
     }
 
     #[test]

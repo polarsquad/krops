@@ -20,21 +20,23 @@ Operator (ASO) that reconciles Azure resources from `workload/azure-base/`.
   `azure-bootstrap`).
 - `mise -E azure install` (adds `az`), a GitHub PAT and an age key as for
   `aws` (`.env`, see [operations.md](./operations.md)).
-- Resource providers, the service principal, the shared resource group and
-  the `krops-aso` identity are created by:
+- Resource providers (including the Arc ones), the shared resource group and
+  the `krops-capz` / `krops-aso` user-assigned identities with their role
+  grants are created by:
 
   ```sh
   export AZURE_SUBSCRIPTION_ID=<id>
   mise -E azure run azure-bootstrap
   ```
 
-  It prints the values to commit and the service-principal secret once.
+  It prints the values to commit; nothing it prints is secret (there is no
+  service principal).
 
 ## Commit the identifiers
 
 1. `mgmt/azure/infrastructure/azure-identity/azure-vars.yaml`:
-   `AZURE_SUBSCRIPTION_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` (the SP
-   app ID).
+   `AZURE_SUBSCRIPTION_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` (the
+   `krops-capz` UAMI client ID).
 2. `mgmt/azure/addons/flux-apps/flux-instance.yaml` (`cluster-vars`):
    the same two IDs plus `AZURE_ASO_CLIENT_ID`, `AZURE_ASO_PRINCIPAL_ID`
    (the `krops-aso` identity) and `STORAGE_ACCOUNT_NAME` (globally unique,
@@ -46,22 +48,16 @@ Operator (ASO) that reconciles Azure resources from `workload/azure-base/`.
 
 ## Credentials
 
-One service principal serves CAPZ (`AzureClusterIdentity` in
-`azure-identity/cluster-identity.yaml`) and the bundled ASO
-(`serviceoperator.azure.com/credential-from: aso-credentials` on every
-management-side ASO resource). It lives SOPS-encrypted in
-`mgmt/azure/infrastructure/azure-identity/aso-credentials.sops.yaml`:
-
-```sh
-mise run sops-decrypt mgmt/azure/infrastructure/azure-identity/aso-credentials.sops.yaml > /tmp/aso.yaml
-# set stringData.AZURE_SUBSCRIPTION_ID / AZURE_TENANT_ID / AZURE_CLIENT_ID / AZURE_CLIENT_SECRET
-mv /tmp/aso.yaml mgmt/azure/infrastructure/azure-identity/aso-credentials.sops.yaml
-mise run sops-encrypt mgmt/azure/infrastructure/azure-identity/aso-credentials.sops.yaml
-```
-
-Workload clusters hold no Azure secret: their ASO authenticates with
-workload identity through the federated credential in
-`mgmt/azure/infrastructure/aso-workload-identity/`.
+No Azure secret exists at rest. CAPZ and the bundled ASO authenticate with
+workload identity against the `krops-capz` UAMI (`AzureClusterIdentity` with
+`type: WorkloadIdentity`, and the bundled ASO's
+`serviceoperator.azure.com/credential-from: aso-credentials` annotation, a
+plain Secret); in kind the token issuer is the Arc-hosted OIDC issuer (the
+`arc-federate` mise task, run by bootstrap-rs as `post-kind-create-task`),
+post-pivot it is the management cluster's own OIDC issuer. Workload clusters
+are unchanged: their ASO authenticates with workload identity through the
+federated credential in `mgmt/azure/infrastructure/aso-workload-identity/`
+(`krops-aso` UAMI).
 
 ## Bootstrap, pivot, teardown
 
@@ -71,14 +67,21 @@ mise -E azure run mgmt-kubeconfig  # ~/.kube/krops-mgmt.yaml
 mise -E azure run kubeconfigs      # workload kubeconfigs via clusterctl
 ```
 
-During the pivot the CLI decrypts `aso-credentials.sops.yaml` with your age
-key and applies it to the target before `clusterctl move`
-(`pivot-sops-secrets` in `bootstrap.toml`): the moved ASO resources
-reference the Secret by name and clusterctl does not carry it.
+Right after the kind cluster is created, bootstrap-rs runs the `arc-federate`
+mise task (`post-kind-create-task` in `bootstrap.toml`): it Arc-connects the
+kind cluster with an OIDC issuer, patches the kind apiserver to mint tokens
+with that issuer, and creates the two kind-issuer federated credentials for
+CAPZ and ASO.
+
+During the pivot the CLI applies the plain, secret-free
+`aso-credentials` Secret to the target before `clusterctl move`
+(`pivot-manifests` in `bootstrap.toml`): the moved ASO resources reference
+the Secret by name and clusterctl does not carry it.
 
 Teardown is manual for now: `mise -E azure run teardown` refuses and prints
-the steps (`teardown.manual` in `bootstrap.toml`). Automating the Azure
-orphan sweep is tracked in the follow-up issue linked from #71.
+the steps (`teardown.manual` in `bootstrap.toml`), including deleting the Arc
+resource (`az connectedk8s delete`). Automating the Azure orphan sweep is
+tracked in the follow-up issue linked from #71.
 
 ## Reconciliation order
 
@@ -104,6 +107,11 @@ within one minor of the management-side bundle.
 
 - No live acceptance run has been performed yet (no subscription at
   implementation time); placeholders are listed above.
+- The Arc resource uuid (and therefore the issuer URL) changes if the Arc
+  resource is deleted and recreated; the kind-issuer FICs are upserted by
+  `arc-federate` on the next bootstrap, so this self-heals. The
+  `connectedk8s` az extension version is pinned in `mise.azure.toml` but not
+  covered by Renovate.
 - No GPU node pool: GPU quota is 0 on new subscriptions.
 - No reader identity (the `krops-reader` IAM counterpart).
 - The Flexible Server's only administrator is the `krops-aso` identity;

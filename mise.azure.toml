@@ -1,9 +1,10 @@
 # azure environment task layer (issue #71).
 #
 # Like aws, this environment syncs mgmt/azure from GitHub and pivots into an
-# AKS management cluster built by CAPZ. The Azure CLI is only needed for the
-# one-time subscription preparation (azure-bootstrap) and for debugging;
-# nothing in bootstrap/pivot shells out to it.
+# AKS management cluster built by CAPZ. The Azure CLI is needed for the
+# one-time subscription preparation (azure-bootstrap), for the arc-federate
+# hook bootstrap-rs runs right after kind creation (issue #236), and for
+# debugging.
 
 [env]
 KROPS_PROFILE = "azure"
@@ -77,8 +78,17 @@ ARC_NAME="${ARC_NAME:-krops-azure-bootstrap}"
 ARC_RG="${ARC_RG:-krops-shared}"
 ARC_LOCATION="${AZURE_LOCATION:-swedencentral}"
 KIND_NODE="${KIND_NODE:-mgmt-control-plane}"
+# Pin the context: the hook's kubectl must target the kind bootstrap cluster
+# regardless of the ambient current context (healthy-reuse path).
+KIND_CONTEXT="${KIND_CONTEXT:-kind-mgmt}"
+kubectl config use-context "$KIND_CONTEXT"
 
 az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+if ! az account show >/dev/null 2>&1; then
+  echo "==> no Azure session; starting device-code login"
+  az login --use-device-code --output none
+  az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+fi
 if ! az extension show --name connectedk8s >/dev/null 2>&1; then
   # renovate does not track az CLI extensions; version pinned at authoring time.
   az extension add --name connectedk8s --version 1.11.3 --yes --output none

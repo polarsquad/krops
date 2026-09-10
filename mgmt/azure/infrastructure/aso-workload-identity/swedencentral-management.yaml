@@ -1,0 +1,42 @@
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# Post-pivot federation (issue #236): FICs on the krops-capz UAMI trusting the
+# MANAGEMENT cluster's OIDC issuer for the CAPZ and bundled-ASO service
+# accounts. Created pre-pivot by the bundled ASO running in kind (issuer
+# retries until the swedencentral-management-oidc ConfigMap export appears,
+# same pattern as swedencentral-workload.yaml), so the credentials already
+# exist when CAPZ/ASO start on the management cluster after the move.
+# ══════════════════════════════════════════════════════════════════════════════
+apiVersion: managedidentity.azure.com/v1api20230131
+kind: FederatedIdentityCredential
+metadata:
+  name: krops-capz-mgmt-capz
+  namespace: default
+  annotations:
+    serviceoperator.azure.com/credential-from: aso-credentials
+spec:
+  owner:
+    name: krops-capz
+  audiences:
+    - api://AzureADTokenExchange
+  issuerFromConfig:
+    name: swedencentral-management-oidc
+    key: issuer
+  subject: system:serviceaccount:capz-system:capz-manager
+---
+apiVersion: managedidentity.azure.com/v1api20230131
+kind: FederatedIdentityCredential
+metadata:
+  name: krops-capz-mgmt-aso
+  namespace: default
+  annotations:
+    serviceoperator.azure.com/credential-from: aso-credentials
+spec:
+  owner:
+    name: krops-capz
+  audiences:
+    - api://AzureADTokenExchange
+  issuerFromConfig:
+    name: swedencentral-management-oidc
+    key: issuer
+  subject: system:serviceaccount:capz-system:azureserviceoperator-default

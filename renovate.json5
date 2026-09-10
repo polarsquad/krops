@@ -215,6 +215,15 @@
       "extractVersionTemplate": "^v(?<version>.+)",
       "autoReplaceStringTemplate": "talosctl = \"{{newValue}}\""
     },
+    {
+      "customType": "regex",
+      "description": "mise: azure-cli pin (pipx backend, azure environment layer, issue #71)",
+      "managerFilePatterns": ["/(^|/)mise\\.azure\\.toml$/"],
+      "matchStrings": ["\"pipx:azure-cli\" = \"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "azure-cli",
+      "datasourceTemplate": "pypi",
+      "autoReplaceStringTemplate": "\"pipx:azure-cli\" = \"{{newValue}}\""
+    },
     // ── bootstrap.toml chart pins (annotation-driven) ─────────────────────
     // Datasource and depName live in `# renovate:` comments next to the
     // chart pins in bootstrap.toml (consumed by the Rust binary since the
@@ -286,7 +295,7 @@
       "customType": "regex",
       "description": "CAPI core, kubeadm, and CAPD provider versions (aws, local-host, local-talos)",
       "managerFilePatterns": [
-        "/(^|/)mgmt/(aws|local-host|local-talos)/capi-providers/(capi-system|capd-system)/.+\\.ya?ml$/"
+        "/(^|/)mgmt/(aws|azure|local-host|local-talos)/capi-providers/(capi-system|capd-system)/.+\\.ya?ml$/"
       ],
       "matchStrings": ["\\s{2}version: \"v(?<currentValue>[^\"]+)\""],
       "depNameTemplate": "kubernetes-sigs/cluster-api",
@@ -308,9 +317,21 @@
     },
     {
       "customType": "regex",
+      "description": "CAPZ (Azure infrastructure) provider version (issue #71)",
+      "managerFilePatterns": [
+        "/(^|/)mgmt/azure/capi-providers/capz-system/.+\\.ya?ml$/"
+      ],
+      "matchStrings": ["\\s{2}version: \"v(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "kubernetes-sigs/cluster-api-provider-azure",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.+)",
+      "autoReplaceStringTemplate": "  version: \"v{{newValue}}\""
+    },
+    {
+      "customType": "regex",
       "description": "CAAPH (helm add-on) provider version",
       "managerFilePatterns": [
-        "/(^|/)mgmt/(aws|local-host)/capi-providers/caaph-system/.+\\.ya?ml$/"
+        "/(^|/)mgmt/(aws|azure|local-host)/capi-providers/caaph-system/.+\\.ya?ml$/"
       ],
       "matchStrings": ["\\s{2}version: \"v(?<currentValue>[^\"]+)\""],
       "depNameTemplate": "kubernetes-sigs/cluster-api-addon-provider-helm",
@@ -424,14 +445,22 @@
       "groupName": "flux"
     },
     {
-      "description": "Group the CAPI family (core, kubeadm, CAPD, CAPA, CAAPH)",
+      "description": "Group the CAPI family (core, kubeadm, CAPD, CAPA, CAAPH, CAPZ)",
       "matchDatasources": ["github-releases"],
       "matchPackageNames": [
         "kubernetes-sigs/cluster-api",
         "kubernetes-sigs/cluster-api-provider-aws",
-        "kubernetes-sigs/cluster-api-addon-provider-helm"
+        "kubernetes-sigs/cluster-api-addon-provider-helm",
+        "kubernetes-sigs/cluster-api-provider-azure"
       ],
       "groupName": "cluster-api"
+    },
+    {
+      "description": "CAPZ bundles ASO, which must be upgraded one minor version at a time (issue #71)",
+      "matchDatasources": ["github-releases"],
+      "matchPackageNames": ["kubernetes-sigs/cluster-api-provider-azure"],
+      "separateMultipleMinor": true,
+      "groupName": null
     },
     {
       "description": "Group imperative pivot chart pins with their GitOps HelmReleases",

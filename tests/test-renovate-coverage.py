@@ -46,6 +46,10 @@ EXPECTED = {
     },
     "mise.local-talos.toml": {"siderolabs/talos"},
     "mise.toml": {"astral-sh/uv"},
+    "mgmt/azure/capi-providers/capz-system/providers.yaml": {
+        "kubernetes-sigs/cluster-api-provider-azure",
+    },
+    "mise.azure.toml": {"azure-cli"},
 }
 
 REQUIRED_SINGLE_REGISTRY = {

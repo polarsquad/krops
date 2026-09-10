@@ -24,12 +24,8 @@
 
   <!-- ===== connections (behind boxes) ===== -->
   <line x1="612" y1="256" x2="508" y2="256" stroke="#B0F6C0" stroke-width="2.5" marker-end="url(#arrow-purple)"/>
-  <text x="561" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#FFFFFF">2. syncs</text>
-  <text x="561" y="244" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="11" fill="#5CE0B4">mgmt/local-host/</text>
   <path d="M284,484 V594" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-teal)"/>
-  <text x="470" y="530" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">3. provisions CAPD cluster &#183; installs Flux via <tspan font-family="DejaVu Sans Mono" fill="#5CE0B4">flux-apps</tspan></text>
   <path d="M820,484 V560 H560 V594" fill="none" stroke="#B0F6C0" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-purple)"/>
-  <text x="820" y="580" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">4. workload Flux pulls same OCI artifact</text>
 
   <!-- ===== management cluster ===== -->
   <rect x="64" y="150" width="440" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
@@ -69,7 +65,7 @@
   <g fill="none" stroke="#D4E2DA" stroke-width="1.7" stroke-linejoin="round">
     <path d="M270,406 h9 a5,5 0 1 1 10,0 h9 v9 a5,5 0 1 1 0,10 v9 h-28 z"/>
   </g>
-  <text x="306" y="420" font-family="DejaVu Sans" font-size="15" fill="#D4E2DA">Flux bootstrap addon</text>
+  <text x="306" y="420" font-family="DejaVu Sans" font-size="15" fill="#D4E2DA">Flux addon</text>
 
   <!-- ===== local OCI registry ===== -->
   <rect x="620" y="150" width="400" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
@@ -92,7 +88,6 @@
 
   <!-- push arrow into registry (from laptop) -->
   <line x1="1058" y1="256" x2="1028" y2="256" stroke="#859D91" stroke-width="2" marker-end="url(#arrow-gray)"/>
-  <text x="1044" y="230" text-anchor="end" font-family="DejaVu Sans" font-size="15" fill="#859D91">1. oci-push</text>
 
   <!-- ===== workload cluster ===== -->
   <rect x="290" y="600" width="540" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
@@ -124,7 +119,6 @@
 
   <!-- port-forward arrow -->
   <path d="M830,817 H1000" fill="none" stroke="#859D91" stroke-width="2" marker-end="url(#arrow-gray)"/>
-  <text x="915" y="795" text-anchor="middle" font-family="DejaVu Sans" font-size="15" fill="#859D91">5. port-forward</text>
   <text x="915" y="843" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#E8A868">localhost:9898</text>
 
   <!-- ===== legend strip ===== -->

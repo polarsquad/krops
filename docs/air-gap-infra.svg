@@ -50,13 +50,11 @@
 
   <!-- build -> bundle arrow -->
   <line x1="508" y1="278" x2="612" y2="278" stroke="#5CE0B4" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
-  <text x="561" y="258" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#FFFFFF">1. build</text>
 
   <!-- ===== the gap ===== -->
   <line x1="64" y1="432" x2="1030" y2="432" stroke="#E5B85C" stroke-width="2" stroke-dasharray="12,10"/>
   <text x="547" y="424" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#E5B85C">THE GAP &#183; no internet below this line (validated radio-off)</text>
   <path d="M820,406 V446" fill="none" stroke="#B0F6C0" stroke-width="2.5" marker-end="url(#arrow-purple)"/>
-  <text x="852" y="440" font-family="DejaVu Sans" font-size="15" fill="#859D91">2. carry across</text>
 
   <!-- ===== management cluster (offline) ===== -->
   <rect x="64" y="486" width="500" height="444" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
@@ -87,7 +85,6 @@
 
   <!-- provisions arrow -->
   <line x1="564" y1="708" x2="668" y2="708" stroke="#5CE0B4" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-teal)"/>
-  <text x="616" y="686" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#FFFFFF">4. provisions</text>
 
   <!-- ===== workload cluster (offline) ===== -->
   <rect x="676" y="486" width="354" height="444" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>

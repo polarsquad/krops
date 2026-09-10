@@ -21,11 +21,8 @@
 
   <!-- ===== connections (drawn first, behind boxes) ===== -->
   <line x1="508" y1="256" x2="612" y2="256" stroke="#5CE0B4" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
-  <text x="561" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#FFFFFF">1. syncs</text>
-  <text x="561" y="244" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="16" fill="#5CE0B4">mgmt/</text>
   <path d="M284,484 V594" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-teal)"/>
   <path d="M284,556 H815 V594" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-teal)"/>
-  <text x="560" y="530" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">provisions EKS clusters &#183; installs Flux via <tspan font-family="DejaVu Sans Mono" fill="#5CE0B4">flux-apps</tspan></text>
 
   <!-- ===== management cluster ===== -->
   <rect x="64" y="150" width="440" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
@@ -65,7 +62,7 @@
   <g fill="none" stroke="#D4E2DA" stroke-width="1.7" stroke-linejoin="round">
     <path d="M270,406 h9 a5,5 0 1 1 10,0 h9 v9 a5,5 0 1 1 0,10 v9 h-28 z"/>
   </g>
-  <text x="306" y="420" font-family="DejaVu Sans" font-size="15" fill="#D4E2DA">Flux bootstrap addon</text>
+  <text x="306" y="420" font-family="DejaVu Sans" font-size="15" fill="#D4E2DA">Flux addon</text>
 
   <!-- ===== git repository ===== -->
   <rect x="620" y="150" width="400" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>

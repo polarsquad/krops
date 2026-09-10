@@ -30,10 +30,7 @@
 
   <!-- ===== connections (behind boxes) ===== -->
   <line x1="572" y1="256" x2="640" y2="256" stroke="#5CE0B4" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
-  <text x="606" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#FFFFFF">1. syncs</text>
-  <text x="606" y="244" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="13" fill="#5CE0B4">mgmt/</text>
   <path d="M294,484 V564" fill="none" stroke="#E8A868" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-amber)"/>
-  <text x="306" y="534" font-family="DejaVu Sans" font-size="15.5" fill="#D4E2DA">claims Hardware &#183; PXE boots Talos &#183; sets VIP endpoint</text>
 
   <!-- ===== management cluster ===== -->
   <rect x="64" y="150" width="500" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>

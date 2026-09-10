@@ -30,12 +30,8 @@
 
   <!-- ===== connections (behind boxes) ===== -->
   <line x1="508" y1="256" x2="612" y2="256" stroke="#5CE0B4" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
-  <text x="561" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#FFFFFF">1. syncs</text>
-  <text x="561" y="244" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#5CE0B4">mgmt/azure/</text>
   <path d="M284,490 V594" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-teal)"/>
-  <text x="552" y="540" text-anchor="middle" font-family="DejaVu Sans" font-size="15.5" fill="#D4E2DA">provisions AKS &#183; installs Flux via <tspan font-family="DejaVu Sans Mono" fill="#5CE0B4">flux-apps</tspan></text>
   <path d="M820,490 V560 H480 V594" fill="none" stroke="#68C5EB" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-blue)"/>
-  <text x="730" y="586" text-anchor="middle" font-family="DejaVu Sans" font-size="15" fill="#D4E2DA">workload Flux syncs <tspan font-family="DejaVu Sans Mono" fill="#68C5EB">workload/swedencentral-01/</tspan></text>
 
   <!-- ===== management cluster ===== -->
   <rect x="64" y="150" width="440" height="340" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>

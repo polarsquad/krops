@@ -77,6 +77,11 @@ jobs:
           RENOVATE_GITHUB_COM_TOKEN: ${{ github.token }}
         run: python3 tests/test-renovate-coverage.py
 
+      - name: Verify Renovate updates Zarf release assets and checksums together
+        env:
+          RENOVATE_GITHUB_COM_TOKEN: ${{ github.token }}
+        run: python3 tests/test-renovate-release-assets.py
+
       - name: bootstrap.toml cross-check
         run: python3 tests/test-bootstrap-config.py
 

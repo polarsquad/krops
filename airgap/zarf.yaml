@@ -181,23 +181,28 @@ components:
               esac
               clusterctl=/tmp/krops-airgap/bin/clusterctl-"$os"-arm64
               [ -x "$clusterctl" ] || { echo "ERROR: unsupported clusterctl host OS: $os" >&2; exit 1; }
+              # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-addon-provider-helm
               "$clusterctl" generate provider --addon helm:v0.6.4 \
                 --config /tmp/krops-airgap/caaph/clusterctl.yaml \
                 --write-to /tmp/krops-airgap/caaph/addon-components.rendered.yaml &&
               kubectl apply -f /tmp/krops-airgap/caaph/addon-components.rendered.yaml
     files:
+      # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-addon-provider-helm
       - source: https://github.com/kubernetes-sigs/cluster-api-addon-provider-helm/releases/download/v0.6.4/addon-components.yaml
         shasum: a70f4eb77eac626231daca1e2a046b4b069bb84320efa327cc8c56a9c4ca03e6
         target: /tmp/krops-airgap/caaph/addon-helm/v0.6.4/components.yaml
+      # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-addon-provider-helm
       - source: https://github.com/kubernetes-sigs/cluster-api-addon-provider-helm/releases/download/v0.6.4/metadata.yaml
         shasum: d50a44ee0db2f0368699d15ff011b9b5a61d9969483de1c4f6e4e6046390530f
         target: /tmp/krops-airgap/caaph/addon-helm/v0.6.4/metadata.yaml
       - source: files/clusterctl-caaph.yaml
         target: /tmp/krops-airgap/caaph/clusterctl.yaml
+      # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api
       - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.1/clusterctl-darwin-arm64
         shasum: bce7a27ee9dd3f3cbdd3b463203a706ec31ea6ee98926045fbd9dfbe9c020f4b
         target: /tmp/krops-airgap/bin/clusterctl-darwin-arm64
         executable: true
+      # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api
       - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.1/clusterctl-linux-arm64
         shasum: 16ec2d3ab39338e94dfa9ddb070c4f37073683db517fa6052ffc38d6702d7d8b
         target: /tmp/krops-airgap/bin/clusterctl-linux-arm64

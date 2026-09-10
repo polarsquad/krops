@@ -383,6 +383,48 @@
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker"
     },
+    {
+      "customType": "regex",
+      "description": "CAAPH Zarf release files with verified checksums and staged-version paths",
+      "managerFilePatterns": ["/(^|/)airgap/zarf\\.yaml$/"],
+      "matchStrings": [
+        "(?<header># renovate: datasource=(?<datasource>github-release-attachments) depName=(?<depName>kubernetes-sigs/cluster-api-addon-provider-helm)\\n)(?<indent>\\s*)- source: (?<urlPrefix>https://github\\.com/[^/]+/[^/]+/releases/download/)(?<currentValue>v[^/]+)/(?<asset>[^\\n]+)\\n\\s*shasum: (?<currentDigest>[a-f0-9]{64})\\n\\s*target: (?<targetPrefix>[^\\n]*?/)(?:v[^/]+)/(?<targetAsset>[^\\n]+)"
+      ],
+      "versioningTemplate": "loose",
+      "autoReplaceStringTemplate": "{{{header}}}{{{indent}}}- source: {{{urlPrefix}}}{{{newValue}}}/{{{asset}}}\n{{{indent}}}  shasum: {{{newDigest}}}\n{{{indent}}}  target: {{{targetPrefix}}}{{{newValue}}}/{{{targetAsset}}}"
+    },
+    {
+      "customType": "regex",
+      "description": "CAAPH version rendered by the Zarf deployment action",
+      "managerFilePatterns": ["/(^|/)airgap/zarf\\.yaml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>github-releases) depName=(?<depName>kubernetes-sigs/cluster-api-addon-provider-helm)\\n\\s*\\\"\\$clusterctl\\\" generate provider --addon helm:v(?<currentValue>[^\\s\\\\]+)"
+      ],
+      "extractVersionTemplate": "^v(?<version>.+)",
+      "versioningTemplate": "semver-coerced",
+      "autoReplaceStringTemplate": "# renovate: datasource={{{datasource}}} depName={{{depName}}}\n              \"$clusterctl\" generate provider --addon helm:v{{newValue}}"
+    },
+    {
+      "customType": "regex",
+      "description": "Bundled clusterctl release files with verified SHA-256 checksums",
+      "managerFilePatterns": ["/(^|/)airgap/zarf\\.yaml$/"],
+      "matchStrings": [
+        "(?<header># renovate: datasource=(?<datasource>github-release-attachments) depName=(?<depName>kubernetes-sigs/cluster-api)\\n)(?<indent>\\s*)- source: (?<urlPrefix>https://github\\.com/[^/]+/[^/]+/releases/download/)(?<currentValue>v[^/]+)/(?<asset>[^\\n]+)\\n\\s*shasum: (?<currentDigest>[a-f0-9]{64})"
+      ],
+      "versioningTemplate": "loose",
+      "autoReplaceStringTemplate": "{{{header}}}{{{indent}}}- source: {{{urlPrefix}}}{{{newValue}}}/{{{asset}}}\n{{{indent}}}  shasum: {{{newDigest}}}"
+    },
+    {
+      "customType": "regex",
+      "description": "CAAPH clusterctl config staged release path",
+      "managerFilePatterns": ["/(^|/)airgap/files/clusterctl-caaph\\.yaml$/"],
+      "matchStrings": [
+        "(?<header># renovate: datasource=(?<datasource>github-releases) depName=(?<depName>kubernetes-sigs/cluster-api-addon-provider-helm)\\n)\\s*url: (?<urlPrefix>.*?/)(?<currentValue>v[^/]+)/components\\.yaml"
+      ],
+      "extractVersionTemplate": "^v(?<version>.+)",
+      "versioningTemplate": "semver-coerced",
+      "autoReplaceStringTemplate": "{{{header}}}    url: {{{urlPrefix}}}v{{newValue}}/components.yaml"
+    },
     // EKS addon versions (*-eksbuild.*) intentionally not managed: they have
     // no public registry datasource. Tracked in issue #74 as manual updates.
     // The locally built localhost:5001/krops-airgap:latest artifact is
@@ -398,6 +440,12 @@
         "airgap/zarf.yaml",
         "airgap/scripts/*.sh"
       ],
+      "pinDigests": true
+    },
+    {
+      "description": "Keep Zarf GitHub release asset URLs and SHA-256 checksums together",
+      "matchDatasources": ["github-release-attachments"],
+      "matchFileNames": ["airgap/zarf.yaml"],
       "pinDigests": true
     },
     {
@@ -446,7 +494,7 @@
     },
     {
       "description": "Group the CAPI family (core, kubeadm, CAPD, CAPA, CAAPH, CAPZ)",
-      "matchDatasources": ["github-releases"],
+      "matchDatasources": ["github-releases", "github-release-attachments"],
       "matchPackageNames": [
         "kubernetes-sigs/cluster-api",
         "kubernetes-sigs/cluster-api-provider-aws",

@@ -36,7 +36,7 @@ def main() -> int:
     missing = {}
     for package_file in EXPECTED_FILES:
         dependencies = result.deps_without_pin_digest(
-            package_file, EXCLUDED_DEP_NAMES
+            package_file, EXCLUDED_DEP_NAMES, allowed_datasources={"docker"}
         )
         if dependencies:
             missing[package_file] = dependencies

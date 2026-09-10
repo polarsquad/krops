@@ -50,6 +50,10 @@ EXPECTED = {
         "kubernetes-sigs/cluster-api-provider-azure",
     },
     "mise.azure.toml": {"azure-cli"},
+    "airgap/zarf.yaml": {
+        "kubernetes-sigs/cluster-api",
+        "kubernetes-sigs/cluster-api-addon-provider-helm",
+    },
 }
 
 REQUIRED_SINGLE_REGISTRY = {

@@ -425,6 +425,12 @@ fn required_tools(env: &Environment) -> Vec<&'static str> {
     tools
 }
 
+/// argv for the optional post-kind-create hook (issue #236): the named mise
+/// task in the active profile, same invocation shape as aws-credentials.
+fn post_kind_create_hook_args<'a>(profile: &'a str, task: &'a str) -> Vec<&'a str> {
+    vec!["-E", profile, "run", task]
+}
+
 /// Whether the GitHub/age preflight (PAT, repo branch probe, sops age
 /// key) must run: gated on the sync source (issue #105 scope item 6),
 /// not the profile name. AWS-only credential steps stay profile-gated.
@@ -2384,6 +2390,17 @@ async fn run_bootstrap(cfg: &Config, http: &reqwest::Client) -> Result<()> {
     // Step 1: ensure the kind management cluster (reuse by default; --recreate replaces).
     ensure_kind_cluster(cfg, &preflight.engine_sock).await?;
 
+    // Optional provider hook (issue #236): runs on both the fresh-create and
+    // healthy-reuse paths so a rerun re-asserts the setup (e.g. azure Arc
+    // federation). A non-zero exit aborts the bootstrap before Flux installs.
+    if let Some(task) = &cfg.environment.post_kind_create_task {
+        println!(
+            ">>> Running post-kind-create task '{task}' (mise -E {} run {task})...",
+            cfg.profile
+        );
+        run("mise", &post_kind_create_hook_args(&cfg.profile, task)).await?;
+    }
+
     // Step 1.5: bootstrap the local container registry (local-host only).
     if cfg.is_local() {
         bootstrap_local_registry(cfg, &preflight.engine, http).await?;
@@ -2708,6 +2725,12 @@ mod tests {
         assert!(local.len() > base.len());
         assert!(local.contains(&"flux"));
         assert!(local.contains(&"curl"));
+    }
+
+    #[test]
+    fn post_kind_create_hook_command_uses_profile_and_task() {
+        let args = post_kind_create_hook_args("azure", "arc-federate");
+        assert_eq!(args, vec!["-E", "azure", "run", "arc-federate"]);
     }
 
     #[test]

@@ -1,0 +1,56 @@
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# Secure-by-default storage account + blob container (the S3 bucket's
+# counterpart in workload/base/s3-buckets/). Posture:
+#   - no anonymous blob access, HTTPS only, TLS 1.2 minimum
+#   - shared-key (account key) access disabled: Entra ID authorization only
+#   - blob versioning + 7-day soft delete
+#   - Microsoft-managed encryption at rest (default)
+# Account names are globally unique and 3-24 lowercase alphanumerics, so the
+# name is a committed literal in cluster-vars (STORAGE_ACCOUNT_NAME).
+# ══════════════════════════════════════════════════════════════════════════════
+apiVersion: storage.azure.com/v1api20230101
+kind: StorageAccount
+metadata:
+  name: data
+  namespace: default
+spec:
+  azureName: ${STORAGE_ACCOUNT_NAME}
+  location: ${AZURE_LOCATION}
+  owner:
+    armId: /subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/krops-${CLUSTER_NAME}-data
+  kind: StorageV2
+  sku:
+    name: Standard_LRS
+  accessTier: Hot
+  allowBlobPublicAccess: false
+  allowSharedKeyAccess: false
+  supportsHttpsTrafficOnly: true
+  minimumTlsVersion: TLS1_2
+  tags:
+    managed-by: flux-aso
+    cluster: ${CLUSTER_NAME}
+---
+apiVersion: storage.azure.com/v1api20230101
+kind: StorageAccountsBlobService
+metadata:
+  name: data-blob
+  namespace: default
+spec:
+  owner:
+    name: data
+  isVersioningEnabled: true
+  deleteRetentionPolicy:
+    enabled: true
+    days: 7
+---
+apiVersion: storage.azure.com/v1api20230101
+kind: StorageAccountsBlobServicesContainer
+metadata:
+  name: data
+  namespace: default
+spec:
+  azureName: data
+  owner:
+    name: data-blob
+  publicAccess: None

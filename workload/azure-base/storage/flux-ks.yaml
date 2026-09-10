@@ -1,0 +1,29 @@
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# Flux Kustomization: storage account + blob container managed by this
+# cluster's ASO.
+#
+# dependsOn: aso — the ASO CRDs and controller must be Ready (aso has
+# wait: true) before the storage CRs are applied.
+# ══════════════════════════════════════════════════════════════════════════════
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: storage
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 2m
+  timeout: 5m
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./workload/azure-base/storage
+  dependsOn:
+    - name: aso
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-vars

@@ -29,11 +29,11 @@
   <text x="1090" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#FFFFFF">FLOW (bare-metal lifecycle &amp; pivot)</text>
 
   <!-- ===== connections (behind boxes) ===== -->
-  <line x1="568" y1="256" x2="612" y2="256" stroke="#5CE0B4" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
-  <text x="590" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#FFFFFF">1. syncs</text>
-  <text x="590" y="244" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="13" fill="#5CE0B4">mgmt/local-talos/</text>
+  <line x1="572" y1="256" x2="640" y2="256" stroke="#5CE0B4" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
+  <text x="606" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#FFFFFF">1. syncs</text>
+  <text x="606" y="244" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="13" fill="#5CE0B4">mgmt/</text>
   <path d="M294,484 V564" fill="none" stroke="#E8A868" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-amber)"/>
-  <text x="294" y="534" text-anchor="middle" font-family="DejaVu Sans" font-size="15.5" fill="#D4E2DA">claims Hardware &#183; PXE boots Talos &#183; sets VIP endpoint</text>
+  <text x="306" y="534" font-family="DejaVu Sans" font-size="15.5" fill="#D4E2DA">claims Hardware &#183; PXE boots Talos &#183; sets VIP endpoint</text>
 
   <!-- ===== management cluster ===== -->
   <rect x="64" y="150" width="500" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
@@ -77,27 +77,27 @@
   <text x="106" y="448" font-family="DejaVu Sans Mono" font-size="13.5" fill="#859D91">&#8226; <tspan fill="#D4E2DA">capi-system:</tspan> CAPI core operator (v1.14.1)</text>
 
   <!-- ===== git repository ===== -->
-  <rect x="620" y="150" width="400" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
-  <rect x="636" y="158" width="368" height="5" rx="2.5" fill="#B0F6C0"/>
-  <text x="820" y="196" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#B0F6C0">Git Repository</text>
-  <text x="820" y="220" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#859D91">(polarsquad/krops on GitHub)</text>
+  <rect x="648" y="150" width="372" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="664" y="158" width="340" height="5" rx="2.5" fill="#B0F6C0"/>
+  <text x="834" y="196" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#B0F6C0">Git Repository</text>
+  <text x="834" y="220" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#859D91">(polarsquad/krops on GitHub)</text>
 
   <!-- folder tree -->
   <g fill="none" stroke-width="1.7">
-    <path d="M660,250 h9 l4,5 h15 v16 h-28 z" stroke="#5CE0B4"/>
-    <path d="M708,288 h8 l4,4.5 h13 v14 h-25 z" stroke="#5CE0B4" stroke-opacity="0.85"/>
-    <path d="M708,322 h8 l4,4.5 h13 v14 h-25 z" stroke="#5CE0B4" stroke-opacity="0.85"/>
-    <path d="M708,356 h8 l4,4.5 h13 v14 h-25 z" stroke="#5CE0B4" stroke-opacity="0.85"/>
+    <path d="M688,250 h9 l4,5 h15 v16 h-28 z" stroke="#5CE0B4"/>
+    <path d="M736,288 h8 l4,4.5 h13 v14 h-25 z" stroke="#5CE0B4" stroke-opacity="0.85"/>
+    <path d="M736,322 h8 l4,4.5 h13 v14 h-25 z" stroke="#5CE0B4" stroke-opacity="0.85"/>
+    <path d="M736,356 h8 l4,4.5 h13 v14 h-25 z" stroke="#5CE0B4" stroke-opacity="0.85"/>
   </g>
   <g stroke="#284637" stroke-width="1.4" fill="none">
-    <path d="M674,274 V365 M674,297 h28 M674,331 h28 M674,365 h28"/>
+    <path d="M702,274 V365 M702,297 h28 M702,331 h28 M702,365 h28"/>
   </g>
-  <text x="700" y="268" font-family="DejaVu Sans Mono" font-size="16.5" font-weight="bold" fill="#5CE0B4">mgmt/local-talos/</text>
-  <text x="744" y="303" font-family="DejaVu Sans Mono" font-size="15" fill="#D4E2DA">infrastructure/</text>
-  <text x="744" y="337" font-family="DejaVu Sans Mono" font-size="15" fill="#D4E2DA">capi-providers/</text>
-  <text x="744" y="371" font-family="DejaVu Sans Mono" font-size="15" fill="#D4E2DA">clusters/management/</text>
-  <text x="820" y="420" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">Syncs directly from GitHub (PAT)</text>
-  <text x="820" y="444" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">Committed site values (VIP endpoint IP)</text>
+  <text x="728" y="268" font-family="DejaVu Sans Mono" font-size="16.5" font-weight="bold" fill="#5CE0B4">mgmt/local-talos/</text>
+  <text x="772" y="303" font-family="DejaVu Sans Mono" font-size="15" fill="#D4E2DA">infrastructure/</text>
+  <text x="772" y="337" font-family="DejaVu Sans Mono" font-size="15" fill="#D4E2DA">capi-providers/</text>
+  <text x="772" y="371" font-family="DejaVu Sans Mono" font-size="15" fill="#D4E2DA">clusters/management/</text>
+  <text x="834" y="420" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">Syncs directly from GitHub (PAT)</text>
+  <text x="834" y="444" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">Committed site values (VIP endpoint IP)</text>
 
   <!-- ===== physical metal substrate ===== -->
   <rect x="64" y="570" width="460" height="390" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
@@ -159,7 +159,7 @@
   <text x="580" y="1022" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#E8A868">Tinkerbell</text>
   <text x="680" y="1022" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">= hardware provisioning</text>
   <line x1="885" y1="994" x2="885" y2="1036" stroke="#284637" stroke-width="1.4"/>
-  <text x="905" y="1022" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#E5B85C">Scope fence</text>
+  <text x="897" y="1022" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#E5B85C">Scope fence</text>
 
   <!-- ===== flow panel ===== -->
   <rect x="1090" y="150" width="446" height="904" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>

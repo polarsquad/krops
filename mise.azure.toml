@@ -64,6 +64,69 @@ Nothing is secret: no service principal exists (issue #236).
 EOF
 '''
 
+# Idempotent: re-running `connectedk8s connect` against the same Arc resource
+# is an update; `az identity federated-credential create` with an existing
+# name is an upsert, so a recreated Arc resource (new issuer uuid) self-heals
+# on the next run.
+[tasks.arc-federate]
+description = "Federate the kind bootstrap cluster (issue #236): Arc OIDC issuer, apiserver issuer patch, FICs for CAPZ/ASO workload identity. Idempotent; run by bootstrap-rs (post-kind-create-task), safe to run by hand for debugging."
+run = '''
+set -eu
+: "${AZURE_SUBSCRIPTION_ID:?set AZURE_SUBSCRIPTION_ID in .env or the shell}"
+ARC_NAME="${ARC_NAME:-krops-azure-bootstrap}"
+ARC_RG="${ARC_RG:-krops-shared}"
+ARC_LOCATION="${AZURE_LOCATION:-swedencentral}"
+KIND_NODE="${KIND_NODE:-mgmt-control-plane}"
+
+az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+if ! az extension show --name connectedk8s >/dev/null 2>&1; then
+  # renovate does not track az CLI extensions; version pinned at authoring time.
+  az extension add --name connectedk8s --version 1.11.3 --yes --output none
+fi
+
+echo "==> Arc connect kind cluster as $ARC_NAME (--enable-oidc-issuer)"
+az connectedk8s connect --name "$ARC_NAME" --resource-group "$ARC_RG" \
+  --location "$ARC_LOCATION" --enable-oidc-issuer --output none
+
+ISSUER=""
+for i in $(seq 1 30); do
+  ISSUER=$(az connectedk8s show --name "$ARC_NAME" --resource-group "$ARC_RG" \
+    --query oidcIssuerProfile.issuerUrl -o tsv 2>/dev/null || true)
+  [ -n "$ISSUER" ] && break
+  sleep 10
+done
+: "${ISSUER:?oidcIssuerProfile.issuerUrl did not populate within 5 minutes}"
+echo "==> issuer: $ISSUER"
+
+echo "==> waiting for Arc agents"
+kubectl -n azure-arc wait --for=condition=Available deploy --all --timeout=300s
+
+echo "==> patch kind apiserver to mint tokens with the Arc issuer"
+if docker exec "$KIND_NODE" grep -q -- "--service-account-issuer=$ISSUER" \
+     /etc/kubernetes/manifests/kube-apiserver.yaml; then
+  echo "    already patched"
+else
+  docker exec "$KIND_NODE" sed -i -E \
+    "s|^(\\s*)- --service-account-issuer=.*$|\\1- --service-account-issuer=$ISSUER\\n\\1- --service-account-issuer=https://kubernetes.default.svc.cluster.local|" \
+    /etc/kubernetes/manifests/kube-apiserver.yaml
+  echo "    waiting for the apiserver static pod to come back healthy"
+  for i in $(seq 1 60); do
+    kubectl get --raw=/healthz >/dev/null 2>&1 && break
+    sleep 2
+  done
+  kubectl get --raw=/healthz >/dev/null
+fi
+
+fic() { # <fic-name> <subject>
+  echo "==> FIC $1 on krops-capz ($2)"
+  az identity federated-credential create --name "$1" --identity-name krops-capz \
+    --resource-group "$ARC_RG" --issuer "$ISSUER" --subject "$2" \
+    --audiences api://AzureADTokenExchange --output none
+}
+fic krops-capz-kind-capz system:serviceaccount:capz-system:capz-manager
+fic krops-capz-kind-aso  system:serviceaccount:capz-system:azureserviceoperator-default
+'''
+
 [tasks.kubeconfigs]
 description = "Export the AKS workload-cluster kubeconfig via clusterctl (no endpoint rewrite: AKS is remote)"
 run = '''

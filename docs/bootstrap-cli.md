@@ -91,6 +91,14 @@ teardown names against the Git manifests. Renovate updates the annotated chart
 pins together with their declarative counterparts. See
 [Dependencies](./dependencies.md).
 
+- `pivot-sops-secrets` (optional, list): SOPS-encrypted manifests the pivot
+  decrypts with `SOPS_AGE_KEY_FILE` (defaults to `AGE_KEY_FILE`) and applies to
+  the target before `clusterctl move`. Used by `azure` for the ASO/CAPZ
+  credential Secret that moved objects reference by name.
+- `teardown.manual` (optional, string): when set, `krops-bootstrap teardown`
+  refuses to run for that environment and prints the text. `azure` uses it
+  until the live acceptance run defines the Azure orphan sweep.
+
 ## Bootstrap and pivot controls
 
 | Variable | Default | Used by |

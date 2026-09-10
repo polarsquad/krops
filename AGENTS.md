@@ -54,6 +54,12 @@ resources. There is no app source code here, only declarative infrastructure.
   migrations). Teardown is manual until the live acceptance run.
 - `workload/`: synced by each WORKLOAD cluster's Flux.
   - `base/`: ACK controllers and S3/RDS/IAM custom resources.
+  - `azure-base/`: cert-manager, ASO (workload identity), and the Azure
+    resources (VNet + delegated subnet + private DNS, storage account +
+    container, PostgreSQL Flexible Server). `swedencentral-01/` points at it.
+    `tests/test-azure-identity-chain.py` (in `mise run validate` and CI)
+    cross-checks the ConfigMap/subject couplings between these and
+    `mgmt/azure/infrastructure/aso-workload-identity/`.
   - `<region>-01/`: per-cluster overlays pointing at `../base`.
 - `airgap/`: Zarf offline transfer bundle for the local-host profile.
   `zarf.yaml` + `images.txt` define the packages; `scripts/` builds,

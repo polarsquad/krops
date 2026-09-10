@@ -72,6 +72,12 @@ pub struct Environment {
     pub provider_manifests: Vec<String>,
     #[serde(default)]
     pub move_fallbacks: Vec<MoveFallback>,
+    /// SOPS-encrypted manifests the pivot decrypts (operator age key) and
+    /// applies to the target before `clusterctl move` (issue #71): secrets
+    /// referenced by moved objects without an owner reference into the
+    /// Cluster hierarchy. Relative to the repository root.
+    #[serde(default)]
+    pub pivot_sops_secrets: Vec<String>,
     /// Teardown constants for this environment (issue #100).
     #[serde(default)]
     pub teardown: TeardownEnv,
@@ -154,6 +160,11 @@ pub struct TeardownEnv {
     /// or PXE-boot fresh.
     #[serde(default)]
     pub hardware_release: bool,
+    /// Teardown is not automated for this environment: refuse to run and
+    /// print this operator text instead (issue #71, azure until the live
+    /// acceptance run establishes the sweep).
+    #[serde(default)]
+    pub manual: Option<String>,
 }
 
 impl BootstrapConfig {
@@ -355,6 +366,26 @@ manifest = "mgmt/aws/infrastructure/aws-identity/identity.yaml"
         let empty = format!("{bad}[environments]\n");
         let config: BootstrapConfig = toml::from_str(&empty).unwrap();
         assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn parses_pivot_sops_secrets_and_manual_teardown() {
+        let text = format!(
+            "{MINIMAL}\n[environments.azure]\nkind = \"azure\"\nsync = \"github\"\n\
+             sync-path = \"mgmt/azure\"\nmgmt-cluster = \"swedencentral-management\"\n\
+             mgmt-ready-timeout = \"40m\"\ninfra-provider-namespace = \"capz-system\"\n\
+             infra-provider-name = \"azure\"\nprovider-manifests = []\n\
+             pivot-sops-secrets = [\"mgmt/azure/x.sops.yaml\"]\n\
+             [environments.azure.teardown]\nmanual = \"do it by hand\"\n"
+        );
+        let config = parse(&text).unwrap();
+        let azure = config.environment("azure").unwrap();
+        assert_eq!(azure.pivot_sops_secrets, vec!["mgmt/azure/x.sops.yaml"]);
+        assert_eq!(azure.teardown.manual.as_deref(), Some("do it by hand"));
+        // Existing environments default to no secrets and automated teardown.
+        let aws = config.environment("aws").unwrap();
+        assert!(aws.pivot_sops_secrets.is_empty());
+        assert!(aws.teardown.manual.is_none());
     }
 
     #[test]

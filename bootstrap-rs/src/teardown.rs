@@ -1584,12 +1584,24 @@ pub async fn remove_registry_container(engine: Option<&str>, name: &str) {
     }
 }
 
+/// Environments whose teardown is not automated declare
+/// `[environments.<name>.teardown] manual = "..."` (issue #71); the run
+/// refuses before any preflight or mutation and prints the text.
+pub fn manual_teardown_refusal(env_name: &str, td: &crate::config::TeardownEnv) -> Option<String> {
+    td.manual
+        .as_ref()
+        .map(|text| format!("teardown is manual for the '{env_name}' environment:\n{text}"))
+}
+
 /// The full teardown run. Mirrors teardown.sh's flow with the
 /// post-pivot controller-host resolution.
 #[allow(clippy::too_many_arguments)]
 pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
     let env = &cfg.environment;
     let td = &env.teardown;
+    if let Some(msg) = manual_teardown_refusal(&cfg.profile, td) {
+        bail!("{msg}");
+    }
 
     // Never let the AWS CLI open an interactive pager.
     std::env::set_var("AWS_PAGER", "");
@@ -2057,6 +2069,18 @@ pub async fn detect_engine() -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn manual_teardown_is_refused_with_text() {
+        let td = crate::config::TeardownEnv {
+            manual: Some("hand".into()),
+            ..Default::default()
+        };
+        let msg = manual_teardown_refusal("azure", &td).unwrap();
+        assert!(msg.starts_with("teardown is manual for the 'azure' environment:"));
+        assert!(msg.ends_with("hand"));
+        assert!(manual_teardown_refusal("aws", &crate::config::TeardownEnv::default()).is_none());
+    }
 
     #[test]
     fn guard_resolves_the_script_contract() {

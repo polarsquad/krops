@@ -55,12 +55,13 @@ spec:
 
 ---
 # ══════════════════════════════════════════════════════════════════════════════
-# Node Pool 1: GPU – single cheapest NVIDIA GPU instance (g4dn.xlarge, 1x T4)
+# Node Pool 1: x86 – cheapest on-demand Linux x86 (t3.medium, 2 vCPU / 4 GiB)
+# Replaces the former g4dn.xlarge GPU pool; no GPU label/taint (no accelerator).
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: MachinePool
 metadata:
-  name: workload-gpu
+  name: workload-x86
   namespace: default
 spec:
   clusterName: workload
@@ -73,28 +74,23 @@ spec:
       infrastructureRef:
         apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
         kind: AWSManagedMachinePool
-        name: workload-gpu
+        name: workload-x86
       version: "1.34.6"
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSManagedMachinePool
 metadata:
-  name: workload-gpu
+  name: workload-x86
   namespace: default
 spec:
-  instanceType: g4dn.xlarge
+  # Cheapest offered on-demand Linux x86 at 2 vCPU / 4 GiB in eu-north-1
+  # (t3a.medium is not offered in this region).
+  instanceType: t3.medium
   scaling:
     minSize: 1
     maxSize: 2
-  amiType: AL2023_x86_64_NVIDIA
+  amiType: AL2023_x86_64_STANDARD
   capacityType: onDemand
-  labels:
-    node.kubernetes.io/gpu: "true"
-    nvidia.com/gpu.present: "true"
-  taints:
-    - key: nvidia.com/gpu
-      value: "true"
-      effect: no-schedule
 
 ---
 # ══════════════════════════════════════════════════════════════════════════════
@@ -125,6 +121,8 @@ metadata:
   name: workload-arm
   namespace: default
 spec:
+  # Cheapest offered on-demand Linux ARM (Graviton2) at 2 vCPU / 4 GiB;
+  # AL2023 requires Graviton2+ (Graviton1 a1 excluded).
   instanceType: t4g.medium
   scaling:
     minSize: 3

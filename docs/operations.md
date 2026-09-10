@@ -218,7 +218,6 @@ You also need:
 | Quota | Code | Needed | Why |
 |---|---|---|---|
 | EC2-VPC Elastic IPs (per region) | `L-0263D0A3` | ≥ 3 free | One EIP per NAT gateway (3 AZs) |
-| Running On-Demand G and VT instances | `L-DB2E81BA` | ≥ 4 vCPUs | GPU node pool (g4dn.xlarge); some regions default to **0** |
 
 Request increases with
 `aws service-quotas request-service-quota-increase --service-code ec2 --quota-code <code> --desired-value <n> --region <region>`.

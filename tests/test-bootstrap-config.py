@@ -22,16 +22,19 @@ CHART_MANIFESTS = {
     "flux-operator": [
         "mgmt/aws/addons/flux-apps/flux-operator.yaml",
         "mgmt/local-host/addons/flux-apps/flux-operator.yaml",
+        "mgmt/azure/addons/flux-apps/flux-operator.yaml",
     ],
     "cert-manager": [
         "mgmt/aws/infrastructure/cert-manager/helmrelease.yaml",
         "mgmt/local-host/infrastructure/cert-manager/helmrelease.yaml",
         "mgmt/local-talos/infrastructure/cert-manager/helmrelease.yaml",
+        "mgmt/azure/infrastructure/cert-manager/helmrelease.yaml",
     ],
     "capi-operator": [
         "mgmt/aws/infrastructure/capi-operator/helmrelease.yaml",
         "mgmt/local-host/infrastructure/capi-operator/helmrelease.yaml",
         "mgmt/local-talos/infrastructure/capi-operator/helmrelease.yaml",
+        "mgmt/azure/infrastructure/capi-operator/helmrelease.yaml",
     ],
 }
 

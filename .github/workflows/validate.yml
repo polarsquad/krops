@@ -75,6 +75,9 @@ jobs:
       - name: bootstrap.toml cross-check
         run: python3 tests/test-bootstrap-config.py
 
+      - name: Azure identity chain cross-check
+        run: pip install --quiet pyyaml && python3 tests/test-azure-identity-chain.py
+
   yaml-lint:
     name: Lint YAML
     runs-on: ubuntu-latest

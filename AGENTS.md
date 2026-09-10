@@ -82,9 +82,11 @@ resources. There is no app source code here, only declarative infrastructure.
   rerun-safe-by-default semantics. Chart versions it installs imperatively
   are Renovate-annotated constants in `src/main.rs`. CI (bootstrap-rs
   workflow) runs fmt/clippy/build/test; the toolchain is pinned in
-  `rust-toolchain.toml`. Two config-driven knobs added for azure:
+  `rust-toolchain.toml`. Four config-driven knobs added for azure:
   `pivot-sops-secrets` (SOPS manifests applied in the pivot target before
-  the move) and `teardown.manual` (refuse with operator text).
+  the move), `teardown.manual` (refuse with operator text),
+  `post-kind-create-task` (mise task run after kind creation) and
+  `pivot-manifests` (plain manifests applied in the target before the move).
 - `bootstrap.sh` / `pivot.sh` / `teardown.sh`: the shell equivalents of the
   CLI's phases. Kept until the binary completes full parity runs per
   environment, then retired (issues #92/#95/#100). The lifecycle mise tasks

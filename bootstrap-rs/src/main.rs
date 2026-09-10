@@ -1848,6 +1848,21 @@ async fn pivot_install_capi_in_target(
         .await?;
     }
 
+    // Plain pivot manifests (issue #236): non-secret objects the moved
+    // resources reference by name that clusterctl does not carry (the
+    // workload-identity aso-credentials Secret). Applied pre-move for the
+    // same reason as pivot-sops-secrets below, minus the decryption.
+    if !cfg.environment.pivot_manifests.is_empty() {
+        println!(">>> Applying pivot manifests in the target...");
+        for manifest in &cfg.environment.pivot_manifests {
+            run(
+                "kubectl",
+                &kubectl_cmd(Some(kc), &["apply", "-f", manifest]),
+            )
+            .await?;
+        }
+    }
+
     if cfg.profile == "aws" {
         // CAPA credentials: the InfrastructureProvider above references the
         // aws-credentials secret (configSecret.name). On the bootstrap
@@ -2731,6 +2746,32 @@ mod tests {
     fn post_kind_create_hook_command_uses_profile_and_task() {
         let args = post_kind_create_hook_args("azure", "arc-federate");
         assert_eq!(args, vec!["-E", "azure", "run", "arc-federate"]);
+    }
+
+    #[test]
+    fn pivot_manifests_apply_after_provider_manifests() {
+        // Guard the Phase 3 ordering contract: pivot-manifests are applied
+        // after provider CRs (CAPZ must exist before its identity Secret is
+        // meaningful) and before pivot-sops-secrets. The ordering lives in
+        // pivot_install_capi_in_target; this test pins the source order.
+        let src = include_str!("main.rs");
+        let providers = src
+            .find("for manifest in &cfg.environment.provider_manifests")
+            .unwrap();
+        let plain = src
+            .find("for manifest in &cfg.environment.pivot_manifests")
+            .unwrap();
+        let sops = src
+            .find("for manifest in &cfg.environment.pivot_sops_secrets")
+            .unwrap();
+        assert!(
+            providers < plain,
+            "pivot-manifests must apply after provider-manifests"
+        );
+        assert!(
+            plain < sops,
+            "pivot-manifests must apply before pivot-sops-secrets"
+        );
     }
 
     #[test]

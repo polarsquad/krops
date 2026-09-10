@@ -175,6 +175,8 @@ Run the checks that match what you touched. CI runs all of them.
 | You changed | Run |
 |---|---|
 | Anything | `mise run validate` (shell syntax, air-gap digest gate, `bootstrap.toml` cross-check, every kustomize overlay) |
+| `README.md` or `docs/` | `mise run docs-build` (assembles `build/docs/` and runs the strict MkDocs build that CI gates on) |
+| `tools/assemble_docs.py` | `mise run docs-test`, then `mise run docs-build` |
 | `mgmt/` or `workload/` YAML | `yamllint` with the CI settings (line length and document start disabled, `*.sops.yaml` ignored) |
 | `bootstrap-rs/` | `cargo fmt --check`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo build --locked`, `cargo test --locked` |
 | `renovate.json5` or a pinned version | The pinned dry-run from `AGENTS.md`, then `mise x node@24 -- python3 tests/test-renovate-coverage.py` and `python3 airgap/tests/test-renovate-digest-pinning.py` |

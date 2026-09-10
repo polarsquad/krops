@@ -235,7 +235,8 @@ teardown controls, toolbox release, and current parity status.
 ## Repository layout
 
 ```
-├── .github/workflows/             Validation, Rust/toolbox CI, signed releases
+├── .github/workflows/             Validation, Rust/toolbox CI, docs CI and
+│                                  Pages deploy, signed releases
 ├── airgap/                        Zarf air-gap bundle, image inventory, scripts
 ├── bootstrap-rs/                  Lifecycle CLI, toolbox Dockerfile, Rust tests
 ├── bootstrap.toml                 Repository-owned lifecycle configuration
@@ -243,6 +244,10 @@ teardown controls, toolbox release, and current parity status.
 │   teardown.sh                    retained until both parity gates pass
 ├── scripts/toolbox-run.sh         Docker/Podman wrapper used by lifecycle tasks
 ├── tests/                         Config and Renovate coverage cross-checks
+├── mkdocs.yml                     MkDocs Material config for the docs site
+├── pyproject.toml / uv.lock       Python project for the docs site build
+├── tools/assemble_docs.py         Assembles build/docs/ from README.md + docs/
+├── website/                       Docs site assets: colour scheme CSS, CNAME
 ├── docs/                          Detailed documentation (see table above)
 ├── mise.toml / mise.*.toml        Pinned toolchain and per-environment
 │                                  task layers (aws, local-host, local-talos)

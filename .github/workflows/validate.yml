@@ -54,6 +54,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7.0.1
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          version: "0.12.11"
+
       - name: Set up Node.js
         uses: actions/setup-node@v7.0.0
         with:
@@ -75,8 +80,12 @@ jobs:
       - name: bootstrap.toml cross-check
         run: python3 tests/test-bootstrap-config.py
 
+      # uv run resolves pyyaml from pyproject.toml/uv.lock, the same environment
+      # mise run validate uses for this cross-check.
       - name: Azure identity chain cross-check
-        run: pip install --quiet pyyaml && python3 tests/test-azure-identity-chain.py
+        run: |
+          uv sync --locked
+          uv run python tests/test-azure-identity-chain.py
 
   yaml-lint:
     name: Lint YAML

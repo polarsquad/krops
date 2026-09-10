@@ -66,8 +66,8 @@ flowchart TD
     REPO --> FS
 
     subgraph aws["AWS"]
-        EKS1[EKS: eu-north-1-workload<br/>ARM + GPU node pools<br/>pod-identity agent addon]
-        EKS2[EKS: eu-west-1-workload<br/>ARM + GPU node pools<br/>pod-identity agent addon]
+        EKS1[EKS: eu-north-1-workload<br/>x86 + ARM node pools<br/>pod-identity agent addon]
+        EKS2[EKS: eu-west-1-workload<br/>x86 + ARM node pools<br/>pod-identity agent addon]
         ROLE[IAM Role: krops-ack-s3-controller<br/>trust: pods.eks.amazonaws.com]
         RDSROLE[IAM Role: krops-ack-rds-controller<br/>trust: pods.eks.amazonaws.com]
         IAMROLE[IAM Role: krops-ack-iam-controller<br/>trust: pods.eks.amazonaws.com]

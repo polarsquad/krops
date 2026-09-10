@@ -1,0 +1,26 @@
+# ── Core Provider ────────────────────────────────────────────────────────────
+apiVersion: operator.cluster.x-k8s.io/v1alpha2
+kind: CoreProvider
+metadata:
+  name: cluster-api
+  namespace: capi-system
+spec:
+  version: "v1.14.0"
+---
+# ── Kubeadm Bootstrap Provider ───────────────────────────────────────────────
+apiVersion: operator.cluster.x-k8s.io/v1alpha2
+kind: BootstrapProvider
+metadata:
+  name: kubeadm
+  namespace: capi-system
+spec:
+  version: "v1.14.0"
+---
+# ── Kubeadm Control Plane Provider ───────────────────────────────────────────
+apiVersion: operator.cluster.x-k8s.io/v1alpha2
+kind: ControlPlaneProvider
+metadata:
+  name: kubeadm
+  namespace: capi-system
+spec:
+  version: "v1.14.0"

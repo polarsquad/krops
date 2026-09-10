@@ -1,0 +1,32 @@
+# k0smotron v2.1.0 ships bootstrap, control-plane, and infrastructure
+# providers under one name (see docs/extending.md).
+# BootstrapProvider: installs k0s worker components on RemoteMachines via SSH.
+# ControlPlaneProvider: K0smotronControlPlane – hosted CP runs as pods on the
+#   management cluster; no control-plane nodes are provisioned on GPU hosts.
+# InfrastructureProvider: RemoteMachine / RemoteCluster CRDs for arbitrary
+#   SSH-accessible hosts (RunPod, Vast.ai, Crusoe, Hyperstack, Latitude, …).
+# renovate: datasource=github-releases depName=k0sproject/k0smotron
+---
+apiVersion: operator.cluster.x-k8s.io/v1alpha2
+kind: BootstrapProvider
+metadata:
+  name: k0sproject-k0smotron
+  namespace: k0smotron-system
+spec:
+  version: "v2.1.0"
+---
+apiVersion: operator.cluster.x-k8s.io/v1alpha2
+kind: ControlPlaneProvider
+metadata:
+  name: k0sproject-k0smotron
+  namespace: k0smotron-system
+spec:
+  version: "v2.1.0"
+---
+apiVersion: operator.cluster.x-k8s.io/v1alpha2
+kind: InfrastructureProvider
+metadata:
+  name: k0sproject-k0smotron
+  namespace: k0smotron-system
+spec:
+  version: "v2.1.0"

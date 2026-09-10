@@ -60,6 +60,9 @@ def main() -> int:
         return 1
 
     charts = config.get("charts", {})
+    for required_env in ("local-host", "aws", "local-talos", "azure"):
+        if required_env not in config.get("environments", {}):
+            failures.append(f"environments.{required_env} section missing from bootstrap.toml")
     for chart, manifests in CHART_MANIFESTS.items():
         declared = charts.get(chart)
         if declared is None:
@@ -100,6 +103,14 @@ def main() -> int:
                     f"environments.{name} move-fallback manifest missing: "
                     f"{fallback.get('manifest')}"
                 )
+        # SOPS manifests the pivot decrypts and applies in the target before
+        # the move (issue #71): must exist and must follow the *.sops.yaml
+        # naming so .sops.yaml's creation rule covers them.
+        for manifest in env.get("pivot-sops-secrets", []):
+            if not (REPO_ROOT / manifest).is_file():
+                failures.append(f"environments.{name} pivot-sops-secret missing: {manifest}")
+            if not manifest.endswith(".sops.yaml"):
+                failures.append(f"environments.{name} pivot-sops-secret is not a *.sops.yaml: {manifest}")
 
         # ── teardown constants (issue #100) ─────────────────────────────
         td = env.get("teardown", {})

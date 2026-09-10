@@ -168,3 +168,41 @@ capi-workloads = []
 # Talos for the operator to re-use or PXE-boot fresh. No container-prefix
 # sweep (that is the local-host CAPD path) and no AWS orphan sweep.
 hardware-release = true
+
+[environments.azure]
+kind = "azure"
+# Flux syncs the GitHub repository (GitRepository + flux-github-pat), like aws.
+sync = "github"
+sync-path = "mgmt/azure"
+mgmt-cluster = "swedencentral-management"
+mgmt-ready-timeout = "40m"
+infra-provider-namespace = "capz-system"
+infra-provider-name = "azure"
+provider-manifests = [
+  "mgmt/azure/capi-providers/capi-system/namespace.yaml",
+  "mgmt/azure/capi-providers/capi-system/providers.yaml",
+  "mgmt/azure/capi-providers/capz-system/namespace.yaml",
+  "mgmt/azure/capi-providers/capz-system/capz-variables.yaml",
+  "mgmt/azure/capi-providers/capz-system/providers.yaml",
+  "mgmt/azure/capi-providers/caaph-system/namespace.yaml",
+  "mgmt/azure/capi-providers/caaph-system/addon-provider.yaml",
+]
+# SOPS-encrypted manifests decrypted with the operator's age key and applied
+# to the pivot target before `clusterctl move` (issue #71): the moved ASO
+# resources reference the aso-credentials Secret by annotation and the
+# AzureClusterIdentity references it by name; neither is moved by clusterctl
+# (the Secret carries no owner reference into the Cluster hierarchy).
+pivot-sops-secrets = [
+  "mgmt/azure/infrastructure/azure-identity/aso-credentials.sops.yaml",
+]
+
+[environments.azure.teardown]
+# Teardown is manual until the live acceptance run (issue #71 follow-up)
+# establishes the orphan sweep for AKS/ASO. The binary refuses to run and
+# prints this text.
+manual = """Azure teardown is not automated yet.
+  1. Suspend Flux: flux suspend kustomization --all
+  2. Delete the workload Cluster objects and wait for CAPZ to remove AKS
+  3. Delete the resource groups: az group delete --yes --name <rg>
+     (krops-swedencentral-workload-data, swedencentral-workload,
+      swedencentral-management, krops-shared, and every MC_* node group)"""

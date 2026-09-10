@@ -16,6 +16,8 @@ def test_readme_docs_links_keep_anchors():
 
 def test_readme_image_links_become_site_relative():
     assert rewrite_readme_links("![l](docs/aws-infra.svg)") == "![l](aws-infra.svg)"
+    assert rewrite_readme_links("![l](docs/azure-infra.svg)") == "![l](azure-infra.svg)"
+    assert rewrite_readme_links("![l](docs/local-talos-infra.svg)") == "![l](local-talos-infra.svg)"
 
 
 def test_readme_root_file_links_point_at_github():

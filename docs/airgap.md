@@ -5,6 +5,8 @@ on a connected machine and deployed end-to-end with **no internet access**:
 the management cluster, Flux, CAPI, and a CAPD workload cluster, all from one
 package plus a small set of image archives.
 
+![krops air-gap architecture](air-gap-infra.svg)
+
 Status: **validated with the radio off** (2026-08-18). Rehearsed connected on
 an isolated `airgap-mgmt` cluster + a renamed `airgap-wl` workload cluster
 (coexisting with the live baseline), then deployed and verified end-to-end by

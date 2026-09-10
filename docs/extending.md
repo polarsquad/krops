@@ -99,7 +99,8 @@ Talos supplies the bootstrap and control plane providers only; pair it with
 any infrastructure provider (CAPT, CAPA, CAPZ, ...) that supplies the
 machines. The worked in-repo example is the `local-talos` environment:
 `mgmt/local-talos/` pairs the Talos providers with Tinkerbell (CAPT) to
-PXE-boot a bare-metal management machine.
+PXE-boot a bare-metal management machine. See the architecture diagram in
+[docs/local-talos-infra.svg](local-talos-infra.svg).
 
 1. Two directories, matching the upstream namespace conventions:
 

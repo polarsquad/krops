@@ -1,0 +1,222 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1150" viewBox="0 0 1600 1150">
+  <defs>
+    <marker id="arrow-teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5CE0B4"/>
+    </marker>
+    <marker id="arrow-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#859D91"/>
+    </marker>
+    <marker id="arrow-purple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B0F6C0"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#68C5EB"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#E8A868"/>
+    </marker>
+  </defs>
+
+  <!-- ===== background ===== -->
+  <rect width="1600" height="1150" fill="#0C120F"/>
+
+  <!-- ===== title block ===== -->
+  <text x="800" y="60" text-anchor="middle" font-family="DejaVu Sans" font-size="40" font-weight="bold" fill="#5CE0B4">krops &#183; local-talos Environment &#183; Bare Metal CAPI</text>
+  <text x="800" y="96" text-anchor="middle" font-family="DejaVu Sans" font-size="19" fill="#859D91">Flux + CAPI/CAPT (Tinkerbell) + Talos (CABPT/CACPPT) &#183; hardware-defined control plane &#183; single-node on physical metal</text>
+
+  <!-- ===== section headers ===== -->
+  <text x="64" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#FFFFFF">TOPOLOGY (bare-metal management plane)</text>
+  <text x="1090" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#FFFFFF">FLOW (bare-metal lifecycle &amp; pivot)</text>
+
+  <!-- ===== connections (behind boxes) ===== -->
+  <line x1="568" y1="256" x2="612" y2="256" stroke="#5CE0B4" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
+  <text x="590" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#FFFFFF">1. syncs</text>
+  <text x="590" y="244" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="13" fill="#5CE0B4">mgmt/local-talos/</text>
+  <path d="M294,484 V564" fill="none" stroke="#E8A868" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-amber)"/>
+  <text x="294" y="534" text-anchor="middle" font-family="DejaVu Sans" font-size="15.5" fill="#D4E2DA">claims Hardware &#183; PXE boots Talos &#183; sets VIP endpoint</text>
+
+  <!-- ===== management cluster ===== -->
+  <rect x="64" y="150" width="500" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="80" y="158" width="468" height="5" rx="2.5" fill="#5CE0B4"/>
+  <text x="314" y="196" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#5CE0B4">Management Cluster</text>
+  <text x="314" y="220" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#859D91">(talos-mgmt-01 &#183; physical metal &#183; post-pivot)</text>
+
+  <!-- flux glyph -->
+  <g transform="translate(122,260)">
+    <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#5CE0B4"/>
+    <line x1="0" y1="-18" x2="0" y2="18" stroke="#131E18" stroke-width="2.5"/>
+    <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M-10,33 L0,39 L10,33" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="122" y="324" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#FFFFFF">Flux</text>
+  <line x1="162" y1="264" x2="220" y2="264" stroke="#859D91" stroke-width="2" marker-end="url(#arrow-gray)"/>
+
+  <!-- capi/capt/talos chip -->
+  <rect x="228" y="228" width="316" height="72" rx="10" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
+  <g stroke="#5CE0B4" stroke-width="1.6" fill="none">
+    <circle cx="260" cy="256" r="9"/>
+    <circle cx="260" cy="256" r="3.2"/>
+    <g>
+      <line x1="260" y1="243" x2="260" y2="247"/><line x1="260" y1="265" x2="260" y2="269"/>
+      <line x1="247" y1="256" x2="251" y2="256"/><line x1="269" y1="256" x2="273" y2="256"/>
+      <line x1="251" y1="247" x2="254" y2="250"/><line x1="266" y1="262" x2="269" y2="265"/>
+      <line x1="251" y1="265" x2="254" y2="262"/><line x1="266" y1="250" x2="269" y2="247"/>
+    </g>
+    <circle cx="278" cy="274" r="6.5"/>
+    <circle cx="278" cy="274" r="2.2"/>
+  </g>
+  <text x="296" y="260" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#FFFFFF">CAPI / CAPT / Talos</text>
+  <text x="296" y="283" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">Tinkerbell + Talos providers</text>
+
+  <!-- providers subpanel -->
+  <rect x="88" y="334" width="452" height="130" rx="10" fill="#5CE0B4" fill-opacity="0.12" stroke="#5CE0B4" stroke-opacity="0.5" stroke-width="1.2"/>
+  <text x="314" y="358" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#5CE0B4">Installed CAPI providers (mgmt/local-talos/)</text>
+  <text x="106" y="382" font-family="DejaVu Sans Mono" font-size="13.5" fill="#D4E2DA">&#8226; <tspan fill="#FFFFFF">capt-system:</tspan> Tinkerbell CAPT v0.7.1 (installer-image fork)</text>
+  <text x="106" y="404" font-family="DejaVu Sans Mono" font-size="13.5" fill="#D4E2DA">&#8226; <tspan fill="#FFFFFF">cabpt-system:</tspan> Talos bootstrap provider (v0.7.8)</text>
+  <text x="106" y="426" font-family="DejaVu Sans Mono" font-size="13.5" fill="#D4E2DA">&#8226; <tspan fill="#FFFFFF">cacppt-system:</tspan> Talos control plane provider (v0.6.5)</text>
+  <text x="106" y="448" font-family="DejaVu Sans Mono" font-size="13.5" fill="#859D91">&#8226; <tspan fill="#D4E2DA">capi-system:</tspan> CAPI core operator (v1.14.1)</text>
+
+  <!-- ===== git repository ===== -->
+  <rect x="620" y="150" width="400" height="330" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="636" y="158" width="368" height="5" rx="2.5" fill="#B0F6C0"/>
+  <text x="820" y="196" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#B0F6C0">Git Repository</text>
+  <text x="820" y="220" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#859D91">(polarsquad/krops on GitHub)</text>
+
+  <!-- folder tree -->
+  <g fill="none" stroke-width="1.7">
+    <path d="M660,250 h9 l4,5 h15 v16 h-28 z" stroke="#5CE0B4"/>
+    <path d="M708,288 h8 l4,4.5 h13 v14 h-25 z" stroke="#5CE0B4" stroke-opacity="0.85"/>
+    <path d="M708,322 h8 l4,4.5 h13 v14 h-25 z" stroke="#5CE0B4" stroke-opacity="0.85"/>
+    <path d="M708,356 h8 l4,4.5 h13 v14 h-25 z" stroke="#5CE0B4" stroke-opacity="0.85"/>
+  </g>
+  <g stroke="#284637" stroke-width="1.4" fill="none">
+    <path d="M674,274 V365 M674,297 h28 M674,331 h28 M674,365 h28"/>
+  </g>
+  <text x="700" y="268" font-family="DejaVu Sans Mono" font-size="16.5" font-weight="bold" fill="#5CE0B4">mgmt/local-talos/</text>
+  <text x="744" y="303" font-family="DejaVu Sans Mono" font-size="15" fill="#D4E2DA">infrastructure/</text>
+  <text x="744" y="337" font-family="DejaVu Sans Mono" font-size="15" fill="#D4E2DA">capi-providers/</text>
+  <text x="744" y="371" font-family="DejaVu Sans Mono" font-size="15" fill="#D4E2DA">clusters/management/</text>
+  <text x="820" y="420" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">Syncs directly from GitHub (PAT)</text>
+  <text x="820" y="444" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">Committed site values (VIP endpoint IP)</text>
+
+  <!-- ===== physical metal substrate ===== -->
+  <rect x="64" y="570" width="460" height="390" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="80" y="578" width="428" height="5" rx="2.5" fill="#E8A868"/>
+  <text x="294" y="616" text-anchor="middle" font-family="DejaVu Sans" font-size="24" font-weight="bold" fill="#E8A868">Physical Metal Substrate</text>
+  <text x="294" y="640" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">Tinkerbell Hardware &amp; BMC / PXE</text>
+
+  <!-- hardware info box -->
+  <rect x="88" y="658" width="412" height="66" rx="8" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
+  <text x="106" y="684" font-family="DejaVu Sans Mono" font-size="15" font-weight="bold" fill="#E8A868">Hardware: talos-mgmt-01</text>
+  <text x="106" y="707" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">Static VIP endpoint IP &#183; BMC MAC / IP credentials</text>
+
+  <!-- boot chain subpanel -->
+  <rect x="88" y="736" width="412" height="144" rx="8" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
+  <text x="106" y="760" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#FFFFFF">Automated bare-metal bootstrap:</text>
+  <text x="106" y="784" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">1. BMC power-on / PXE network boot</text>
+  <text x="106" y="806" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">2. Tinkerbell Hook environment runs on host</text>
+  <text x="106" y="828" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">3. Talos installer image streamed &amp; written to disk</text>
+  <text x="106" y="850" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">4. Reboot into immutable Talos OS (VIP active)</text>
+
+  <!-- talos os chip -->
+  <rect x="88" y="892" width="412" height="52" rx="8" fill="#5CE0B4" fill-opacity="0.12" stroke="#5CE0B4" stroke-opacity="0.5" stroke-width="1.2"/>
+  <text x="294" y="923" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#5CE0B4">Talos Linux: immutable rootfs &#183; API-managed &#183; zero SSH</text>
+
+  <!-- ===== scope fence and teardown ===== -->
+  <rect x="560" y="570" width="460" height="390" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="576" y="578" width="428" height="5" rx="2.5" fill="#E5B85C"/>
+  <text x="790" y="616" text-anchor="middle" font-family="DejaVu Sans" font-size="24" font-weight="bold" fill="#E5B85C">Scope Fence &amp; Teardown</text>
+  <text x="790" y="640" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">management-only design &#183; issue #105</text>
+
+  <!-- scope fence box -->
+  <rect x="584" y="658" width="412" height="114" rx="8" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
+  <text x="604" y="684" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#E5B85C">Management-only scope:</text>
+  <text x="604" y="708" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; <tspan font-weight="bold">No workload clusters:</tspan> local-talos owns no workloads</text>
+  <text x="604" y="730" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; <tspan font-weight="bold">No addons:</tspan> Talos ships CNI (no HCP consumers)</text>
+  <text x="604" y="752" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; Self-contained control plane on single bare-metal host</text>
+
+  <!-- teardown box -->
+  <rect x="584" y="784" width="412" height="160" rx="8" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
+  <text x="604" y="810" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#E5B85C">Hardware-release teardown:</text>
+  <text x="604" y="834" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; Suspend Flux, delete CAPI Cluster objects</text>
+  <text x="604" y="856" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; CAPT releases Hardware back to Tinkerbell pool</text>
+  <text x="604" y="878" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; Physical host is <tspan font-weight="bold" fill="#FFFFFF">NEVER wiped or reclaimed</tspan></text>
+  <text x="604" y="900" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; Host left running Talos for operator reuse</text>
+  <text x="604" y="922" font-family="DejaVu Sans" font-size="13.5" fill="#859D91">&#8226; Zero container or AWS sweep (hardware-release = true)</text>
+
+  <!-- ===== legend strip ===== -->
+  <rect x="64" y="982" width="966" height="66" rx="12" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <g stroke="#E8A868" stroke-width="1.7" fill="none">
+    <circle cx="106" cy="1011" r="8"/>
+    <path d="M102,1019 v4 h8 v-4 M103,1027 h6"/>
+    <line x1="106" y1="996" x2="106" y2="999"/>
+    <line x1="94" y1="1002" x2="96.5" y2="1004"/>
+    <line x1="118" y1="1002" x2="115.5" y2="1004"/>
+  </g>
+  <text x="134" y="1022" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#5CE0B4">Management cluster</text>
+  <text x="330" y="1022" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">= bare metal CAPI + Talos</text>
+  <line x1="560" y1="994" x2="560" y2="1036" stroke="#284637" stroke-width="1.4"/>
+  <text x="580" y="1022" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#E8A868">Tinkerbell</text>
+  <text x="680" y="1022" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">= hardware provisioning</text>
+  <line x1="885" y1="994" x2="885" y2="1036" stroke="#284637" stroke-width="1.4"/>
+  <text x="905" y="1022" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#E5B85C">Scope fence</text>
+
+  <!-- ===== flow panel ===== -->
+  <rect x="1090" y="150" width="446" height="904" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+
+  <!-- step 1 -->
+  <circle cx="1140" cy="204" r="15" fill="#B0F6C0"/>
+  <text x="1140" y="210" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">1</text>
+  <text x="1168" y="200" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Toolbox creates disposable kind;</text>
+  <text x="1168" y="226" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Flux syncs <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#B0F6C0">mgmt/local-talos/</tspan></text>
+  <text x="1168" y="252" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">from GitHub using PAT secret.</text>
+  <line x1="1122" y1="290" x2="1504" y2="290" stroke="#1F362A" stroke-width="1.2"/>
+
+  <!-- step 2 -->
+  <circle cx="1140" cy="336" r="15" fill="#5CE0B4"/>
+  <text x="1140" y="342" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">2</text>
+  <text x="1168" y="332" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">CAPI + CAPT + CABPT + CACPPT</text>
+  <text x="1168" y="358" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">match Tinkerbell Hardware and</text>
+  <text x="1168" y="384" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">provision Talos on bare metal</text>
+  <text x="1168" y="410" font-family="DejaVu Sans" font-size="17" fill="#859D91">(30m timeout: PXE + first boot).</text>
+  <line x1="1122" y1="448" x2="1504" y2="448" stroke="#1F362A" stroke-width="1.2"/>
+
+  <!-- step 3 -->
+  <circle cx="1140" cy="494" r="15" fill="#5CE0B4"/>
+  <text x="1140" y="500" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">3</text>
+  <text x="1168" y="490" font-family="DejaVu Sans Mono" font-size="16" fill="#5CE0B4">krops-bootstrap pivot<tspan font-family="DejaVu Sans" font-size="17" fill="#D4E2DA"> executes</tspan></text>
+  <text x="1168" y="518" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA"><tspan font-family="DejaVu Sans Mono" font-size="16" fill="#FFFFFF">clusterctl move</tspan> into bare-metal</text>
+  <text x="1168" y="544" font-family="DejaVu Sans Mono" font-size="16" fill="#5CE0B4">local-talos-management<tspan font-family="DejaVu Sans" font-size="17" fill="#D4E2DA"> and</tspan></text>
+  <text x="1168" y="570" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">deletes disposable kind cluster.</text>
+  <line x1="1122" y1="608" x2="1504" y2="608" stroke="#1F362A" stroke-width="1.2"/>
+
+  <!-- step 4 -->
+  <circle cx="1140" cy="654" r="15" fill="#68C5EB"/>
+  <text x="1140" y="660" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">4</text>
+  <text x="1168" y="650" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Talos cluster manages itself:</text>
+  <text x="1168" y="676" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Flux self-reconciles from Git;</text>
+  <text x="1168" y="702" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">CAPI maintains control plane;</text>
+  <text x="1168" y="728" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">OS managed via Talos API.</text>
+  <line x1="1122" y1="766" x2="1504" y2="766" stroke="#1F362A" stroke-width="1.2"/>
+
+  <!-- golden rule -->
+  <text x="1122" y="808" font-family="DejaVu Sans" font-size="22" font-weight="bold" fill="#E5B85C">Golden rule</text>
+  <text x="1122" y="842" font-family="DejaVu Sans" font-size="18" fill="#D4E2DA">Edit YAML in Git; never mutate</text>
+  <text x="1122" y="870" font-family="DejaVu Sans" font-size="18" fill="#D4E2DA">the cluster. Flux tracks <tspan font-family="DejaVu Sans Mono" font-size="17" fill="#FFFFFF">main</tspan>:</text>
+  <text x="1122" y="898" font-family="DejaVu Sans" font-size="18" fill="#D4E2DA">bare metal converges to Git state.</text>
+  <line x1="1122" y1="940" x2="1504" y2="940" stroke="#1F362A" stroke-width="1.2"/>
+
+  <!-- color key -->
+  <circle cx="1132" cy="994" r="6" fill="#5CE0B4"/>
+  <text x="1146" y="1000" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">mgmt</text>
+  <circle cx="1210" cy="994" r="6" fill="#B0F6C0"/>
+  <text x="1224" y="1000" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">git</text>
+  <circle cx="1282" cy="994" r="6" fill="#68C5EB"/>
+  <text x="1296" y="1000" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">talos</text>
+  <circle cx="1380" cy="994" r="6" fill="#E8A868"/>
+  <text x="1394" y="1000" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">metal</text>
+
+  <!-- ===== footer ===== -->
+  <text x="800" y="1102" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">Self-managed bare-metal CAPI: single-node management cluster running on immutable Talos Linux.</text>
+  <text x="800" y="1128" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">Hardware-release teardown returns physical host to Tinkerbell pool without destructive wipe.</text>
+</svg>

@@ -14,6 +14,8 @@ Operator (ASO) that reconciles Azure resources from `workload/azure-base/`.
 | RDS PostgreSQL | PostgreSQL Flexible Server (private access, Entra-only auth) |
 | IAM reader role | none yet (follow-up) |
 
+![krops azure architecture](azure-infra.svg)
+
 ## Prerequisites
 
 - An Azure subscription where you hold Owner (needed once, for

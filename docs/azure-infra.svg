@@ -1,0 +1,260 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1150" viewBox="0 0 1600 1150">
+  <defs>
+    <marker id="arrow-teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5CE0B4"/>
+    </marker>
+    <marker id="arrow-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#859D91"/>
+    </marker>
+    <marker id="arrow-purple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B0F6C0"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#68C5EB"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#E8A868"/>
+    </marker>
+  </defs>
+
+  <!-- ===== background ===== -->
+  <rect width="1600" height="1150" fill="#0C120F"/>
+
+  <!-- ===== title block ===== -->
+  <text x="800" y="60" text-anchor="middle" font-family="DejaVu Sans" font-size="40" font-weight="bold" fill="#5CE0B4">krops &#183; Azure Environment &#183; CAPZ + AKS + ASO</text>
+  <text x="800" y="96" text-anchor="middle" font-family="DejaVu Sans" font-size="19" fill="#859D91">Flux + CAPZ (bundled ASO) + workload ASO &#183; Workload Identity &#183; private PostgreSQL and Blob Storage</text>
+
+  <!-- ===== section headers ===== -->
+  <text x="64" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#FFFFFF">TOPOLOGY (clusters and sync flows)</text>
+  <text x="1090" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#FFFFFF">FLOW (reconciliation order)</text>
+
+  <!-- ===== connections (behind boxes) ===== -->
+  <line x1="508" y1="256" x2="612" y2="256" stroke="#5CE0B4" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
+  <text x="561" y="222" text-anchor="middle" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#FFFFFF">1. syncs</text>
+  <text x="561" y="244" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#5CE0B4">mgmt/azure/</text>
+  <path d="M284,490 V594" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-teal)"/>
+  <text x="430" y="540" text-anchor="middle" font-family="DejaVu Sans" font-size="15.5" fill="#D4E2DA">provisions AKS &#183; configures identity &#183; installs Flux via <tspan font-family="DejaVu Sans Mono" fill="#5CE0B4">flux-apps</tspan></text>
+  <path d="M820,490 V560 H480 V594" fill="none" stroke="#68C5EB" stroke-width="2.5" stroke-dasharray="7,6" marker-end="url(#arrow-blue)"/>
+  <text x="730" y="578" text-anchor="middle" font-family="DejaVu Sans" font-size="15" fill="#D4E2DA">workload Flux syncs <tspan font-family="DejaVu Sans Mono" fill="#68C5EB">workload/swedencentral-01/</tspan></text>
+
+  <!-- ===== management cluster ===== -->
+  <rect x="64" y="150" width="440" height="340" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="80" y="158" width="408" height="5" rx="2.5" fill="#5CE0B4"/>
+  <text x="284" y="196" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#5CE0B4">Management Cluster</text>
+  <text x="284" y="220" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#859D91">(swedencentral-management &#183; post-pivot)</text>
+
+  <!-- flux glyph -->
+  <g transform="translate(122,260)">
+    <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#5CE0B4"/>
+    <line x1="0" y1="-18" x2="0" y2="18" stroke="#131E18" stroke-width="2.5"/>
+    <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M-10,33 L0,39 L10,33" fill="none" stroke="#5CE0B4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="122" y="324" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#FFFFFF">Flux</text>
+  <line x1="162" y1="264" x2="230" y2="264" stroke="#859D91" stroke-width="2" marker-end="url(#arrow-gray)"/>
+
+  <!-- capi/capz chip -->
+  <rect x="238" y="228" width="250" height="72" rx="10" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
+  <g stroke="#5CE0B4" stroke-width="1.6" fill="none">
+    <circle cx="272" cy="256" r="9"/>
+    <circle cx="272" cy="256" r="3.2"/>
+    <g>
+      <line x1="272" y1="243" x2="272" y2="247"/><line x1="272" y1="265" x2="272" y2="269"/>
+      <line x1="259" y1="256" x2="263" y2="256"/><line x1="281" y1="256" x2="285" y2="256"/>
+      <line x1="263" y1="247" x2="266" y2="250"/><line x1="278" y1="262" x2="281" y2="265"/>
+      <line x1="263" y1="265" x2="266" y2="262"/><line x1="278" y1="250" x2="281" y2="247"/>
+    </g>
+    <circle cx="290" cy="274" r="6.5"/>
+    <circle cx="290" cy="274" r="2.2"/>
+  </g>
+  <text x="308" y="260" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#FFFFFF">CAPI / CAPZ</text>
+  <text x="308" y="283" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">bundled ASO 2.19.0</text>
+
+  <!-- infra lifecycle sub-panel -->
+  <rect x="88" y="336" width="392" height="136" rx="10" fill="#5CE0B4" fill-opacity="0.12" stroke="#5CE0B4" stroke-opacity="0.5" stroke-width="1.2"/>
+  <text x="284" y="360" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#5CE0B4">Manages infrastructure &amp; identity</text>
+  <text x="106" y="386" font-family="DejaVu Sans" font-size="14.5" fill="#D4E2DA">&#8226; <tspan font-weight="bold">AKS cluster:</tspan> AzureASOManaged* (inline ASO)</text>
+  <text x="106" y="410" font-family="DejaVu Sans" font-size="14.5" fill="#D4E2DA">&#8226; <tspan font-weight="bold">Identity:</tspan> krops-aso user identity + FIC + role</text>
+  <text x="106" y="434" font-family="DejaVu Sans" font-size="14.5" fill="#D4E2DA">&#8226; <tspan font-weight="bold">flux-apps:</tspan> HelmChartProxy + ClusterResourceSets</text>
+  <text x="106" y="458" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">&#8226; <tspan font-family="DejaVu Sans Mono">aso-credentials.sops.yaml</tspan> (one SP for mgmt)</text>
+
+  <!-- ===== git repository ===== -->
+  <rect x="620" y="150" width="400" height="340" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="636" y="158" width="368" height="5" rx="2.5" fill="#B0F6C0"/>
+  <text x="820" y="196" text-anchor="middle" font-family="DejaVu Sans" font-size="25" font-weight="bold" fill="#B0F6C0">Git Repository</text>
+  <text x="820" y="220" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#859D91">(polarsquad/krops)</text>
+
+  <!-- folder tree -->
+  <g fill="none" stroke-width="1.7">
+    <path d="M660,250 h9 l4,5 h15 v16 h-28 z" stroke="#5CE0B4"/>
+    <path d="M660,288 h9 l4,5 h15 v16 h-28 z" stroke="#68C5EB"/>
+    <path d="M708,326 h8 l4,4.5 h13 v14 h-25 z" stroke="#68C5EB" stroke-opacity="0.85"/>
+    <path d="M708,360 h8 l4,4.5 h13 v14 h-25 z" stroke="#68C5EB" stroke-opacity="0.85"/>
+  </g>
+  <g stroke="#284637" stroke-width="1.4" fill="none">
+    <path d="M674,312 V369 M674,335 h28 M674,369 h28"/>
+  </g>
+  <text x="700" y="268" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#5CE0B4">mgmt/azure/</text>
+  <text x="700" y="306" font-family="DejaVu Sans Mono" font-size="17" font-weight="bold" fill="#68C5EB">workload/</text>
+  <text x="744" y="342" font-family="DejaVu Sans Mono" font-size="16" fill="#68C5EB">azure-base/</text>
+  <text x="744" y="376" font-family="DejaVu Sans Mono" font-size="16" fill="#68C5EB">swedencentral-01/</text>
+  <text x="820" y="426" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">Flux tracks <tspan font-family="DejaVu Sans Mono" fill="#D4E2DA">main</tspan></text>
+  <text x="820" y="450" text-anchor="middle" font-family="DejaVu Sans" font-size="14.5" fill="#859D91">SOPS-encrypted SP secret in-repo</text>
+
+  <!-- ===== workload cluster ===== -->
+  <rect x="64" y="600" width="460" height="350" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="80" y="608" width="428" height="5" rx="2.5" fill="#68C5EB"/>
+  <text x="294" y="646" text-anchor="middle" font-family="DejaVu Sans" font-size="24" font-weight="bold" fill="#68C5EB">Workload Cluster</text>
+  <text x="294" y="670" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">swedencentral-workload (AKS)</text>
+
+  <!-- flux glyph -->
+  <g transform="translate(116,712) scale(0.85)">
+    <path d="M0,-18 L15,0 L0,18 L-15,0 Z" fill="#68C5EB"/>
+    <line x1="0" y1="-18" x2="0" y2="18" stroke="#131E18" stroke-width="2.5"/>
+    <path d="M-10,24 L0,30 L10,24" fill="none" stroke="#68C5EB" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M-10,33 L0,39 L10,33" fill="none" stroke="#68C5EB" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="152" y="712" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#FFFFFF">Flux</text>
+  <text x="152" y="731" font-family="DejaVu Sans" font-size="13" fill="#859D91">(local)</text>
+  <rect x="210" y="682" width="284" height="60" rx="8" fill="#1B2C23" stroke="#68C5EB" stroke-opacity="0.6" stroke-width="1.2"/>
+  <text x="352" y="705" text-anchor="middle" font-family="DejaVu Sans" font-size="12.5" fill="#D4E2DA">syncs overlay</text>
+  <text x="352" y="728" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#68C5EB">workload/swedencentral-01/</text>
+
+  <!-- pipeline stages -->
+  <g stroke="#D4E2DA" stroke-width="1.8" fill="none">
+    <circle cx="120" cy="788" r="11"/>
+    <circle cx="120" cy="788" r="3.8"/>
+  </g>
+  <line x1="142" y1="788" x2="176" y2="788" stroke="#859D91" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+  <g stroke="#5CE0B4" stroke-width="1.8" fill="none">
+    <rect x="188" y="774" width="28" height="28" rx="6"/>
+    <path d="M196,788 h12 M202,782 v12"/>
+  </g>
+  <line x1="228" y1="788" x2="262" y2="788" stroke="#859D91" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+  <g stroke="#68C5EB" stroke-width="1.8" fill="none">
+    <circle cx="282" cy="788" r="10"/>
+    <path d="M276,788 h12 M282,782 v12"/>
+  </g>
+  <line x1="304" y1="788" x2="338" y2="788" stroke="#859D91" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+  <g stroke="#E8A868" stroke-width="1.8" fill="none">
+    <ellipse cx="362" cy="778" rx="12" ry="4"/>
+    <path d="M350,778 v18 a12,4 0 0 0 24,0 v-18"/>
+  </g>
+
+  <text x="120" y="828" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="13" fill="#D4E2DA">cert-mgr</text>
+  <text x="202" y="828" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="13" fill="#D4E2DA">aso (FIC)</text>
+  <text x="282" y="828" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="13" fill="#D4E2DA">net + stor</text>
+  <text x="362" y="828" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="13" fill="#D4E2DA">postgres</text>
+
+  <!-- auth badge -->
+  <rect x="88" y="848" width="412" height="38" rx="6" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
+  <text x="294" y="872" text-anchor="middle" font-family="DejaVu Sans" font-size="13.5" fill="#5CE0B4">Zero secrets in cluster &#183; Entra Workload Identity</text>
+
+  <!-- lifecycle strip -->
+  <rect x="88" y="896" width="412" height="40" rx="8" fill="#68C5EB" fill-opacity="0.14"/>
+  <text x="294" y="922" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#68C5EB">Manages application lifecycle</text>
+
+  <!-- ===== azure cloud resources ===== -->
+  <rect x="560" y="600" width="460" height="350" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <rect x="576" y="608" width="428" height="5" rx="2.5" fill="#E8A868"/>
+  <text x="790" y="646" text-anchor="middle" font-family="DejaVu Sans" font-size="24" font-weight="bold" fill="#E8A868">Azure Managed Resources</text>
+  <text x="790" y="670" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">swedencentral &#183; reconciled by workload ASO</text>
+
+  <!-- resource boxes -->
+  <rect x="584" y="690" width="412" height="60" rx="8" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
+  <text x="604" y="715" font-family="DejaVu Sans Mono" font-size="15" font-weight="bold" fill="#E8A868">Virtual Network &amp; Private DNS</text>
+  <text x="604" y="736" font-family="DejaVu Sans" font-size="13.5" fill="#D4E2DA">vnet-swedencentral-workload &#183; delegated subnet &#183; private zone</text>
+
+  <rect x="584" y="760" width="412" height="60" rx="8" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
+  <text x="604" y="785" font-family="DejaVu Sans Mono" font-size="15" font-weight="bold" fill="#E8A868">Storage Account &amp; Blob</text>
+  <text x="604" y="806" font-family="DejaVu Sans" font-size="13.5" fill="#D4E2DA">${STORAGE_ACCOUNT_NAME} in data RG &#183; container "data"</text>
+
+  <rect x="584" y="830" width="412" height="60" rx="8" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
+  <text x="604" y="855" font-family="DejaVu Sans Mono" font-size="15" font-weight="bold" fill="#E8A868">PostgreSQL Flexible Server</text>
+  <text x="604" y="876" font-family="DejaVu Sans" font-size="13.5" fill="#D4E2DA">psql-swedencentral-workload &#183; private VNet access &#183; Entra-only auth</text>
+
+  <!-- azure logo glyph -->
+  <g transform="translate(930, 915)">
+    <text x="0" y="0" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#E8A868">azure</text>
+    <path d="M-15,6 Q15,16 35,5" fill="none" stroke="#E8A868" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <!-- ===== legend strip ===== -->
+  <rect x="64" y="982" width="966" height="66" rx="12" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+  <g stroke="#E8A868" stroke-width="1.7" fill="none">
+    <circle cx="106" cy="1011" r="8"/>
+    <path d="M102,1019 v4 h8 v-4 M103,1027 h6"/>
+    <line x1="106" y1="996" x2="106" y2="999"/>
+    <line x1="94" y1="1002" x2="96.5" y2="1004"/>
+    <line x1="118" y1="1002" x2="115.5" y2="1004"/>
+  </g>
+  <text x="134" y="1022" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#5CE0B4">Management cluster</text>
+  <text x="330" y="1022" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">= infra &amp; identity</text>
+  <line x1="500" y1="994" x2="500" y2="1036" stroke="#284637" stroke-width="1.4"/>
+  <text x="520" y="1022" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#68C5EB">Workload cluster</text>
+  <text x="690" y="1022" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">= apps</text>
+  <line x1="755" y1="994" x2="755" y2="1036" stroke="#284637" stroke-width="1.4"/>
+  <text x="775" y="1022" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#E8A868">Workload ASO</text>
+  <text x="915" y="1022" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">= Azure CRDs</text>
+
+  <!-- ===== flow panel ===== -->
+  <rect x="1090" y="150" width="446" height="904" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
+
+  <!-- step 1 -->
+  <circle cx="1140" cy="204" r="15" fill="#5CE0B4"/>
+  <text x="1140" y="210" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">1</text>
+  <text x="1168" y="200" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Management cluster Flux syncs</text>
+  <text x="1168" y="226" font-family="DejaVu Sans Mono" font-size="16" fill="#5CE0B4">mgmt/azure/<tspan font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">, provisions AKS</tspan></text>
+  <text x="1168" y="252" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">clusters via CAPZ + bundled ASO,</text>
+  <text x="1168" y="278" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">and installs Flux via <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#5CE0B4">flux-apps</tspan>.</text>
+  <line x1="1122" y1="310" x2="1504" y2="310" stroke="#1F362A" stroke-width="1.2"/>
+
+  <!-- step 2 -->
+  <circle cx="1140" cy="354" r="15" fill="#B0F6C0"/>
+  <text x="1140" y="360" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">2</text>
+  <text x="1168" y="350" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Bundled ASO reconciles identity:</text>
+  <text x="1168" y="376" font-family="DejaVu Sans Mono" font-size="15.5" fill="#B0F6C0">krops-aso <tspan font-family="DejaVu Sans" fill="#D4E2DA">user identity, data RG,</tspan></text>
+  <text x="1168" y="402" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Contributor role, and federated</text>
+  <text x="1168" y="428" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">credential (FIC) for workload SA.</text>
+  <line x1="1122" y1="462" x2="1504" y2="462" stroke="#1F362A" stroke-width="1.2"/>
+
+  <!-- step 3 -->
+  <circle cx="1140" cy="510" r="15" fill="#68C5EB"/>
+  <text x="1140" y="516" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">3</text>
+  <text x="1168" y="506" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Workload cluster runs local Flux:</text>
+  <text x="1168" y="540" font-family="DejaVu Sans Mono" font-size="17" fill="#D4E2DA">1. <tspan fill="#FFFFFF">cert-manager</tspan></text>
+  <text x="1168" y="568" font-family="DejaVu Sans Mono" font-size="17" fill="#D4E2DA">2. <tspan fill="#FFFFFF">aso</tspan> <tspan font-family="DejaVu Sans" font-size="15" fill="#859D91">(2.19.0 via Workload Identity)</tspan></text>
+  <text x="1168" y="596" font-family="DejaVu Sans Mono" font-size="17" fill="#D4E2DA">3. <tspan fill="#FFFFFF">networking &#183; storage</tspan></text>
+  <text x="1168" y="624" font-family="DejaVu Sans Mono" font-size="17" fill="#D4E2DA">4. <tspan fill="#FFFFFF">postgres</tspan> <tspan font-family="DejaVu Sans" font-size="14.5" fill="#859D91">(dependsOn: networking)</tspan></text>
+  <line x1="1122" y1="658" x2="1504" y2="658" stroke="#1F362A" stroke-width="1.2"/>
+
+  <!-- step 4 -->
+  <circle cx="1140" cy="704" r="15" fill="#E8A868"/>
+  <text x="1140" y="710" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">4</text>
+  <text x="1168" y="700" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Workload ASO creates cloud infra:</text>
+  <text x="1168" y="726" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">VNet + delegated subnet + DNS,</text>
+  <text x="1168" y="752" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Storage Account + blob container,</text>
+  <text x="1168" y="778" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">PostgreSQL (Entra-only auth).</text>
+  <line x1="1122" y1="808" x2="1504" y2="808" stroke="#1F362A" stroke-width="1.2"/>
+
+  <!-- golden rule -->
+  <text x="1122" y="848" font-family="DejaVu Sans" font-size="22" font-weight="bold" fill="#E5B85C">Golden rule</text>
+  <text x="1122" y="880" font-family="DejaVu Sans" font-size="18" fill="#D4E2DA">Edit YAML in Git; never mutate</text>
+  <text x="1122" y="908" font-family="DejaVu Sans" font-size="18" fill="#D4E2DA">the clusters. Flux tracks <tspan font-family="DejaVu Sans Mono" font-size="17" fill="#FFFFFF">main</tspan>:</text>
+  <text x="1122" y="936" font-family="DejaVu Sans" font-size="18" fill="#D4E2DA">nothing reconciles until merged.</text>
+  <line x1="1122" y1="966" x2="1504" y2="966" stroke="#1F362A" stroke-width="1.2"/>
+
+  <!-- color key -->
+  <circle cx="1132" cy="1006" r="6" fill="#5CE0B4"/>
+  <text x="1146" y="1012" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">mgmt</text>
+  <circle cx="1210" cy="1006" r="6" fill="#B0F6C0"/>
+  <text x="1224" y="1012" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">git</text>
+  <circle cx="1282" cy="1006" r="6" fill="#68C5EB"/>
+  <text x="1296" y="1012" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">workload</text>
+  <circle cx="1398" cy="1006" r="6" fill="#E8A868"/>
+  <text x="1412" y="1012" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">azure</text>
+
+  <!-- ===== footer ===== -->
+  <text x="800" y="1102" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">Single service principal on mgmt; workload clusters authenticate via Workload Identity.</text>
+  <text x="800" y="1128" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">No Terraform, no state files: CAPI and ASO manage Azure entirely through Kubernetes CRDs.</text>
+</svg>

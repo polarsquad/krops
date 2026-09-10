@@ -60,7 +60,11 @@ not a developer self-service portal; you are the consumer.
 
 ![krops aws architecture](docs/aws-infra.svg)
 
+![krops azure architecture](docs/azure-infra.svg)
+
 ![krops local-host architecture](docs/local-host-infra.svg)
+
+![krops local-talos architecture](docs/local-talos-infra.svg)
 
 ![krops air-gap architecture](docs/air-gap-infra.svg)
 

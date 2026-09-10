@@ -1,0 +1,75 @@
+# azure environment task layer (issue #71).
+#
+# Like aws, this environment syncs mgmt/azure from GitHub and pivots into an
+# AKS management cluster built by CAPZ. The Azure CLI is only needed for the
+# one-time subscription preparation (azure-bootstrap) and for debugging;
+# nothing in bootstrap/pivot shells out to it.
+
+[env]
+KROPS_PROFILE = "azure"
+
+[tools]
+"pipx:azure-cli" = "2.90.0"
+
+[tasks.azure-bootstrap]
+description = "One-time subscription prep: register providers, create the CAPZ/ASO service principal, the shared resource group and the krops-aso identity; prints the values to commit"
+run = '''
+set -eu
+: "${AZURE_SUBSCRIPTION_ID:?set AZURE_SUBSCRIPTION_ID in .env or the shell}"
+AZURE_LOCATION="${AZURE_LOCATION:-swedencentral}"
+az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+for ns in Microsoft.Compute Microsoft.Network Microsoft.ContainerService \
+          Microsoft.ManagedIdentity Microsoft.Authorization Microsoft.Storage \
+          Microsoft.DBforPostgreSQL; do
+  echo "==> register $ns"
+  az provider register --namespace "$ns" --wait >/dev/null
+done
+echo "==> resource group krops-shared"
+az group create --name krops-shared --location "$AZURE_LOCATION" --output none
+echo "==> user-assigned identity krops-aso (adopted by ASO from Git)"
+az identity create --name krops-aso --resource-group krops-shared \
+  --location "$AZURE_LOCATION" --output none
+CLIENT_ID=$(az identity show -g krops-shared -n krops-aso --query clientId -o tsv)
+PRINCIPAL_ID=$(az identity show -g krops-shared -n krops-aso --query principalId -o tsv)
+echo "==> service principal krops-capz (Contributor + RBAC Administrator on the subscription)"
+SP_JSON=$(az ad sp create-for-rbac --name krops-capz --role Contributor \
+  --scopes "/subscriptions/${AZURE_SUBSCRIPTION_ID}" --output json)
+SP_APP_ID=$(printf '%s' "$SP_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["appId"])')
+az role assignment create --assignee "$SP_APP_ID" \
+  --role "Role Based Access Control Administrator" \
+  --scope "/subscriptions/${AZURE_SUBSCRIPTION_ID}" --output none
+TENANT_ID=$(az account show --query tenantId -o tsv)
+cat <<EOF
+
+Commit these (non-secret) values:
+  mgmt/azure/infrastructure/azure-identity/azure-vars.yaml
+    AZURE_SUBSCRIPTION_ID: "${AZURE_SUBSCRIPTION_ID}"
+    AZURE_TENANT_ID:       "${TENANT_ID}"
+  mgmt/azure/addons/flux-apps/flux-instance.yaml (cluster-vars)
+    AZURE_ASO_CLIENT_ID:    "${CLIENT_ID}"
+    AZURE_ASO_PRINCIPAL_ID: "${PRINCIPAL_ID}"
+
+Put the service principal into the SOPS secret (docs/secrets.md, "Azure"):
+  mgmt/azure/infrastructure/azure-identity/aso-credentials.sops.yaml
+    AZURE_SUBSCRIPTION_ID, AZURE_TENANT_ID, AZURE_CLIENT_ID (appId), AZURE_CLIENT_SECRET (password)
+The password is printed ONCE below; store it, then run: mise run sops-encrypt <file>
+EOF
+printf '%s\n' "$SP_JSON"
+'''
+
+[tasks.kubeconfigs]
+description = "Export the AKS workload-cluster kubeconfig via clusterctl (no endpoint rewrite: AKS is remote)"
+run = '''
+KUBECONFIG_FILE="${KUBECONFIG_FILE:-$HOME/.kube/krops-workloads.yaml}"
+fail=0
+for location in $(find mgmt/azure/clusters -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort); do
+  cluster="${location}-workload"
+  echo "==> ${cluster}"
+  if ! clusterctl get kubeconfig "$cluster" -n default > "${KUBECONFIG_FILE}.${cluster}"; then
+    echo "    FAILED: ${cluster} — cluster not provisioned yet?" >&2
+    fail=1
+  fi
+done
+echo "Use with: KUBECONFIG=${KUBECONFIG_FILE}.<cluster> kubectl get nodes"
+exit $fail
+'''

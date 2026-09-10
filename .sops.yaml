@@ -1,5 +1,5 @@
 # SOPS configuration. Encrypts only the `data`/`stringData` fields of any
-# manifest named `*.sops.yaml` under mgmt/aws/, leaving keys/metadata readable.
+# manifest named `*.sops.yaml` under mgmt/aws/ or mgmt/azure/, leaving keys/metadata readable.
 #
 # The `age` recipient below is a PUBLIC key — safe to commit. The matching
 # PRIVATE key lives in `age.agekey` (gitignored) and is loaded into the cluster
@@ -7,6 +7,6 @@
 #
 # To rotate or add recipients, edit this file and run:  mise run sops-updatekeys
 creation_rules:
-  - path_regex: mgmt/aws/.*\.sops\.yaml$
+  - path_regex: mgmt/(aws|azure)/.*\.sops\.yaml$
     encrypted_regex: "^(data|stringData)$"
     age: age1amqtgevmdxutg07rkr3wggua43620zgncgfq53vkww0283wrgspqv9q0jw

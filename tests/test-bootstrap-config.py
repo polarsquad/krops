@@ -29,6 +29,7 @@ CHART_MANIFESTS = {
         "mgmt/local-host/infrastructure/cert-manager/helmrelease.yaml",
         "mgmt/local-talos/infrastructure/cert-manager/helmrelease.yaml",
         "mgmt/azure/infrastructure/cert-manager/helmrelease.yaml",
+        "workload/azure-base/cert-manager/helmrelease.yaml",
     ],
     "capi-operator": [
         "mgmt/aws/infrastructure/capi-operator/helmrelease.yaml",

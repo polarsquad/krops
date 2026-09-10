@@ -1,0 +1,20 @@
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# cert-manager on the workload cluster: ASO's webhooks require it. wait: true
+# so the ASO HelmRelease only installs once the CA injector is Ready.
+# ══════════════════════════════════════════════════════════════════════════════
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cert-manager
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 2m
+  timeout: 10m
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./workload/azure-base/cert-manager

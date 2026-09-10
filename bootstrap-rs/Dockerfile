@@ -75,17 +75,19 @@ ENV MISE_DATA_DIR=/usr/local/share/mise \
 
 COPY --from=build /usr/local/bin/krops-bootstrap /usr/local/bin/krops-bootstrap
 COPY bootstrap-rs/toolbox-entrypoint.sh /usr/local/bin/toolbox-entrypoint.sh
-COPY mise.toml mise.aws.toml /opt/krops/
+COPY mise.toml mise.aws.toml mise.azure.toml /opt/krops/
 
 RUN chmod +x /usr/local/bin/toolbox-entrypoint.sh
 
 # Install every tool the configs pin except the dev-only toolchains the
 # lifecycle never invokes (go, python, zarf: airgap builds run on the
 # host, not inside the toolbox). The aws layer (aws-cli, clusterawsadm)
-# installs too; credentials arrive at runtime.
+# and the azure layer (azure-cli, for the arc-federate hook and
+# azure-bootstrap) install too; credentials arrive at runtime.
 RUN cd /opt/krops \
     && mise install -y kind helm kubectl clusterctl flux2 sops age \
     && mise -E aws install -y aws-cli clusterawsadm \
+    && mise -E azure install -y \
     && mise reshim
 
 WORKDIR /workspace

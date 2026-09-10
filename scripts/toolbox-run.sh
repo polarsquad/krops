@@ -125,6 +125,9 @@ PASS_ENV=(
   -e AWS_ACCESS_KEY_ID
   -e AWS_SECRET_ACCESS_KEY
   -e AWS_SESSION_TOKEN
+  -e AZURE_SUBSCRIPTION_ID
+  -e AZURE_LOCATION
+  -e AZURE_CONFIG_DIR
 )
 
 # Repo-local persistent kubeconfig state (gitignored): the toolbox's internal

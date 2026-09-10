@@ -1,15 +1,19 @@
 ---
 # ══════════════════════════════════════════════════════════════════════════════
 # AzureClusterIdentity: the credential CAPZ itself uses (kubeconfig retrieval,
-# AKS API calls). The bundled ASO reads the SAME service principal through the
+# AKS API calls). type WorkloadIdentity (issue #236): CAPZ exchanges the
+# projected token of its capz-manager service account for the krops-capz
+# user-assigned identity; in kind the token issuer is the Arc-hosted OIDC
+# issuer (mise task arc-federate), post-pivot it is the management cluster's
+# own OIDC issuer. No client secret exists anywhere.
+#
+# The bundled ASO uses the SAME identity through the
 # `serviceoperator.azure.com/credential-from: aso-credentials` annotation on
-# each ASO resource (see clusters/). Both point at the aso-credentials Secret
-# in `default`; CAPZ reads its `AZURE_CLIENT_SECRET` key.
+# each ASO resource; aso-credentials is a plain (secret-free) Secret.
 #
 # move-hierarchy: clusterctl move carries the identity to the pivot target
-# with the Cluster. The aso-credentials Secret does NOT move (no
-# move-hierarchy label, no owner reference); the pivot applies it from
-# pivot-sops-secrets (bootstrap.toml) before the move.
+# with the Cluster. The aso-credentials Secret does NOT move; the pivot
+# applies it from pivot-manifests (bootstrap.toml) before the move.
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: AzureClusterIdentity
@@ -19,10 +23,7 @@ metadata:
   labels:
     clusterctl.cluster.x-k8s.io/move-hierarchy: "true"
 spec:
-  type: ServicePrincipal
+  type: WorkloadIdentity
   allowedNamespaces: {}
   tenantID: "${AZURE_TENANT_ID}"
   clientID: "${AZURE_CLIENT_ID}"
-  clientSecret:
-    name: aso-credentials
-    namespace: default

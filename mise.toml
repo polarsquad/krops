@@ -79,7 +79,7 @@ run = "sops --decrypt --input-type yaml --output-type yaml"
 [tasks.sops-updatekeys]
 description = "Re-encrypt all *.sops.yaml files to match recipients in .sops.yaml"
 run = """
-for f in $(find mgmt/aws -name '*.sops.yaml'); do
+for f in $(find mgmt -name '*.sops.yaml'); do
   echo "==> updatekeys $f"
   sops updatekeys --yes "$f"
 done
@@ -96,7 +96,7 @@ run = "scripts/toolbox-run.sh pivot"
 [tasks.mgmt-kubeconfig]
 description = "Export the management-cluster kubeconfig to ~/.kube/krops-mgmt.yaml"
 run = '''
-MGMT_CLUSTER="${MGMT_CLUSTER:-$(case "${KROPS_PROFILE:-aws}" in local-host) echo local-management;; local-talos) echo local-talos-management;; *) echo eu-north-1-management;; esac)}"
+MGMT_CLUSTER="${MGMT_CLUSTER:-$(case "${KROPS_PROFILE:-aws}" in local-host) echo local-management;; local-talos) echo local-talos-management;; azure) echo swedencentral-management;; *) echo eu-north-1-management;; esac)}"
 MGMT_KUBECONFIG="${MGMT_KUBECONFIG:-$HOME/.kube/krops-mgmt.yaml}"
 clusterctl get kubeconfig "$MGMT_CLUSTER" -n default > "$MGMT_KUBECONFIG"
 chmod 600 "$MGMT_KUBECONFIG"

@@ -83,11 +83,13 @@ RUN chmod +x /usr/local/bin/toolbox-entrypoint.sh
 # lifecycle never invokes (go, python, zarf: airgap builds run on the
 # host, not inside the toolbox). The aws layer (aws-cli, clusterawsadm)
 # and the azure layer (azure-cli, for the arc-federate hook and
-# azure-bootstrap) install too; credentials arrive at runtime.
+# azure-bootstrap) install too; credentials arrive at runtime. azure-cli
+# is a pipx backend tool and needs the pinned python present to install.
 RUN cd /opt/krops \
     && mise install -y kind helm kubectl clusterctl flux2 sops age \
     && mise -E aws install -y aws-cli clusterawsadm \
-    && mise -E azure install -y \
+    && mise install -y python@3.14.7 uv@0.12.11 \
+    && mise -E azure install -y azure-cli \
     && mise reshim
 
 WORKDIR /workspace

@@ -1,0 +1,83 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cert-manager
+  namespace: flux-system
+spec:
+  interval: 5m
+  retryInterval: 2m
+  timeout: 5m
+  prune: true
+  wait: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./mgmt/azure/infrastructure/cert-manager
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: capi-operator
+  namespace: flux-system
+spec:
+  interval: 5m
+  retryInterval: 2m
+  timeout: 5m
+  prune: true
+  wait: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./mgmt/azure/infrastructure/capi-operator
+  dependsOn:
+    - name: cert-manager
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: azure-identity
+  namespace: flux-system
+spec:
+  interval: 5m
+  retryInterval: 2m
+  timeout: 5m
+  prune: true
+  wait: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./mgmt/azure/infrastructure/azure-identity
+  # The AzureClusterIdentity CRD ships with CAPZ.
+  dependsOn:
+    - name: capz-system
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: azure-vars
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: aso-workload-identity
+  namespace: flux-system
+spec:
+  interval: 5m
+  retryInterval: 2m
+  timeout: 10m
+  prune: true
+  wait: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./mgmt/azure/infrastructure/aso-workload-identity
+  dependsOn:
+    - name: azure-identity
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: azure-vars

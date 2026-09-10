@@ -12,7 +12,7 @@ KROPS_PROFILE = "azure"
 "pipx:azure-cli" = "2.90.0"
 
 [tasks.azure-bootstrap]
-description = "One-time subscription prep: register providers, create the CAPZ/ASO service principal, the shared resource group and the krops-aso identity; prints the values to commit"
+description = "One-time subscription prep: register providers (incl. Arc), create the shared resource group and the krops-capz / krops-aso user-assigned identities with their role grants; prints the values to commit. No service principal (issue #236)."
 run = '''
 set -eu
 : "${AZURE_SUBSCRIPTION_ID:?set AZURE_SUBSCRIPTION_ID in .env or the shell}"
@@ -20,24 +20,35 @@ AZURE_LOCATION="${AZURE_LOCATION:-swedencentral}"
 az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 for ns in Microsoft.Compute Microsoft.Network Microsoft.ContainerService \
           Microsoft.ManagedIdentity Microsoft.Authorization Microsoft.Storage \
-          Microsoft.DBforPostgreSQL; do
+          Microsoft.DBforPostgreSQL \
+          Microsoft.Kubernetes Microsoft.KubernetesConfiguration \
+          Microsoft.ExtendedLocation; do
   echo "==> register $ns"
   az provider register --namespace "$ns" --wait >/dev/null
 done
 echo "==> resource group krops-shared"
 az group create --name krops-shared --location "$AZURE_LOCATION" --output none
-echo "==> user-assigned identity krops-aso (adopted by ASO from Git)"
+
+echo "==> user-assigned identity krops-aso (workload-cluster ASO; adopted from Git)"
 az identity create --name krops-aso --resource-group krops-shared \
   --location "$AZURE_LOCATION" --output none
-CLIENT_ID=$(az identity show -g krops-shared -n krops-aso --query clientId -o tsv)
-PRINCIPAL_ID=$(az identity show -g krops-shared -n krops-aso --query principalId -o tsv)
-echo "==> service principal krops-capz (Contributor + RBAC Administrator on the subscription)"
-SP_JSON=$(az ad sp create-for-rbac --name krops-capz --role Contributor \
-  --scopes "/subscriptions/${AZURE_SUBSCRIPTION_ID}" --output json)
-SP_APP_ID=$(printf '%s' "$SP_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["appId"])')
-az role assignment create --assignee "$SP_APP_ID" \
+ASO_CLIENT_ID=$(az identity show -g krops-shared -n krops-aso --query clientId -o tsv)
+ASO_PRINCIPAL_ID=$(az identity show -g krops-shared -n krops-aso --query principalId -o tsv)
+
+echo "==> user-assigned identity krops-capz (CAPZ + management-side ASO; adopted from Git)"
+az identity create --name krops-capz --resource-group krops-shared \
+  --location "$AZURE_LOCATION" --output none
+CAPZ_CLIENT_ID=$(az identity show -g krops-shared -n krops-capz --query clientId -o tsv)
+CAPZ_PRINCIPAL_ID=$(az identity show -g krops-shared -n krops-capz --query principalId -o tsv)
+echo "==> role grants for krops-capz (Contributor + RBAC Administrator on the subscription)"
+az role assignment create --assignee-object-id "$CAPZ_PRINCIPAL_ID" \
+  --assignee-principal-type ServicePrincipal \
+  --role Contributor --scope "/subscriptions/${AZURE_SUBSCRIPTION_ID}" --output none
+az role assignment create --assignee-object-id "$CAPZ_PRINCIPAL_ID" \
+  --assignee-principal-type ServicePrincipal \
   --role "Role Based Access Control Administrator" \
   --scope "/subscriptions/${AZURE_SUBSCRIPTION_ID}" --output none
+
 TENANT_ID=$(az account show --query tenantId -o tsv)
 cat <<EOF
 
@@ -45,16 +56,12 @@ Commit these (non-secret) values:
   mgmt/azure/infrastructure/azure-identity/azure-vars.yaml
     AZURE_SUBSCRIPTION_ID: "${AZURE_SUBSCRIPTION_ID}"
     AZURE_TENANT_ID:       "${TENANT_ID}"
+    AZURE_CLIENT_ID:       "${CAPZ_CLIENT_ID}"   # krops-capz UAMI client ID
   mgmt/azure/addons/flux-apps/flux-instance.yaml (cluster-vars)
-    AZURE_ASO_CLIENT_ID:    "${CLIENT_ID}"
-    AZURE_ASO_PRINCIPAL_ID: "${PRINCIPAL_ID}"
-
-Put the service principal into the SOPS secret (docs/secrets.md, "Azure"):
-  mgmt/azure/infrastructure/azure-identity/aso-credentials.sops.yaml
-    AZURE_SUBSCRIPTION_ID, AZURE_TENANT_ID, AZURE_CLIENT_ID (appId), AZURE_CLIENT_SECRET (password)
-The password is printed ONCE below; store it, then run: mise run sops-encrypt <file>
+    AZURE_ASO_CLIENT_ID:    "${ASO_CLIENT_ID}"
+    AZURE_ASO_PRINCIPAL_ID: "${ASO_PRINCIPAL_ID}"
+Nothing is secret: no service principal exists (issue #236).
 EOF
-printf '%s\n' "$SP_JSON"
 '''
 
 [tasks.kubeconfigs]

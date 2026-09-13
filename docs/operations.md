@@ -208,6 +208,18 @@ You also need:
      `machine.install.image`; without the annotation the default schematic
      is used.
   4. Set the machine to PXE-boot from the network Smee serves.
+
+     **Installer image handoff status:** on the current pin pair (CABPT v0.7.8
+     + CAPT fork v0.7.1) the annotation handoff above is unverified and not
+     functional: CABPT v0.7.8 reads the installer image through a hardcoded
+     v1beta2 InfrastructureMachine GVK, while the CAPT fork's TinkerbellMachine
+     CRD serves only v1beta1, so the lookup cannot succeed (issue #265).
+     CABPT v0.8.x changed the mechanism to `spec.imageFactory` (an Image
+     Factory HTTP API call), so bumping CABPT is a behavior change, not a
+     version bump; fork retirement is tracked in issue #266 and is blocked on
+     upstream PR tinkerbell/cluster-api-provider-tinkerbell#604. Until the pins
+     move, verify the installer image the machine actually receives before
+     relying on the annotation.
 - Two site-specific values in
   `mgmt/local-talos/clusters/management/cluster.yaml` before the first run:
   `spec.controlPlaneEndpoint.host` (the machine's stable IP) and the

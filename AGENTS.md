@@ -35,7 +35,16 @@ resources. There is no app source code here, only declarative infrastructure.
   the shrinedogg fork release v0.7.1 (upstream main plus the
   installer-image annotation mirror, PR tinkerbell#604; see
   `capi-providers/capt-system/provider.yaml`); re-point at upstream once a
-  release there includes it. Scope fence:
+  release there includes it. On the current pin pair (CABPT v0.7.8 + CAPT
+  fork v0.7.1) the Hardware-annotation to
+  `TinkerbellMachine.status.installerImage` to `machine.install.image`
+  handoff is unverified and not functional: CABPT v0.7.8 reads the installer
+  image through a hardcoded v1beta2 InfrastructureMachine GVK while the CAPT
+  fork's TinkerbellMachine CRD serves only v1beta1 (issue #265), and CABPT
+  v0.8.x changed the mechanism to `spec.imageFactory` (an Image Factory HTTP
+  API call), so a CABPT bump is a behavior change, not a version bump. Fork
+  retirement is tracked in issue #266, blocked on upstream PR
+  tinkerbell/cluster-api-provider-tinkerbell#604. Scope fence:
   management-only; no `addons/` (Talos ships its own CNI, no
   HelmChartProxy consumers). The wiring landed in #169 and the docs in
   #171; the remaining #105 item is the hardware acceptance run.

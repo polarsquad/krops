@@ -43,6 +43,11 @@ case "$CONTAINER_ENGINE" in
     docker info >/dev/null 2>&1 || { echo "ERROR: Docker daemon not reachable" >&2; exit 1; }
     ;;
   podman)
+    # The remote client defaults to /run/podman/podman.sock; the wrapper
+    # mounts the engine API socket at /var/run/docker.sock, so point the
+    # client there explicitly. ENGINE_SOCK stays the daemon-side path kind
+    # uses for node extraMounts (issue #255).
+    export CONTAINER_HOST="${CONTAINER_HOST:-unix:///var/run/docker.sock}"
     podman info >/dev/null 2>&1 || { echo "ERROR: Podman not reachable" >&2; exit 1; }
     export KIND_EXPERIMENTAL_PROVIDER=podman
     ;;

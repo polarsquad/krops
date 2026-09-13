@@ -39,6 +39,11 @@ if ! python3 airgap/tests/test-airgap-image-digests.py; then
   echo "    FAILED: air-gap image digest pins" >&2
   fail=1
 fi
+echo "==> toolbox entrypoint (podman client socket)"
+if ! python3 tests/test-toolbox-entrypoint-podman.py; then
+  echo "    FAILED: toolbox entrypoint podman client socket" >&2
+  fail=1
+fi
 echo "==> bootstrap.toml cross-check"
 if ! python3 tests/test-bootstrap-config.py; then
   echo "    FAILED: bootstrap.toml cross-check" >&2

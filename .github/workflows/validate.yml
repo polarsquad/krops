@@ -20,6 +20,9 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: python3 airgap/tests/test-airgap-image-digests.py --changed-from "$BASE_SHA"
 
+      - name: Verify digest token boundary (reject overlong)
+        run: python3 airgap/tests/test-digest-regex.py
+
   kustomize-build:
     name: Build kustomize overlays
     runs-on: ubuntu-latest

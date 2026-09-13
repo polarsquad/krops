@@ -35,8 +35,8 @@ IMAGE_REF = re.compile(
     r"(?:[a-z0-9][a-z0-9._-]*/)*[a-z0-9][a-z0-9._-]*)"
     r"(?:"
     r":(?P<tag>[A-Za-z0-9_][A-Za-z0-9_.-]*)"
-    r"(?:@(?P<digest>sha256:[a-f0-9]{64}))?"
-    r"|@(?P<digest_only>sha256:[a-f0-9]{64})"
+    r"(?:@(?P<digest>sha256:[a-f0-9]{64}(?![a-f0-9])))?"
+    r"|@(?P<digest_only>sha256:[a-f0-9]{64}(?![a-f0-9]))"
     r")"
 )
 

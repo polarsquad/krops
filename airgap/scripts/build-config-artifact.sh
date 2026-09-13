@@ -168,12 +168,9 @@ spec:
       name: local-workload-flux-instance
 EOF
 
-# cluster-class.yaml: add preLoadImages to both DevMachineTemplates. Two
-# offline-only gaps found by Wi-Fi-off runs (connected runs mask them by
+# cluster-class.yaml: add preLoadImages to both DevMachineTemplates. One
+# offline-only gap found by Wi-Fi-off runs (connected runs mask it by
 # pulling silently):
-#   - registry.k8s.io/pause:3.10.1: leftover from the v1.35.0 generation,
-#     whose kubeadm required 3.10.1; v1.37.0 kubeadm pulls 3.10.2 (already
-#     in images.txt). Kept until the pause-pin follow-up removes it.
 #   - docker.io/kindest/kindnetd:v20260528-9350166c: the vendored CNI pins
 #     this tag but the v1.37.0 node bakes v20260820; the CNI pull hangs
 #     offline so nodes never become Ready.
@@ -185,7 +182,6 @@ import sys
 path = sys.argv[1]
 txt = open(path).read()
 preload = """          preLoadImages:
-            - registry.k8s.io/pause:3.10.1@sha256:278fb9dbcca9518083ad1e11276933a2e96f23de604a3a08cc3c80002767d24c
             - docker.io/kindest/kindnetd:v20260528-9350166c@sha256:92f49a1b2c9242058481fc3e13412c19a62cfeb090717dad4598719d32351f1f
             - ghcr.io/controlplaneio-fluxcd/flux-operator:v0.58.0@sha256:1c919ce1e28716f817ded65c06df0b7a8269542387d5a2ce50212450473c6209
             - ghcr.io/fluxcd/source-controller:v1.9.4@sha256:8a8ed0a57b8b86f561d5a4309a69f65e62f0cebe4de8801593c5ff35a3bc3c23

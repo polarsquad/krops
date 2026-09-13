@@ -353,6 +353,19 @@
       "versioningTemplate": "docker",
       "autoReplaceStringTemplate": "kindest/node:v{{newValue}}"
     },
+    {
+      "customType": "regex",
+      "description": "kindest/node topology.version pins (must track the node image, #142)",
+      "managerFilePatterns": [
+        "/(^|/)mgmt/local-host/clusters/docker/cluster\\.yaml$/",
+        "/(^|/)mgmt/local-host/clusters/management/cluster\\.yaml$/"
+      ],
+      "matchStrings": ["(?<indent>[ \t]+)version: v(?<currentValue>[0-9A-Za-z.\\-]+)"],
+      "depNameTemplate": "kindest/node",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker",
+      "autoReplaceStringTemplate": "{{{indent}}}version: v{{{newValue}}}"
+    },
     // ── airgap image inventory and zarf package ──────────────────────────
     {
       "customType": "regex",

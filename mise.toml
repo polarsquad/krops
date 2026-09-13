@@ -39,6 +39,11 @@ if ! python3 airgap/tests/test-airgap-image-digests.py; then
   echo "    FAILED: air-gap image digest pins" >&2
   fail=1
 fi
+echo "==> air-gap ownership invariant (zarf.yaml vs images.txt)"
+if ! python3 airgap/tests/test-airgap-ownership.py; then
+  echo "    FAILED: air-gap ownership invariant" >&2
+  fail=1
+fi
 echo "==> bootstrap.toml cross-check"
 if ! python3 tests/test-bootstrap-config.py; then
   echo "    FAILED: bootstrap.toml cross-check" >&2

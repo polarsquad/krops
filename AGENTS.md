@@ -65,7 +65,12 @@ resources. There is no app source code here, only declarative infrastructure.
     `mgmt/azure/infrastructure/aso-workload-identity/`.
   - `<region>-01/`: per-cluster overlays pointing at `../base`.
 - `airgap/`: Zarf offline transfer bundle for the local-host profile.
-  `zarf.yaml` + `images.txt` define the packages; `scripts/` builds,
+  `zarf.yaml` is the authoritative image listing for the package and
+  `images.txt` is the superset inventory (the `scripts/` preloads derive from
+  the same pins); `airgap/tests/test-airgap-ownership.py` (in `mise run
+  validate` and CI) enforces that every `zarf.yaml` image appears in
+  `images.txt` with the identical tag and digest, guarding against partial
+  air-gap updates (issue #228). `scripts/` builds,
   renders, and stages the bundle (`build-*`, `render-*`, `stage-*`,
   `offline-run.sh`); `archives/` and `rendered/` are gitignored outputs.
   Zarf fetches SHA-256-pinned CAAPH release assets and bundles arm64

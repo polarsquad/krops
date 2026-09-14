@@ -148,7 +148,7 @@ components:
     images:
       - registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.14.1@sha256:ffb7a4abd84a16d8fd22640f459621cf5aae9f74918a33aae85bc92e0a9cb55c
       - registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.14.1@sha256:4e2bb4a833a46c52b1c1ccd533c09b70bfa1cbcb22e765da778c66ab68a43617
-      - gcr.io/k8s-staging-cluster-api/capd-manager:v1.14.1@sha256:5a84cacabd60c871c513442e2da84851bee158e7cf672135cabf3ad20e9ca7ea
+      - gcr.io/k8s-staging-cluster-api/capd-manager:v1.14.2@sha256:ba1cb33f80ef97e222922023797672efb1c1a4ebe3920ee28e042cd48103bc98
     healthChecks:
       - apiVersion: apps/v1
         kind: Deployment

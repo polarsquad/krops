@@ -44,6 +44,24 @@ files.
 The locally built `localhost:5001/krops-airgap:latest` config artifact is the
 only documented exception because it is created immediately before packaging.
 
+### Image pin ownership
+
+`zarf.yaml` is the authoritative artifact listing for the bundle: every image
+in its per-component `images:` lists must also appear in `airgap/images.txt`
+with the identical tag and digest. `images.txt` is the superset inventory; it
+additionally carries the kind node images and workload-node images that
+travel as archives, and the preload steps in `airgap/scripts` derive from the
+same pins. `airgap/tests/test-airgap-ownership.py` checks that invariant in
+`mise run validate` and CI, so an air-gap dependency that is updated in one
+file but not the others fails the build instead of shipping a bundle with
+conflicting versions or digests.
+
+Renovate 44.50.1 has no native zarf manager, so the air-gap surfaces are
+managed by the shared custom-regex managers in `renovate.json5` rather than a
+native manager. That is an accepted deviation from issue #228's "discovered
+by a native Renovate manager" acceptance criterion; the ownership invariant
+above is the CI-enforced guard against the partial updates #228 is about.
+
 Every package build must be signed. For an operator build, generate or obtain
 a Cosign-compatible key pair, keep the private key outside the repository, and
 set `ZARF_SIGNING_KEY` to it. Set `ZARF_SIGNING_KEY_PASS` when the key is

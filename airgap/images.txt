@@ -24,7 +24,7 @@ ghcr.io/fluxcd/source-controller:v1.9.4@sha256:8a8ed0a57b8b86f561d5a4309a69f65e6
 quay.io/jetstack/cert-manager-controller:v1.21.1@sha256:416a2d76870d996460e62bd7f521bf14fa017be9e3e904aab92163a331fcb61a
 quay.io/jetstack/cert-manager-cainjector:v1.21.1@sha256:ccf6b919ec0500745a47a910118f834f9636d0aac1ff221245cd2557ed8c7c98
 quay.io/jetstack/cert-manager-webhook:v1.21.1@sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42
-quay.io/jetstack/cert-manager-startupapicheck:v1.21.1@sha256:d8ab6416e6e7303a86fa0a8daa82c94a8001f21c9d78eb2e7db20534e5d07ae8
+quay.io/jetstack/cert-manager-startupapicheck:v1.21.2@sha256:46e75b6866359ffb5d82624f41e3ed1c70b2994982702ced547ce5edb418a8f5
 registry.k8s.io/capi-operator/cluster-api-operator:v0.29.0@sha256:465e72f8b06ae96de7c142d552f898fb4d0d92ab5d71c8691e431a19d1b4955c
 registry.k8s.io/cluster-api/cluster-api-controller:v1.14.1@sha256:47b6eb088b584690a5ac2218a5b5014bf9a0fbe5cd0ef2999347176b5fdedb69
 registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.14.1@sha256:ffb7a4abd84a16d8fd22640f459621cf5aae9f74918a33aae85bc92e0a9cb55c

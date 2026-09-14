@@ -17,7 +17,7 @@
 # slim-bookworm matches the runtime stage's glibc (bookworm, 2.36): a
 # binary built on the default rust image (trixie, glibc 2.39) fails on
 # bookworm with "GLIBC_2.39 not found".
-FROM rust:1.98.0-slim-bookworm@sha256:1469a27c125cb5a3aebfa4f4e4665d935b02fb72cc093b2c974b3d740e43f157 AS build
+FROM rust:1.98.1-slim-bookworm@sha256:ebd900bae66fd508b466cef82d64a83a5fb34682e4c8b2797a42908bddc95a57 AS build
 
 WORKDIR /build
 COPY bootstrap-rs/ ./bootstrap-rs/
@@ -28,7 +28,7 @@ RUN cd bootstrap-rs && cargo build --locked --release \
 FROM debian:bookworm-slim@sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171
 
 # renovate: datasource=github-releases depName=jdx/mise extractVersion=^v(?<version>.+) versioning=semver
-ARG MISE_VERSION=2026.9.2
+ARG MISE_VERSION=2026.9.7
 # Set by BuildKit: "amd64" or "arm64".
 ARG TARGETARCH
 

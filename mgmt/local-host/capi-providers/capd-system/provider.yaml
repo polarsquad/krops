@@ -5,7 +5,7 @@ metadata:
   name: docker
   namespace: capd-system
 spec:
-  version: "v1.14.1"
+  version: "v1.14.2"
   deployment:
     containers:
       - name: manager

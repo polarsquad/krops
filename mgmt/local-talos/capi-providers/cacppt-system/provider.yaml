@@ -8,6 +8,6 @@ metadata:
   namespace: cacppt-system
 spec:
   # renovate: datasource=github-releases depName=sidero-community/cluster-api-control-plane-provider-talos
-  version: "v0.6.5"
+  version: "v0.7.1"
   fetchConfig:
     url: "https://github.com/sidero-community/cluster-api-control-plane-provider-talos/releases"

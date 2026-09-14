@@ -39,10 +39,10 @@ components:
         valuesFiles:
           - values/cert-manager.yaml
     images:
-      - quay.io/jetstack/cert-manager-controller:v1.21.1@sha256:416a2d76870d996460e62bd7f521bf14fa017be9e3e904aab92163a331fcb61a
-      - quay.io/jetstack/cert-manager-cainjector:v1.21.1@sha256:ccf6b919ec0500745a47a910118f834f9636d0aac1ff221245cd2557ed8c7c98
-      - quay.io/jetstack/cert-manager-webhook:v1.21.1@sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42
-      - quay.io/jetstack/cert-manager-startupapicheck:v1.21.1@sha256:d8ab6416e6e7303a86fa0a8daa82c94a8001f21c9d78eb2e7db20534e5d07ae8
+      - quay.io/jetstack/cert-manager-controller:v1.21.2@sha256:70f532fd9cfde0b09d55687200942399d89838bc2d5d5b45152eb799a15912b8
+      - quay.io/jetstack/cert-manager-cainjector:v1.21.2@sha256:c85268c64f2e0e76684bf5fe8906caff34b82523561c6affe0fae3546bd87562
+      - quay.io/jetstack/cert-manager-webhook:v1.21.2@sha256:a60e2dac46dbb8a7f3df95c54ce941012f54c2fe022f0ee55aaa1ab40ed957ae
+      - quay.io/jetstack/cert-manager-startupapicheck:v1.21.2@sha256:46e75b6866359ffb5d82624f41e3ed1c70b2994982702ced547ce5edb418a8f5
     healthChecks:
       - apiVersion: apps/v1
         kind: Deployment
@@ -124,7 +124,7 @@ components:
         files:
           - manifests/core-cluster-api.components.yaml
     images:
-      - registry.k8s.io/cluster-api/cluster-api-controller:v1.14.1@sha256:47b6eb088b584690a5ac2218a5b5014bf9a0fbe5cd0ef2999347176b5fdedb69
+      - registry.k8s.io/cluster-api/cluster-api-controller:v1.14.2@sha256:031f0d7cbef66b324ae247852adc9ae6f788cd499bd57fe38c581804147fb035
     healthChecks:
       - apiVersion: apps/v1
         kind: Deployment
@@ -146,9 +146,9 @@ components:
         files:
           - manifests/infrastructure-docker.components.yaml
     images:
-      - registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.14.1@sha256:ffb7a4abd84a16d8fd22640f459621cf5aae9f74918a33aae85bc92e0a9cb55c
-      - registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.14.1@sha256:4e2bb4a833a46c52b1c1ccd533c09b70bfa1cbcb22e765da778c66ab68a43617
-      - gcr.io/k8s-staging-cluster-api/capd-manager:v1.14.1@sha256:5a84cacabd60c871c513442e2da84851bee158e7cf672135cabf3ad20e9ca7ea
+      - registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.14.2@sha256:31adb8a779173e6d106757b509b142549caddcc248fccc65b774b11d3a6f4c02
+      - registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.14.2@sha256:fb991a63cbe3e534f3bbec993009abf45c6d076e9b36366d073155aec3adade3
+      - gcr.io/k8s-staging-cluster-api/capd-manager:v1.14.2@sha256:ba1cb33f80ef97e222922023797672efb1c1a4ebe3920ee28e042cd48103bc98
     healthChecks:
       - apiVersion: apps/v1
         kind: Deployment

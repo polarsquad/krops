@@ -35,7 +35,16 @@ resources. There is no app source code here, only declarative infrastructure.
   the shrinedogg fork release v0.7.1 (upstream main plus the
   installer-image annotation mirror, PR tinkerbell#604; see
   `capi-providers/capt-system/provider.yaml`); re-point at upstream once a
-  release there includes it. Scope fence:
+  release there includes it. On the current pin pair (CABPT v0.7.8 + CAPT
+  fork v0.7.1) the Hardware-annotation to
+  `TinkerbellMachine.status.installerImage` to `machine.install.image`
+  handoff is unverified and not functional: CABPT v0.7.8 reads the installer
+  image through a hardcoded v1beta2 InfrastructureMachine GVK while the CAPT
+  fork's TinkerbellMachine CRD serves only v1beta1 (issue #265), and CABPT
+  v0.8.x changed the mechanism to `spec.imageFactory` (an Image Factory HTTP
+  API call), so a CABPT bump is a behavior change, not a version bump. Fork
+  retirement is tracked in issue #266, blocked on upstream PR
+  tinkerbell/cluster-api-provider-tinkerbell#604. Scope fence:
   management-only; no `addons/` (Talos ships its own CNI, no
   HelmChartProxy consumers). The wiring landed in #169 and the docs in
   #171; the remaining #105 item is the hardware acceptance run.
@@ -65,7 +74,12 @@ resources. There is no app source code here, only declarative infrastructure.
     `mgmt/azure/infrastructure/aso-workload-identity/`.
   - `<region>-01/`: per-cluster overlays pointing at `../base`.
 - `airgap/`: Zarf offline transfer bundle for the local-host profile.
-  `zarf.yaml` + `images.txt` define the packages; `scripts/` builds,
+  `zarf.yaml` is the authoritative image listing for the package and
+  `images.txt` is the superset inventory (the `scripts/` preloads derive from
+  the same pins); `airgap/tests/test-airgap-ownership.py` (in `mise run
+  validate` and CI) enforces that every `zarf.yaml` image appears in
+  `images.txt` with the identical tag and digest, guarding against partial
+  air-gap updates (issue #228). `scripts/` builds,
   renders, and stages the bundle (`build-*`, `render-*`, `stage-*`,
   `offline-run.sh`); `archives/` and `rendered/` are gitignored outputs.
   Zarf fetches SHA-256-pinned CAAPH release assets and bundles arm64
@@ -209,7 +223,7 @@ is a file list plus assertions, never a copy of the subprocess/parsing
 logic. The harness needs Node >= 24.11 (renovate's `engines` field);
 locally: `mise x node@24 -- python3 tests/test-renovate-coverage.py`.
 The offline unit test `tests/test-renovate-actions-grouping.py` also runs in
-that CI job and uses the shared harness to apply Renovate’s real package-rule
+that CI job and uses the shared harness to apply Renovate's real package-rule
 engine, checking that only action dependencies join the GitHub Actions group.
 Run locally with Renovate on PATH and Node >= 24.11. These tests
 do not cover lookup liveness or the replacement path; only the

@@ -20,6 +20,8 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: python3 airgap/tests/test-airgap-image-digests.py --changed-from "$BASE_SHA"
 
+      - name: Verify airgap ownership invariant
+        run: python3 airgap/tests/test-airgap-ownership.py
       - name: Verify digest token boundary (reject overlong)
         run: python3 airgap/tests/test-digest-regex.py
 
@@ -58,17 +60,17 @@ jobs:
         uses: actions/checkout@v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@v10.1.0
         with:
-          version: "0.12.11"
+          version: "0.12.13"
 
       - name: Set up Node.js
         uses: actions/setup-node@v7.0.0
         with:
-          node-version: 24.20.0
+          node-version: 24.21.0
 
       - name: Install Renovate
-        run: npm install --global renovate@44.69.8
+        run: npm install --global renovate@44.84.0
 
       - name: Verify only actions join the GitHub Actions group
         run: python3 tests/test-renovate-actions-grouping.py

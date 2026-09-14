@@ -31,7 +31,7 @@ spec:
   chart:
     spec:
       chart: azure-service-operator
-      version: "2.19.0"
+      version: "2.21.1"
       sourceRef:
         kind: HelmRepository
         name: azure-service-operator

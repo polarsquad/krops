@@ -2,7 +2,7 @@
 name = "krops-site"
 version = "0.0.0"
 description = "Documentation website build for krops (GitHub Pages)"
-requires-python = ">=3.13"
+requires-python = "==3.14.7"
 dependencies = [
   "mkdocs-material==9.7.7",
   "pyyaml==6.0.3",

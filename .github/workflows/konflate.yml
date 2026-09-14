@@ -37,7 +37,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository
     services:
       konflate:
-        image: ghcr.io/home-operations/konflate:0.6.3
+        image: ghcr.io/home-operations/konflate:0.6.4
         ports:
           - 8080:8080
         env:

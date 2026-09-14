@@ -25,8 +25,12 @@ Renovate discovers and updates versions in:
   pins consumed by `krops-bootstrap`. One annotation-driven custom manager reads
   the adjacent `# renovate:` metadata. `mise run validate` cross-checks these
   pins against their declarative Helm releases and proxies.
-- `bootstrap-rs/Dockerfile`: digest-pinned build and runtime base images, plus
-  the mise CLI and Podman remote-client build arguments used by the toolbox.
+- `bootstrap-rs/Dockerfile`: digest-pinned build and runtime base images, the
+  mise CLI and Podman remote-client build arguments used by the toolbox, and
+  the inline `uv@` pin in the mise install layer (issue #307): it must move in
+  lockstep with the `mise.toml` pin, because azure-cli's pipx backend resolves
+  its uv dependency against the mise.toml-selected version during the image
+  build.
 - `mgmt/**` and `workload/**` YAML: Flux, Helm, Kubernetes manifests, chart
   values, and clusterctl provider CRs under `capi-providers/`.
 - `kindest/node` image tags wherever they are referenced in management

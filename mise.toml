@@ -44,6 +44,11 @@ if ! python3 airgap/tests/test-airgap-ownership.py; then
   echo "    FAILED: air-gap ownership invariant" >&2
   fail=1
 fi
+echo "==> toolbox entrypoint (podman client socket)"
+if ! python3 tests/test-toolbox-entrypoint-podman.py; then
+  echo "    FAILED: toolbox entrypoint podman client socket" >&2
+  fail=1
+fi
 echo "==> air-gap digest token boundary"
 if ! python3 airgap/tests/test-digest-regex.py; then
   echo "    FAILED: air-gap digest token boundary" >&2

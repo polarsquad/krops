@@ -28,6 +28,12 @@ EXPECTED = {
     },
     "pivot.sh": {"cert-manager", "cluster-api-operator"},
     ".github/workflows/validate.yml": {"renovate"},
+    "mgmt/local-host/clusters/docker/cluster.yaml": {
+        "kindest/node",
+    },
+    "mgmt/local-host/clusters/management/cluster.yaml": {
+        "kindest/node",
+    },
     "mgmt/local-talos/capi-providers/capi-system/providers.yaml": {
         "kubernetes-sigs/cluster-api",
     },
@@ -46,6 +52,7 @@ EXPECTED = {
     },
     "mise.local-talos.toml": {"siderolabs/talos"},
     "mise.toml": {"astral-sh/uv"},
+    "bootstrap-rs/Dockerfile": {"astral-sh/uv"},
     "mgmt/azure/capi-providers/capz-system/providers.yaml": {
         "kubernetes-sigs/cluster-api-provider-azure",
     },

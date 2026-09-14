@@ -18,9 +18,10 @@ EXPECTED_FILES = [
 DIGEST = re.compile(r"@sha256:[a-f0-9]{64}")
 EXCLUDED_DEP_NAMES = {"localhost:5001/krops-airgap"}
 REQUIRED_DEP_NAMES = {
-    "airgap/images.txt": {"ghcr.io/fluxcd/source-controller"},
-    "airgap/scripts/build-config-artifact.sh": {"registry.k8s.io/pause"},
-    "airgap/scripts/build-package.sh": {"registry.k8s.io/pause"},
+    "airgap/images.txt": {
+        "ghcr.io/fluxcd/source-controller",
+        "registry.k8s.io/pause",
+    },
     "airgap/scripts/stage-and-create-cluster.sh": {"kindest/node"},
     "airgap/zarf.yaml": {"quay.io/jetstack/cert-manager-controller"},
 }

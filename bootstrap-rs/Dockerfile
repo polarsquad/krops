@@ -88,7 +88,7 @@ RUN chmod +x /usr/local/bin/toolbox-entrypoint.sh
 RUN cd /opt/krops \
     && mise install -y kind helm kubectl clusterctl flux2 sops age \
     && mise -E aws install -y aws-cli clusterawsadm \
-    && mise install -y python@3.14.7 uv@0.12.11 \
+    && mise install -y python@3.14.7 uv@0.12.13 \
     && mise -E azure install -y azure-cli \
     && mise reshim
 

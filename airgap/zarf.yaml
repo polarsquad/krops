@@ -114,15 +114,61 @@ components:
       - ghcr.io/fluxcd/notification-controller:v1.9.3@sha256:071c351a0fb163eeb6a2bb82f1e894f51b6b0734216d2e97d3d99c9ab9d710b9
 
   # CAPI core: 13 CRDs (Cluster, Machine, MachineDeployment, ClusterClass,
-  # ClusterResourceSet, ...) + the capi-controller-manager. Captured from the
-  # v1.14.0 release asset (the capi-operator normally fetches it online; in
-  # the gap the operator is absent, so Zarf applies the components directly).
+  # ClusterResourceSet, ...) + the capi-controller-manager. Zarf fetches the
+  # v1.14.2 release asset (SHA-256 verified) and renders it with clusterctl
+  # during deploy, the same pattern CAAPH uses below (the capi-operator
+  # normally fetches and renders it online; it is absent in the gap). The
+  # clusterctl binary and clusterctl-providers.yaml are staged here, not
+  # per-component: capi-providers and caaph reuse them from
+  # /tmp/krops-airgap later in the same deploy run.
   - name: capi-core
     required: true
-    manifests:
-      - name: capi-core
-        files:
-          - manifests/core-cluster-api.components.yaml
+    files:
+      # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.1/clusterctl-darwin-arm64
+        shasum: bce7a27ee9dd3f3cbdd3b463203a706ec31ea6ee98926045fbd9dfbe9c020f4b
+        target: /tmp/krops-airgap/bin/clusterctl-darwin-arm64
+        executable: true
+      # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.1/clusterctl-linux-arm64
+        shasum: 16ec2d3ab39338e94dfa9ddb070c4f37073683db517fa6052ffc38d6702d7d8b
+        target: /tmp/krops-airgap/bin/clusterctl-linux-arm64
+        executable: true
+      - source: files/clusterctl-providers.yaml
+        target: /tmp/krops-airgap/clusterctl-providers.yaml
+      # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-core
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.2/core-components.yaml
+        shasum: b2fff42cb5e35440ed963a463c5ab128004481b5a4336ea0005812be2ff7e2a8
+        target: /tmp/krops-airgap/capi/cluster-api/v1.14.2/core-components.yaml
+      # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-core
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.2/metadata.yaml
+        shasum: c470906f551ac3e3e9aedc9a3e733b5a5994428693df43e95f65ea67c035f9fe
+        target: /tmp/krops-airgap/capi/cluster-api/v1.14.2/metadata.yaml
+    actions:
+      onDeploy:
+        after:
+          - description: Render and apply the core CAPI provider
+            cmd: |
+              os=$(uname -s | tr '[:upper:]' '[:lower:]')
+              arch=$(uname -m)
+              case "$arch" in
+                arm64|aarch64) ;;
+                *)
+                  echo "ERROR: the capi-core air-gap component requires an arm64 deploy host; got $arch" >&2
+                  exit 1
+                  ;;
+              esac
+              clusterctl=/tmp/krops-airgap/bin/clusterctl-"$os"-arm64
+              [ -x "$clusterctl" ] || { echo "ERROR: bundled clusterctl is missing or not executable: $clusterctl" >&2; exit 1; }
+              rendered=/tmp/krops-airgap/capi/core.rendered.yaml
+              # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-core
+              "$clusterctl" generate provider --core cluster-api:v1.14.2 \
+                --config /tmp/krops-airgap/clusterctl-providers.yaml \
+                --write-to "$rendered" &&
+              sed -E 's/--feature-gates=.*/--feature-gates=ClusterTopology=true/' "$rendered" > "$rendered.patched" &&
+              mv "$rendered.patched" "$rendered" &&
+              kubectl apply -f "$rendered"
+            maxTotalSeconds: 120
     images:
       - registry.k8s.io/cluster-api/cluster-api-controller:v1.14.2@sha256:031f0d7cbef66b324ae247852adc9ae6f788cd499bd57fe38c581804147fb035
     healthChecks:
@@ -131,20 +177,73 @@ components:
         name: capi-controller-manager
         namespace: capi-system
 
-  # CAPI providers: bootstrap, control-plane, and CAPD infrastructure.
-  # Captured from the live cluster's capi-operator ConfigMaps.
+  # CAPI providers: bootstrap, control-plane, and CAPD infrastructure. Zarf
+  # fetches each v1.14.2 release asset (SHA-256 verified) and renders it with
+  # clusterctl during deploy, reusing the clusterctl binary and
+  # clusterctl-providers.yaml staged by the capi-core component above.
   - name: capi-providers
     required: true
-    manifests:
-      - name: kubeadm-bootstrap
-        files:
-          - manifests/bootstrap-kubeadm.components.yaml
-      - name: kubeadm-control-plane
-        files:
-          - manifests/control-plane-kubeadm.components.yaml
-      - name: capd
-        files:
-          - manifests/infrastructure-docker.components.yaml
+    files:
+      # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-bootstrap-kubeadm
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.2/bootstrap-components.yaml
+        shasum: 2a2d24f83244a6dae60e35d9e72e93c6ac3c209eedc467184737bb8eecfd63bb
+        target: /tmp/krops-airgap/capi/bootstrap-kubeadm/v1.14.2/bootstrap-components.yaml
+      # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-bootstrap-kubeadm
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.2/metadata.yaml
+        shasum: c470906f551ac3e3e9aedc9a3e733b5a5994428693df43e95f65ea67c035f9fe
+        target: /tmp/krops-airgap/capi/bootstrap-kubeadm/v1.14.2/metadata.yaml
+      # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-control-plane-kubeadm
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.2/control-plane-components.yaml
+        shasum: 7aa827b43eee898d8597bb39b7db5cf755c872c7a4da68b05cc3a9f35c459c93
+        target: /tmp/krops-airgap/capi/control-plane-kubeadm/v1.14.2/control-plane-components.yaml
+      # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-control-plane-kubeadm
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.2/metadata.yaml
+        shasum: c470906f551ac3e3e9aedc9a3e733b5a5994428693df43e95f65ea67c035f9fe
+        target: /tmp/krops-airgap/capi/control-plane-kubeadm/v1.14.2/metadata.yaml
+      # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-infrastructure-docker
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.2/infrastructure-components-development.yaml
+        shasum: f6aef43bf70b76a38b1628cd4349d291159fbfd8082dbe9c2ec13d04487b5867
+        target: /tmp/krops-airgap/capi/infrastructure-docker/v1.14.2/infrastructure-components-development.yaml
+      # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-infrastructure-docker
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.2/metadata.yaml
+        shasum: c470906f551ac3e3e9aedc9a3e733b5a5994428693df43e95f65ea67c035f9fe
+        target: /tmp/krops-airgap/capi/infrastructure-docker/v1.14.2/metadata.yaml
+    actions:
+      onDeploy:
+        after:
+          - description: Render and apply the kubeadm bootstrap, kubeadm control-plane, and CAPD providers
+            cmd: |
+              os=$(uname -s | tr '[:upper:]' '[:lower:]')
+              arch=$(uname -m)
+              case "$arch" in
+                arm64|aarch64) ;;
+                *)
+                  echo "ERROR: the capi-providers air-gap component requires an arm64 deploy host; got $arch" >&2
+                  exit 1
+                  ;;
+              esac
+              clusterctl=/tmp/krops-airgap/bin/clusterctl-"$os"-arm64
+              [ -x "$clusterctl" ] || { echo "ERROR: bundled clusterctl is missing or not executable: $clusterctl" >&2; exit 1; }
+              config=/tmp/krops-airgap/clusterctl-providers.yaml
+              patch_feature_gates() {
+                sed -E 's/--feature-gates=.*/--feature-gates=ClusterTopology=true/' "$1" > "$1.patched" && mv "$1.patched" "$1"
+              }
+              # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-bootstrap-kubeadm
+              "$clusterctl" generate provider --bootstrap kubeadm:v1.14.2 \
+                --config "$config" --write-to /tmp/krops-airgap/capi/bootstrap.rendered.yaml &&
+              patch_feature_gates /tmp/krops-airgap/capi/bootstrap.rendered.yaml &&
+              kubectl apply -f /tmp/krops-airgap/capi/bootstrap.rendered.yaml &&
+              # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-control-plane-kubeadm
+              "$clusterctl" generate provider --control-plane kubeadm:v1.14.2 \
+                --config "$config" --write-to /tmp/krops-airgap/capi/control-plane.rendered.yaml &&
+              patch_feature_gates /tmp/krops-airgap/capi/control-plane.rendered.yaml &&
+              kubectl apply -f /tmp/krops-airgap/capi/control-plane.rendered.yaml &&
+              # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-infrastructure-docker
+              "$clusterctl" generate provider --infrastructure docker:v1.14.2 \
+                --config "$config" --write-to /tmp/krops-airgap/capi/infrastructure.rendered.yaml &&
+              patch_feature_gates /tmp/krops-airgap/capi/infrastructure.rendered.yaml &&
+              kubectl apply -f /tmp/krops-airgap/capi/infrastructure.rendered.yaml
+            maxTotalSeconds: 180
     images:
       - registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.14.2@sha256:31adb8a779173e6d106757b509b142549caddcc248fccc65b774b11d3a6f4c02
       - registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.14.2@sha256:fb991a63cbe3e534f3bbec993009abf45c6d076e9b36366d073155aec3adade3
@@ -163,6 +262,8 @@ components:
         name: capd-controller-manager
         namespace: capd-system
 
+  # CAAPH provider. Reuses the clusterctl binary and clusterctl-providers.yaml
+  # staged by the capi-core component above (this component runs after it).
   - name: caaph
     required: true
     actions:
@@ -183,7 +284,7 @@ components:
               [ -x "$clusterctl" ] || { echo "ERROR: bundled clusterctl is missing or not executable: $clusterctl" >&2; exit 1; }
               # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-addon-provider-helm
               "$clusterctl" generate provider --addon helm:v0.6.4 \
-                --config /tmp/krops-airgap/caaph/clusterctl.yaml \
+                --config /tmp/krops-airgap/clusterctl-providers.yaml \
                 --write-to /tmp/krops-airgap/caaph/addon-components.rendered.yaml &&
               kubectl apply -f /tmp/krops-airgap/caaph/addon-components.rendered.yaml
             maxTotalSeconds: 120
@@ -196,18 +297,6 @@ components:
       - source: https://github.com/kubernetes-sigs/cluster-api-addon-provider-helm/releases/download/v0.6.4/metadata.yaml
         shasum: d50a44ee0db2f0368699d15ff011b9b5a61d9969483de1c4f6e4e6046390530f
         target: /tmp/krops-airgap/caaph/addon-helm/v0.6.4/metadata.yaml
-      - source: files/clusterctl-caaph.yaml
-        target: /tmp/krops-airgap/caaph/clusterctl.yaml
-      # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api
-      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.1/clusterctl-darwin-arm64
-        shasum: bce7a27ee9dd3f3cbdd3b463203a706ec31ea6ee98926045fbd9dfbe9c020f4b
-        target: /tmp/krops-airgap/bin/clusterctl-darwin-arm64
-        executable: true
-      # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api
-      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.1/clusterctl-linux-arm64
-        shasum: 16ec2d3ab39338e94dfa9ddb070c4f37073683db517fa6052ffc38d6702d7d8b
-        target: /tmp/krops-airgap/bin/clusterctl-linux-arm64
-        executable: true
     images:
       - registry.k8s.io/cluster-api-helm/cluster-api-helm-controller:v0.6.4@sha256:97d2a86f8e35d23bb4656b26f4564b35f109e47a0dc4860b71089e52eb6e6a24
     healthChecks:

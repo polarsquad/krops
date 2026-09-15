@@ -220,13 +220,20 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
 
 ## Empirical findings (why the package looks the way it does)
 
-1. **CAPI provider components are clusterctl templates.** The
-   capi-operator substitutes `${VAR:=default}` placeholders and applies the
-   provider-spec `--feature-gates=ClusterTopology=true` arg override at
-   install. In the gap we are the operator, so
-   `scripts/substitute-components.sh` performs both steps up front. CAAPH is
-   fetched by Zarf from pinned `v0.6.4` release assets, verified against their
-   SHA-256 checksums, then rendered by `clusterctl` during offline deployment.
+1. **CAPI provider components are clusterctl templates.** The capi-operator
+   substitutes `${VAR:=default}` placeholders and applies the provider-spec
+   `--feature-gates=ClusterTopology=true` arg override at install. In the gap
+   we are the operator: all five providers (core, kubeadm bootstrap, kubeadm
+   control-plane, CAPD, CAAPH) are fetched by Zarf from pinned upstream
+   release assets, verified against their SHA-256 checksums, then rendered by
+   `clusterctl` during offline deployment — `clusterctl generate provider`
+   resolves the `${VAR:=default}` placeholders natively, and a `sed` step in
+   each Zarf action applies the `ClusterTopology=true` override afterward.
+   This replaced committed, static component snapshots (and the
+   `scripts/substitute-components.sh` helper that patched them), which had no
+   mechanism keeping them in sync with the digest pins Renovate manages in
+   `zarf.yaml` — see issue #80's investigation for how that drifted a whole
+   CAPI minor version out of sync undetected.
 2. **`spec.distribution.artifact` must be omitted** from the FluxInstance.
    The operator fetches it at every reconcile and its fetcher has no
    insecure-registry option (verified: "http: server gave HTTP response to

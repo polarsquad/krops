@@ -24,7 +24,10 @@ Renovate discovers and updates versions in:
 - `bootstrap.toml`: the Flux Operator, cert-manager, and CAPI Operator chart
   pins consumed by `krops-bootstrap`. One annotation-driven custom manager reads
   the adjacent `# renovate:` metadata. `mise run validate` cross-checks these
-  pins against their declarative Helm releases and proxies.
+  pins against their declarative Helm releases and proxies. cert-manager's
+  pin, its `pivot.sh`/HelmRelease counterparts, its `airgap/zarf.yaml` chart
+  pin, and its four `airgap/images.txt`/`airgap/zarf.yaml` image tags all
+  share the `platform-charts` group so they can't drift apart (issue #322).
 - `bootstrap-rs/Dockerfile`: digest-pinned build and runtime base images, the
   mise CLI and Podman remote-client build arguments used by the toolbox, and
   the inline `uv@` pin in the mise install layer (issue #307): it must move in
@@ -36,7 +39,9 @@ Renovate discovers and updates versions in:
 - `kindest/node` image tags wherever they are referenced in management
   manifests and air-gap scripts.
 - `airgap/images.txt` and `airgap/zarf.yaml`: container image references,
-  pinned by digest.
+  pinned by digest. `airgap/zarf.yaml` also embeds its own Helm chart-version
+  pins (e.g. cert-manager's); the cert-manager one is annotation-driven like
+  `bootstrap.toml`'s, so it isn't just carried along by the image-ref manager.
 - `.github/workflows/`: GitHub Actions references and the Renovate CLI pin used
   by the digest and managed-pin coverage tests.
 - `pivot.sh`: imperative cert-manager and CAPI Operator chart pins, retained
@@ -70,6 +75,25 @@ matched by exact depName, not by registry host, and stay in the separate
 `cluster-api` group. The kind CLI and Talos's own `talosVersion`
 machine-config contract version each follow their own release cadence and
 are intentionally excluded from this group.
+
+cert-manager's Helm chart version and its container image tags used to be
+tracked as separate, ungrouped dependencies. Four separate Renovate PRs
+(#281-#284) bumped only the image tags in `airgap/images.txt` and
+`airgap/zarf.yaml` to v1.21.2, while nothing bumped any chart-version pin,
+still at 1.21.1. Since `values/cert-manager.yaml` has no image-tag override,
+the chart deployed pods expecting v1.21.1 images by default, but Zarf had
+only mirrored v1.21.2, so every cert-manager pod sat in `ImagePullBackOff`
+and Helm's install wait ran out its 15-minute timeout (issue #322) --
+initially misdiagnosed as a Kubernetes-version incompatibility and reported
+as such upstream before being retracted
+([cert-manager/cert-manager#9123](https://github.com/cert-manager/cert-manager/issues/9123)).
+The `platform-charts` group now covers cert-manager's chart pin and its
+image tags together, same as the `kubernetes-version` group (#142) does for
+Kubernetes; `airgap/zarf.yaml`'s own chart-version line was not tracked by
+any manager at all before this (confirmed with a real `renovate
+--dry-run=full` run, which returned zero dependencies for that line), so an
+annotation-driven custom manager was added for it, mirroring
+`bootstrap.toml`'s pattern.
 
 ## Toolbox release version
 

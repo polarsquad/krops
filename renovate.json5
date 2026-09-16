@@ -435,6 +435,15 @@
     },
     {
       "customType": "regex",
+      "description": "zarf.yaml embedded Helm chart version pins (annotation-driven, mirrors bootstrap.toml). See docs/dependencies.md#managed-surfaces for why this exists.",
+      "managerFilePatterns": ["/(^|/)airgap/zarf\\.yaml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z0-9-]+)(?: registryUrl=(?<registryUrl>\\S+))? depName=(?<depName>\\S+)\\n\\s+version: v(?<currentValue>[^\\s]+)"
+      ],
+      "autoReplaceStringTemplate": "# renovate: datasource={{{datasource}}}{{#if registryUrl}} registryUrl={{{registryUrl}}}{{/if}} depName={{{depName}}}\n        version: v{{{newValue}}}"
+    },
+    {
+      "customType": "regex",
       "description": "zarf.yaml image refs (registry with optional port)",
       "managerFilePatterns": ["/(^|/)airgap/zarf\\.yaml$/"],
       "matchStrings": [
@@ -747,6 +756,18 @@
         "registry.k8s.io/pause"
       ],
       "groupName": "kubernetes-version"
+    },
+    {
+      "description": "Group cert-manager's images.txt/zarf.yaml image tags with its Helm chart pin. See docs/dependencies.md#managed-surfaces for what this covers and why.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": [
+        "quay.io/jetstack/cert-manager-controller",
+        "quay.io/jetstack/cert-manager-cainjector",
+        "quay.io/jetstack/cert-manager-webhook",
+        "quay.io/jetstack/cert-manager-startupapicheck"
+      ],
+      "matchFileNames": ["airgap/images.txt", "airgap/zarf.yaml"],
+      "groupName": "platform-charts"
     },
     // flux2, sops, age, and aws-cli were previously floating "latest" pins;
     // they are now pinned to concrete versions in mise.toml / mise.aws.toml

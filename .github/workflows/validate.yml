@@ -82,6 +82,9 @@ jobs:
       - name: Verify Kubernetes version pins share one group
         run: python3 tests/test-renovate-kubernetes-version-grouping.py
 
+      - name: Verify cert-manager's chart and images.txt image tags group together (#322)
+        run: python3 tests/test-renovate-cert-manager-grouping.py
+
       - name: Verify airgap digest pinning
         env:
           RENOVATE_GITHUB_COM_TOKEN: ${{ github.token }}

@@ -733,10 +733,20 @@
       "groupName": "platform-charts"
     },
     {
-      "description": "Kubernetes node/cluster versions stay independent of each other",
-      "matchDepNames": ["kindest/node"],
-      "separateMajorMinor": true,
-      "groupName": null
+      // See docs/dependencies.md#managed-surfaces for what this covers and why.
+      "description": "Group all Kubernetes-release-version pins into one PR",
+      "matchDepNames": [
+        "kindest/node",
+        "kubernetes/kubernetes",
+        "registry.k8s.io/kube-apiserver",
+        "registry.k8s.io/kube-controller-manager",
+        "registry.k8s.io/kube-proxy",
+        "registry.k8s.io/kube-scheduler",
+        "registry.k8s.io/coredns/coredns",
+        "registry.k8s.io/etcd",
+        "registry.k8s.io/pause"
+      ],
+      "groupName": "kubernetes-version"
     },
     // flux2, sops, age, and aws-cli were previously floating "latest" pins;
     // they are now pinned to concrete versions in mise.toml / mise.aws.toml

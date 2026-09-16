@@ -77,6 +77,9 @@ jobs:
       - name: Verify only actions join the GitHub Actions group
         run: python3 tests/test-renovate-actions-grouping.py
 
+      - name: Verify Kubernetes version pins share one group
+        run: python3 tests/test-renovate-kubernetes-version-grouping.py
+
       - name: Verify airgap digest pinning
         env:
           RENOVATE_GITHUB_COM_TOKEN: ${{ github.token }}

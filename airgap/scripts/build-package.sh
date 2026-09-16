@@ -78,16 +78,16 @@ mv "${init_outputs[0]}" airgap/archives/zarf-init-arm64.tar.zst
 rm -rf "$INIT_STAGING"
 
 HOST_IMAGES=(
-  kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
-  kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+  kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
+  kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
   kindest/haproxy:v20230606-42a2262b@sha256:001a06433666046dea44567c7d7c6adfc2ac0edb556576f6da507ff0b0f063d3
   docker.io/library/registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
 )
 for img in "${HOST_IMAGES[@]}"; do
   docker pull --platform linux/arm64 "$img" >/dev/null
 done
-docker save -o airgap/archives/kindest_node_v1.37.0_mgmt.tar kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
-docker save -o airgap/archives/kindest_node_v1.37.0.tar kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+docker save -o airgap/archives/kindest_node_v1.36.4_mgmt.tar kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
+docker save -o airgap/archives/kindest_node_v1.36.4.tar kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
 docker save -o airgap/archives/kindest_haproxy_v20230606-42a2262b.tar kindest/haproxy:v20230606-42a2262b@sha256:001a06433666046dea44567c7d7c6adfc2ac0edb556576f6da507ff0b0f063d3
 docker save -o airgap/archives/docker.io_library_registry_2.tar docker.io/library/registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
 echo "    saved Zarf init package and host-daemon image archives"

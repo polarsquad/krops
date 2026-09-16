@@ -139,6 +139,31 @@ if ( cd "$AIRGAP_DIR" && "$ZARF" package deploy "$PACKAGE" --confirm ); then
   pass "zarf package deploy"
 else
   fail "zarf package deploy"
+  # Zarf's Helm --wait blocks for the whole timeout with no progress output,
+  # so a failure here gives no clue what actually got stuck. The cluster and
+  # its pods are still up on this runner right after zarf gives up, so
+  # capture their state before the job ends (issue #322: cert-manager's
+  # install has hung at exactly this step even on a Kubernetes version
+  # inside its documented support window, cause still unknown).
+  {
+    echo "===== cert-manager namespace: pods ====="
+    "$KUBECTL" --context "$MGMT_CTX" get pods -n cert-manager -o wide
+    echo
+    echo "===== cert-manager namespace: describe pods ====="
+    "$KUBECTL" --context "$MGMT_CTX" describe pods -n cert-manager
+    echo
+    echo "===== cert-manager namespace: pod logs ====="
+    for pod in $("$KUBECTL" --context "$MGMT_CTX" get pods -n cert-manager -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+      echo "--- $pod ---"
+      "$KUBECTL" --context "$MGMT_CTX" logs -n cert-manager "$pod" --all-containers --tail=200
+    done
+    echo
+    echo "===== cluster-wide events (by time) ====="
+    "$KUBECTL" --context "$MGMT_CTX" get events -A --sort-by=.lastTimestamp
+    echo
+    echo "===== node status/capacity ====="
+    "$KUBECTL" --context "$MGMT_CTX" describe nodes
+  } > /tmp/airgap-cert-manager-debug.txt 2>&1
   exit 1
 fi
 

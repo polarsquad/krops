@@ -32,6 +32,8 @@ jobs:
         run: python3 airgap/tests/test-airgap-verify-identity.py
       - name: Verify the shared clusterctl-resolution script
         run: python3 airgap/tests/test-resolve-clusterctl.py
+      - name: Verify cert-manager debug capture on deploy failure (#329)
+        run: python3 airgap/tests/test-airgap-debug-capture.py
 
   zarf-mise-pin:
     name: Zarf mise asset pin

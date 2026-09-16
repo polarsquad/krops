@@ -270,6 +270,13 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
 6. **Workload-node k8s images are pre-baked** into `kindest/node` (verified:
    136 content blobs), so CAPD nodes come up offline with no pulls. Only the
    workload Flux controllers and podinfo need `preLoadImages`.
+7. **`zarf package deploy`'s Helm `--wait` prints no progress**, so a hang
+   inside it (issue #322: cert-manager's install ran out its 15-minute
+   timeout) gives no clue what got stuck by itself. `offline-run.sh` dumps
+   cert-manager's pods, pod descriptions, pod logs, cluster-wide events, and
+   node status to `/tmp/airgap-cert-manager-debug.txt` when that step fails,
+   while the kind cluster is still up on the runner, uploaded alongside the
+   deployment evidence.
 
 ## Known limitations / follow-ups
 

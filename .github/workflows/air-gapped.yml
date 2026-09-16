@@ -179,6 +179,7 @@ jobs:
             /tmp/airgap-sbom.*
             /tmp/airgap-public-egress.pcap
             /tmp/airgap-public-egress.txt
+            /tmp/airgap-cert-manager-debug.txt
           if-no-files-found: warn
           retention-days: 1
 

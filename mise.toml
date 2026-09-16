@@ -73,6 +73,11 @@ if ! python3 airgap/tests/test-resolve-clusterctl.py; then
   echo "    FAILED: shared clusterctl-resolution script" >&2
   fail=1
 fi
+echo "==> cert-manager debug capture on deploy failure"
+if ! python3 airgap/tests/test-airgap-debug-capture.py; then
+  echo "    FAILED: cert-manager debug capture on deploy failure" >&2
+  fail=1
+fi
 echo "==> bootstrap.toml cross-check"
 if ! python3 tests/test-bootstrap-config.py; then
   echo "    FAILED: bootstrap.toml cross-check" >&2

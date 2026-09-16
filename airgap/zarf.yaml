@@ -35,7 +35,7 @@ components:
       - name: cert-manager
         namespace: cert-manager
         url: https://charts.jetstack.io
-        version: v1.21.1
+        version: v1.21.2
         valuesFiles:
           - values/cert-manager.yaml
     images:

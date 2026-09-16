@@ -101,6 +101,13 @@ arguments. Renovate manages those base references and build arguments.
    same `kindest/node` version. The check compares against `kubeadm config
    images list` for that version, not a live `crictl` harvest against a
    running node -- worth re-confirming there once an operator has one.
+   Also (#322) that cert-manager's chart
+   version (`bootstrap.toml`) matches `pivot.sh`, `airgap/zarf.yaml`'s
+   embedded chart version, and the cert-manager image tags in
+   `airgap/images.txt`/`airgap/zarf.yaml`
+   (`tests/test-cert-manager-version-consistency.py`) -- catches the same
+   drift the `platform-charts` Renovate group prevents, regardless of how it
+   happens.
 3. For toolbox inputs, also require the `bootstrap-rs` workflow's Rust checks
    and container build/smoke job.
 4. For a `kubernetes-version` PR, re-harvest the images kubeadm deploys for

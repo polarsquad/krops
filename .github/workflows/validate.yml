@@ -100,6 +100,9 @@ jobs:
       - name: bootstrap.toml cross-check
         run: python3 tests/test-bootstrap-config.py
 
+      - name: cert-manager version consistency (#322)
+        run: python3 tests/test-cert-manager-version-consistency.py
+
       # uv run resolves pyyaml from pyproject.toml/uv.lock, the same environment
       # mise run validate uses for this cross-check.
       - name: Azure identity chain cross-check

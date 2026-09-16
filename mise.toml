@@ -69,6 +69,11 @@ if ! python3 tests/test-bootstrap-config.py; then
   echo "    FAILED: bootstrap.toml cross-check" >&2
   fail=1
 fi
+echo "==> cert-manager version consistency"
+if ! python3 tests/test-cert-manager-version-consistency.py; then
+  echo "    FAILED: cert-manager version consistency" >&2
+  fail=1
+fi
 echo "==> azure identity chain"
 if ! uv run python tests/test-azure-identity-chain.py; then
   echo "    FAILED: azure identity chain" >&2

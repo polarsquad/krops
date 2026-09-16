@@ -24,6 +24,8 @@ jobs:
         run: python3 airgap/tests/test-airgap-ownership.py
       - name: Verify digest token boundary (reject overlong)
         run: python3 airgap/tests/test-digest-regex.py
+      - name: Verify failure-notification job wiring (#321)
+        run: python3 airgap/tests/test-airgap-failure-notification.py
 
   kustomize-build:
     name: Build kustomize overlays

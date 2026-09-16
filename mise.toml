@@ -54,6 +54,11 @@ if ! python3 airgap/tests/test-digest-regex.py; then
   echo "    FAILED: air-gap digest token boundary" >&2
   fail=1
 fi
+echo "==> failure-notification job wiring"
+if ! python3 airgap/tests/test-airgap-failure-notification.py; then
+  echo "    FAILED: failure-notification job wiring" >&2
+  fail=1
+fi
 echo "==> bootstrap.toml cross-check"
 if ! python3 tests/test-bootstrap-config.py; then
   echo "    FAILED: bootstrap.toml cross-check" >&2

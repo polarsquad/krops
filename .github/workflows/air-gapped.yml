@@ -269,3 +269,45 @@ jobs:
             /tmp/airgap-public-egress.txt
           if-no-files-found: warn
           retention-days: 1
+
+  notify-on-failure:
+    name: File/update failure issue
+    needs: [build, isolated-deploy, monitored-deploy]
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the air-gapped failure issue
+        uses: actions/github-script@v9.0.0
+        with:
+          script: |
+            const title = "air-gapped: scheduled workflow is failing";
+            const labels = ["bug", "area:airgap", "area:ci", "priority:high"];
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `Scheduled run failed: ${runUrl}\n\nTriggered ${context.eventName} at ${new Date().toISOString()}.`;
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: labels.join(","),
+            });
+            const existing = issues.find((issue) => issue.title === title);
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels,
+              });
+            }

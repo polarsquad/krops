@@ -20,9 +20,12 @@ that reconciles GCP resources from `workload/gcp-base/` (PR 2).
 
 - A GCP project with a billing account where you hold Owner (needed once,
   for `gcp-bootstrap`).
-- `mise -E gcp install` (adds `gcloud` 585.0.0, which bundles
-  `gke-gcloud-auth-plugin`), a GitHub PAT and an age key as for `aws`
-  (`.env`, see [operations.md](./operations.md)), and `GCP_PROJECT` set.
+- `mise -E gcp install` (adds `gcloud` 585.0.0), then
+  `gcloud components install gke-gcloud-auth-plugin` once (it is not in the
+  SDK tarball; the toolbox image runs this in its build, so `wif-federate`
+  and the GKE kubeconfig already have it), plus a GitHub PAT and an age key
+  as for `aws` (`.env`, see [operations.md](./operations.md)), and
+  `GCP_PROJECT` set.
 - `gcloud auth login` (browser or
   `gcloud auth login --no-launch-browser`); the session is shared with the
   toolbox through the gitignored `.gcloud/` directory (`CLOUDSDK_CONFIG`).

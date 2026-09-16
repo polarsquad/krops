@@ -4,6 +4,10 @@
 # (Flux postBuild.substituteFrom), the azure-vars counterpart. Lives in
 # flux-system because a Kustomization can only substitute from ConfigMaps in
 # its own namespace. Values come from `mise -E gcp run gcp-bootstrap`.
+# GCP_PROJECT / GCP_PROJECT_NUMBER are also set in
+# mgmt/gcp/addons/flux-apps/flux-instance.yaml (cluster-vars); after
+# gcp-bootstrap runs, update both files together (docs/gcp.md, "Commit the
+# identifiers").
 # GCP_WIF_PROVIDER is NOT set here: it defaults to `mgmt` in the manifests
 # (${GCP_WIF_PROVIDER:=mgmt}); the kind bootstrap cluster overrides it to
 # `kind` through the gcp-wif ConfigMap the wif-federate task creates.

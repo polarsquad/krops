@@ -7,6 +7,9 @@
 #   GCP_* IDs come from `mise -E gcp run gcp-bootstrap`; CLUSTER_NAME and
 #   GCP_NETWORK are literals (the VPC CAPG creates, the bucket/SQL/PSA
 #   resource names are derived from these in workload/gcp-base/).
+#   GCP_PROJECT / GCP_PROJECT_NUMBER are also in
+#   mgmt/gcp/infrastructure/gcp-vars/gcp-vars.yaml; after gcp-bootstrap runs,
+#   update both files together (docs/gcp.md, "Commit the identifiers").
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: v1
 kind: ConfigMap

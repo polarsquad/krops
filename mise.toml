@@ -64,6 +64,11 @@ if ! python3 airgap/tests/test-airgap-failure-notification.py; then
   echo "    FAILED: failure-notification job wiring" >&2
   fail=1
 fi
+echo "==> branch-dispatch signature identity wiring"
+if ! python3 airgap/tests/test-airgap-verify-identity.py; then
+  echo "    FAILED: branch-dispatch signature identity wiring" >&2
+  fail=1
+fi
 echo "==> bootstrap.toml cross-check"
 if ! python3 tests/test-bootstrap-config.py; then
   echo "    FAILED: bootstrap.toml cross-check" >&2

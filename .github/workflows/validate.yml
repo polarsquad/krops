@@ -28,6 +28,8 @@ jobs:
         run: python3 airgap/tests/test-airgap-failure-notification.py
       - name: Verify images.txt k8s component pins match kubeadm (#142)
         run: python3 airgap/tests/test-airgap-kubeadm-images.py
+      - name: Verify branch-dispatch signature identity wiring (#328)
+        run: python3 airgap/tests/test-airgap-verify-identity.py
 
   kustomize-build:
     name: Build kustomize overlays

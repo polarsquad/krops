@@ -21,7 +21,8 @@ jobs:
       id-token: write
     if: >-
       github.event.repository.fork == false &&
-      github.ref_name == github.event.repository.default_branch
+      (github.ref_name == github.event.repository.default_branch ||
+       github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 15
     services:
@@ -90,6 +91,7 @@ jobs:
       - name: Deploy with external egress blocked
         env:
           SKIP_OFFLINE_CHECK: "1"
+          AIRGAP_VERIFY_REF: ${{ github.ref }}
         run: |
           set -uo pipefail
 
@@ -205,6 +207,7 @@ jobs:
       - name: Deploy and monitor public traffic
         env:
           SKIP_OFFLINE_CHECK: "1"
+          AIRGAP_VERIFY_REF: ${{ github.ref }}
         run: |
           set -uo pipefail
 

@@ -28,3 +28,6 @@ __pycache__/
 build/
 .venv/
 .pytest_cache/
+
+# Personal Claude Code overrides (permissions, etc.), not team-shared config
+.claude/settings.local.json

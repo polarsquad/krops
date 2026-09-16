@@ -77,7 +77,7 @@ if ! gcloud auth print-access-token >/dev/null 2>&1; then
   gcloud auth login --no-launch-browser --quiet
 fi
 PROJECT_NUMBER=$(gcloud projects describe "$GCP_PROJECT" --format='value(projectNumber)')
-ISSUER=$(kubectl get --raw /.well-known/openid-configuration | sed -n 's/.*"issuer":"\\([^"]*\\)".*/\\1/p')
+ISSUER=$(kubectl get --raw /.well-known/openid-configuration | sed -n 's/.*"issuer":"\([^"]*\)".*/\1/p')
 : "${ISSUER:?could not read the kind issuer}"
 JWKS=$(mktemp); trap 'rm -f "$JWKS"' EXIT
 kubectl get --raw /openid/v1/jwks > "$JWKS"
@@ -109,7 +109,7 @@ description = "Export the GKE workload-cluster user kubeconfig (clusterctl 1.14 
 run = '''
 KUBECONFIG_FILE="${KUBECONFIG_FILE:-$HOME/.kube/krops-workloads.yaml}"
 fail=0
-for region in $(find mgmt/gcp/clusters -mindepth 1 -maxdepth 1 -type d -exec basename {} \\; | sort); do
+for region in $(find mgmt/gcp/clusters -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort); do
   cluster="${region}-workload"
   echo "==> ${cluster}"
   for secret in "${cluster}-user-kubeconfig" "${cluster}-kubeconfig"; do

@@ -188,15 +188,6 @@
     },
     {
       "customType": "regex",
-      "description": "toolbox image: inline uv pin in the mise install layer (issue #307); must move in lockstep with the mise.toml pin for azure-cli's pipx backend to resolve during the image build. No extractVersionTemplate: uv tags carry no v prefix, same as the mise.toml uv manager.",
-      "managerFilePatterns": ["bootstrap-rs/Dockerfile"],
-      "matchStrings": ["mise install -y python@(?<pythonPin>[0-9][^ \\n\\\\]+) uv@(?<currentValue>[0-9][^ \\n\\\\]+)"],
-      "depNameTemplate": "astral-sh/uv",
-      "datasourceTemplate": "github-releases",
-      "autoReplaceStringTemplate": "mise install -y python@{{{pythonPin}}} uv@{{newValue}}"
-    },
-    {
-      "customType": "regex",
       "description": "mise: aws-cli pin (floating latest tag)",
       "managerFilePatterns": ["/(^|/)mise\\.aws\\.toml$/"],
       "matchStrings": ["aws-cli = \"(?<currentValue>[^\"]+)\""],

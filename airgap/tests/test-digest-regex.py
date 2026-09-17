@@ -12,7 +12,7 @@ def run_gate(root: Path) -> subprocess.CompletedProcess:
     (root / "airgap/tests").mkdir(parents=True, exist_ok=True)
     shutil.copy(GATE, root / "airgap/tests/test-airgap-image-digests.py")
     return subprocess.run([sys.executable, str(root / "airgap/tests/test-airgap-image-digests.py"), "--all"],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, check=False)
 
 def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:

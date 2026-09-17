@@ -40,6 +40,7 @@ def main() -> int:
         subprocess.run(
             ["bash", str(wrapper), "bootstrap", "local-host"],
             env=env, cwd=fake_repo, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            check=False,
         )
         if not argv_log.exists():
             print("docker was never invoked", file=sys.stderr); return 1

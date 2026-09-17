@@ -263,6 +263,13 @@ Run locally with Renovate on PATH and Node >= 24.11. These tests
 do not cover lookup liveness or the replacement path; only the
 dry-run and the handlebars simulation cover those.
 
+The digest-pinning, coverage, and release-assets tests all run sequentially
+in the same CI job and their fixtures overlap on `airgap/zarf.yaml`'s
+`kubernetes-sigs/cluster-api*` depNames, so the harness points every run at
+a shared `RENOVATE_CACHE_DIR` (defaulting to a fixed path under the OS temp
+dir): repeat datasource lookups hit Renovate's on-disk cache instead of the
+GitHub API again.
+
 The offline `airgap/tests/test-airgap-image-digests.py` gate is separate from
 Renovate: it scans air-gap inventories and scripts changed by the PR, requires
 readable tags plus SHA-256 digests, and rejects inconsistent repeated

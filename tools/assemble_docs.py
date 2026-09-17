@@ -3,7 +3,8 @@
 
 Content is never edited here; only repository-relative links are rewritten so
 that the rendered site resolves them (sibling pages) or sends the reader to
-GitHub (files that are not part of the documentation).
+GitHub (files that are not part of the documentation). Architecture diagram
+images additionally become hyperlinks to their raw .svg files on GitHub.
 """
 
 from __future__ import annotations
@@ -28,6 +29,28 @@ def github_url(repo_path: str) -> str:
     return f"{GITHUB}/{kind}/main/{repo_path.strip('/')}"
 
 
+def raw_github_url(repo_path: str) -> str:
+    """URL of a raw file (e.g. an SVG) on GitHub, as served by raw.githubusercontent.com."""
+    return f"{GITHUB}/raw/main/{repo_path.strip('/')}"
+
+
+def _link_diagram_images(text: str) -> str:
+    """Wrap every diagram image in a hyperlink to its raw .svg file on GitHub.
+
+    The target is site-relative at this point (the assembler places every
+    docs/ file at the docs root), so the repo path is docs/<target>.
+    """
+
+    def sub(match: re.Match[str]) -> str:
+        alt, target = match.groups()
+        if _is_external(target):
+            return match.group(0)
+        repo_path = target if target.startswith("docs/") else f"docs/{target}"
+        return f"[![{alt}]({target})]({raw_github_url(repo_path)})"
+
+    return re.sub(r"!\[([^\]]*)\]\(([^)\s]*-infra\.svg)\)", sub, text)
+
+
 def rewrite_readme_links(text: str) -> str:
     """README.md becomes index.md at the docs root, so docs/x -> x; other repo files -> GitHub."""
 
@@ -39,7 +62,7 @@ def rewrite_readme_links(text: str) -> str:
             return f"{pre}{target[len('docs/'):]}{post}"
         return f"{pre}{github_url(target)}{post}"
 
-    return LINK_RE.sub(sub, text)
+    return _link_diagram_images(LINK_RE.sub(sub, text))
 
 
 def rewrite_doc_links(text: str) -> str:
@@ -51,7 +74,7 @@ def rewrite_doc_links(text: str) -> str:
             return match.group(0)
         return f"{pre}{github_url(target[len('../'):])}{post}"
 
-    return LINK_RE.sub(sub, text)
+    return _link_diagram_images(LINK_RE.sub(sub, text))
 
 
 ROOT = Path(__file__).resolve().parent.parent

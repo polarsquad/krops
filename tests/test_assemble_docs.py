@@ -3,6 +3,10 @@ from assemble_docs import assemble, rewrite_doc_links, rewrite_readme_links
 GH = "https://github.com/polarsquad/krops"
 
 
+def raw(name: str) -> str:
+    return f"{GH}/raw/main/docs/{name}.svg"
+
+
 def test_readme_docs_links_become_site_relative():
     assert rewrite_readme_links("[a](docs/architecture.md)") == "[a](architecture.md)"
 
@@ -14,10 +18,14 @@ def test_readme_docs_links_keep_anchors():
     )
 
 
-def test_readme_image_links_become_site_relative():
-    assert rewrite_readme_links("![l](docs/aws-infra.svg)") == "![l](aws-infra.svg)"
-    assert rewrite_readme_links("![l](docs/azure-infra.svg)") == "![l](azure-infra.svg)"
-    assert rewrite_readme_links("![l](docs/local-talos-infra.svg)") == "![l](local-talos-infra.svg)"
+def test_readme_diagram_images_become_raw_links():
+    for name in ("aws-infra", "azure-infra", "local-talos-infra"):
+        assert (
+            rewrite_readme_links(f"![l](docs/{name}.svg)")
+            == f"![l]({name}.svg)".join(
+                ["[", f"]({raw(name)})"]
+            )
+        )
 
 
 def test_readme_root_file_links_point_at_github():
@@ -40,14 +48,27 @@ def test_doc_parent_directory_links_point_at_github_tree():
 
 
 def test_doc_sibling_links_untouched():
-    text = "[o](./operations.md#pivot-recovery) [s](secrets.md) ![d](air-gap-infra.svg) [x](#write-back)"
+    text = "[o](./operations.md#pivot-recovery) [s](secrets.md) [x](#write-back)"
     assert rewrite_doc_links(text) == text
+
+
+def test_doc_diagram_images_become_raw_links():
+    assert (
+        rewrite_doc_links("![d](air-gap-infra.svg)")
+        == "![d](air-gap-infra.svg)".join(["[", f"]({raw('air-gap-infra')})"])
+    )
+
+
+def test_doc_plain_svg_images_untouched():
+    assert rewrite_doc_links("![logo](krops-logo.svg)") == "![logo](krops-logo.svg)"
 
 
 def test_assemble_builds_docs_dir(tmp_path):
     krops = tmp_path / "krops"
     (krops / "docs").mkdir(parents=True)
-    (krops / "README.md").write_text("# krops\n[arch](docs/architecture.md) [l](LICENSE)\n")
+    (krops / "README.md").write_text(
+        "# krops\n[arch](docs/architecture.md) [l](LICENSE)\n![arch-img](docs/aws-infra.svg)\n"
+    )
     (krops / "docs" / "architecture.md").write_text("# Architecture\n[b](../bootstrap.toml)\n")
     (krops / "docs" / "aws-infra.svg").write_text("<svg/>")
     (krops / "docs" / "scratch.png").write_bytes(b"\x89PNG")
@@ -59,7 +80,11 @@ def test_assemble_builds_docs_dir(tmp_path):
 
     assemble(krops=krops, src=src, out=out)
 
-    assert (out / "index.md").read_text() == f"# krops\n[arch](architecture.md) [l]({GH}/blob/main/LICENSE)\n"
+    assert (
+        (out / "index.md").read_text()
+        == f"# krops\n[arch](architecture.md) [l]({GH}/blob/main/LICENSE)\n"
+        f"[![arch-img](aws-infra.svg)]({raw('aws-infra')})\n"
+    )
     assert (out / "architecture.md").read_text() == f"# Architecture\n[b]({GH}/blob/main/bootstrap.toml)\n"
     assert (out / "aws-infra.svg").read_text() == "<svg/>"
     assert (out / "assets" / "css" / "krops.css").exists()

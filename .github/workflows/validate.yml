@@ -59,6 +59,16 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: python3 tests/test-cert-manager-kubernetes-support.py --changed-from "$BASE_SHA"
 
+  airgap-image-existence:
+    name: Air-gap image existence
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Verify every pinned digest is pullable
+        run: python3 airgap/tests/test-airgap-image-existence.py
+
   kustomize-build:
     name: Build kustomize overlays
     runs-on: ubuntu-latest

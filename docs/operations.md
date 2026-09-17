@@ -77,8 +77,12 @@ CONTAINER_ENGINE=podman TOOLBOX_IMAGE="$TOOLBOX_IMAGE" \
 ```
 
 The same wrapper powers `mise run bootstrap`, `mise run pivot`, and
-`mise run teardown`. It detects the engine, loads every `.env` assignment with
-outer quote stripping, and passes only this allowlist into the container:
+`mise run teardown`. It loads every `.env` assignment with outer quote
+stripping before detecting the engine or resolving a socket for it, so a
+`.env`-selected `CONTAINER_ENGINE` takes effect from the start (issue #257).
+An already-exported variable is left alone, so process environment wins over
+`.env`, matching mise's own `env_file` precedence. It then passes only this
+allowlist into the container:
 
 - Engine and lifecycle: `CONTAINER_ENGINE`, `ENGINE_SOCK`, `KROPS_PROFILE`,
   `REGISTRY_PORT`, `OCI_REPOSITORY`, `OCI_TAG`, `BOOTSTRAP_PIVOT`,

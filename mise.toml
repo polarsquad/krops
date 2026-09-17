@@ -27,7 +27,7 @@ env_file = ".env"
 description = "Check scripts and air-gap image pins, cross-check bootstrap config, and build every kustomize overlay"
 run = '''
 fail=0
-for script in bootstrap.sh bootstrap-common.sh pivot.sh teardown.sh airgap/scripts/*.sh; do
+for script in bootstrap.sh bootstrap-common.sh pivot.sh teardown.sh scripts/toolbox-run.sh airgap/scripts/*.sh; do
   echo "==> bash -n $script"
   if ! bash -n "$script"; then
     echo "    FAILED: $script" >&2
@@ -52,6 +52,11 @@ fi
 echo "==> toolbox-run.sh exec (image and CLI args reach the container engine)"
 if ! python3 tests/test-toolbox-run-exec.py; then
   echo "    FAILED: toolbox-run.sh exec" >&2
+  fail=1
+fi
+echo "==> toolbox-run.sh .env precedence"
+if ! python3 tests/test-toolbox-run-env-precedence.py; then
+  echo "    FAILED: toolbox-run.sh .env precedence" >&2
   fail=1
 fi
 echo "==> air-gap digest token boundary"

@@ -20,11 +20,8 @@ def test_readme_docs_links_keep_anchors():
 
 def test_readme_diagram_images_become_raw_links():
     for name in ("aws-infra", "azure-infra", "local-talos-infra"):
-        assert (
-            rewrite_readme_links(f"![l](docs/{name}.svg)")
-            == f"![l]({name}.svg)".join(
-                ["[", f"]({raw(name)})"]
-            )
+        assert rewrite_readme_links(f"![l](docs/{name}.svg)") == (
+            f"[![l]({name}.svg)]({raw(name)})"
         )
 
 
@@ -53,9 +50,8 @@ def test_doc_sibling_links_untouched():
 
 
 def test_doc_diagram_images_become_raw_links():
-    assert (
-        rewrite_doc_links("![d](air-gap-infra.svg)")
-        == "![d](air-gap-infra.svg)".join(["[", f"]({raw('air-gap-infra')})"])
+    assert rewrite_doc_links("![d](air-gap-infra.svg)") == (
+        f"[![d](air-gap-infra.svg)]({raw('air-gap-infra')})"
     )
 
 

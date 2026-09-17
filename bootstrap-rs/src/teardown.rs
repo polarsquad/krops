@@ -17,10 +17,8 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::process::Command;
 
-use crate::{
-    capture_lossy, kubectl_cmd, run, run_quiet, select_toolbox_kind_kubeconfig,
-    toolbox_join_kind_network, toolbox_leave_kind_network, Config,
-};
+use crate::engine::{self, toolbox_join_kind_network, toolbox_leave_kind_network};
+use crate::{capture_lossy, kubectl_cmd, run, run_quiet, select_toolbox_kind_kubeconfig, Config};
 
 // ── Configuration knobs (teardown.sh `${VAR:-default}` equivalents) ───────────
 
@@ -1909,7 +1907,7 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
         if tcfg.aws_only {
             bail!("AWS_ONLY=1 cannot be combined with the local-host profile\n       Use the AWS profile for AWS-only orphan cleanup");
         }
-        let engine = detect_engine().await;
+        let engine = detect_engine(cfg).await;
         let kind_present = run_quiet("kind", &["get", "clusters"]).await
             && capture_lossy("kind", &["get", "clusters"])
                 .await
@@ -2351,30 +2349,23 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
     Ok(())
 }
 
-/// Detect the container engine the way bootstrap.sh does (docker with
-/// podman re-detection, then podman). None when no engine is running.
-pub async fn detect_engine() -> Option<String> {
-    if let Ok(engine) = std::env::var("CONTAINER_ENGINE") {
-        if !engine.is_empty() {
-            if run_quiet(&engine, &["info"]).await {
-                return Some(engine);
-            }
-            eprintln!(">>> WARNING: {engine} is unavailable; registry cleanup will be skipped");
-            return None;
+/// Detect the container engine, preferring `cfg.container_engine`. None
+/// when no engine is running.
+pub async fn detect_engine(cfg: &Config) -> Option<String> {
+    if let Some(engine) = cfg.container_engine.clone() {
+        if run_quiet(&engine, &["info"]).await {
+            return Some(engine);
         }
+        eprintln!(">>> WARNING: {engine} is unavailable; registry cleanup will be skipped");
+        return None;
     }
-    if run_quiet("docker", &["info"]).await {
-        let version = capture_lossy("docker", &["--version"]).await;
-        if version.to_lowercase().contains("podman") {
-            return Some("podman".into());
-        }
-        return Some("docker".into());
+    let engine = engine::detect_running().await;
+    if engine.is_none() {
+        eprintln!(
+            ">>> WARNING: No running container engine found; registry cleanup will be skipped"
+        );
     }
-    if run_quiet("podman", &["info"]).await {
-        return Some("podman".into());
-    }
-    eprintln!(">>> WARNING: No running container engine found; registry cleanup will be skipped");
-    None
+    engine
 }
 
 #[cfg(test)]

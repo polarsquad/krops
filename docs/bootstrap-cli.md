@@ -133,7 +133,9 @@ pins together with their declarative counterparts. See
 | `BOOTSTRAP_KUBECONTEXT` | config value `kind-mgmt` | Source context required by pivot |
 | `PIVOT_SKIP_DELETE` | `0` | Literal `1` keeps kind after a successful pivot |
 
-The toolbox runtime adds three contracts:
+### Toolbox runtime contracts
+
+The toolbox runtime adds four contracts:
 
 - `KROPS_TOOLBOX=1` enables internal kind networking and disables host-only CAPD
   endpoint rewrites.
@@ -142,11 +144,31 @@ The toolbox runtime adds three contracts:
   and `podman machine`.
 - `KUBECONFIG` must name one writable file, not a colon-separated list. The
   wrapper uses `/workspace/.kube/kind.yaml`.
+- `CONTAINER_HOST` points the Podman remote client at the mounted engine
+  socket (`unix:///var/run/docker.sock`) when `KROPS_TOOLBOX=1`. The CLI sets
+  it only if unset, before any Podman probe, so an operator-supplied value is
+  kept regardless of the eventual `CONTAINER_ENGINE`.
 
 The container reaches the local registry at `krops-registry:5000`. Its
 `/root/.kube` mount makes the management kubeconfig persist on the host as
 `./.kube/krops-mgmt.yaml`. The wrapper's environment allowlist and override
 limitations are documented in [Operations](./operations.md#toolbox-container-primary-interface).
+
+**Design notes (`bootstrap-rs/src/engine.rs`):** engine detection, socket
+resolution, `CONTAINER_HOST` defaulting, and kind-network attach/detach used
+to be implemented separately in `preflight_checks`, a `detect_engine_for_network`
+helper that read `Config` defaults instead of the engine `preflight_checks`
+actually resolved, `teardown::detect_engine`, and the toolbox shell entrypoint
+(which also detected and validated the engine before Rust ever ran). All of
+that now lives in one module: `preflight_checks` resolves the engine once and
+threads it through bootstrap, pivot, and teardown instead of re-detecting it,
+and `toolbox-entrypoint.sh` only sets `KROPS_TOOLBOX=1` and execs. Inside the
+toolbox, `podman info` reports the mounted *client* socket (`CONTAINER_HOST`),
+not the daemon-side path kind's `extraMounts` need, so the module skips
+querying it there and uses the static fallback instead. kind-network
+attach/detach checks actual network membership rather than matching Docker's
+and Podman's differently worded "already connected" errors, so it doesn't
+depend on engine- or version-specific error text.
 
 ## What bootstrap and pivot do
 

@@ -106,11 +106,13 @@ not require host mise.
 
 Inside the toolbox:
 
-- The entrypoint sets `KROPS_TOOLBOX=1` and resolves the daemon-side
-  `ENGINE_SOCK` used by kind's socket mount.
-- Each new toolbox container best-effort joins an existing `kind` network at
-  startup. Bootstrap joins explicitly after creating kind; recreate, pivot, and
-  teardown detach before deleting the bootstrap cluster.
+- The entrypoint sets `KROPS_TOOLBOX=1` and execs `krops-bootstrap`, which
+  owns engine detection, the daemon-side `ENGINE_SOCK` used by kind's socket
+  mount, and kind-network attach/detach (issue #256).
+- Bootstrap joins the `kind` network explicitly after creating (or reusing)
+  the cluster; recreate, pivot, and teardown detach before deleting the
+  bootstrap cluster; teardown re-joins first if it needs the internal API
+  endpoint.
 - Kind's internal API endpoint and `krops-registry:5000` then resolve by name.
 - Host-only CAPD endpoint rewrites are skipped because the recorded endpoints
   already resolve on that network.

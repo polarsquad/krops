@@ -692,6 +692,13 @@
       "automerge": false
     },
     {
+      "description": "Automerge the CI-only Renovate CLI pin (patch/minor): the renovate-digest-pinning job reinstalls this exact version and re-runs the full pinning test suite against it, so a green run already validates the bump",
+      "matchDepNames": ["renovate"],
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
       "description": "Group GitHub Actions only, excluding workflow images and runners",
       "matchManagers": ["github-actions"],
       "matchDepTypes": ["action"],

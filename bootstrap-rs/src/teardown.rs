@@ -2400,7 +2400,24 @@ mod tests {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
+        wait_until_executable(&bin);
         bin
+    }
+
+    /// A parallel test's fork can briefly inherit our write fd, making exec fail
+    /// with ETXTBSY; run the no-op probe until it succeeds.
+    fn wait_until_executable(bin: &std::path::Path) {
+        for _ in 0..200 {
+            match std::process::Command::new(bin)
+                .env("STUB_PROBE", "1")
+                .status()
+            {
+                Err(e) if e.raw_os_error() == Some(26) => {
+                    std::thread::sleep(std::time::Duration::from_millis(5))
+                }
+                _ => return,
+            }
+        }
     }
 
     /// A stub whose behavior is chosen per scenario. Records argv to `$STUB_LOG`,
@@ -2412,7 +2429,7 @@ mod tests {
     ) -> std::path::PathBuf {
         let bin = dir.join("kubectl");
         let script = format!(
-            "#!/usr/bin/env sh\necho \"$@\" >> {log}\n{body}\n",
+            "#!/usr/bin/env sh\n[ -n \"${{STUB_PROBE:-}}\" ] && exit 0\necho \"$@\" >> {log}\n{body}\n",
             log = log.display(),
             body = body,
         );

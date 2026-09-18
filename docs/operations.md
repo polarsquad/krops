@@ -77,8 +77,12 @@ CONTAINER_ENGINE=podman TOOLBOX_IMAGE="$TOOLBOX_IMAGE" \
 ```
 
 The same wrapper powers `mise run bootstrap`, `mise run pivot`, and
-`mise run teardown`. It detects the engine, loads every `.env` assignment with
-outer quote stripping, and passes only this allowlist into the container:
+`mise run teardown`. It loads every `.env` assignment with outer quote
+stripping before detecting the engine or resolving a socket for it, so a
+`.env`-selected `CONTAINER_ENGINE` takes effect from the start (issue #257).
+An already-exported variable is left alone, so process environment wins over
+`.env`, matching mise's own `env_file` precedence. It then passes only this
+allowlist into the container:
 
 - Engine and lifecycle: `CONTAINER_ENGINE`, `ENGINE_SOCK`, `KROPS_PROFILE`,
   `REGISTRY_PORT`, `OCI_REPOSITORY`, `OCI_TAG`, `BOOTSTRAP_PIVOT`,
@@ -106,11 +110,13 @@ not require host mise.
 
 Inside the toolbox:
 
-- The entrypoint sets `KROPS_TOOLBOX=1` and resolves the daemon-side
-  `ENGINE_SOCK` used by kind's socket mount.
-- Each new toolbox container best-effort joins an existing `kind` network at
-  startup. Bootstrap joins explicitly after creating kind; recreate, pivot, and
-  teardown detach before deleting the bootstrap cluster.
+- The entrypoint sets `KROPS_TOOLBOX=1` and execs `krops-bootstrap`, which
+  owns engine detection, the daemon-side `ENGINE_SOCK` used by kind's socket
+  mount, and kind-network attach/detach (issue #256).
+- Bootstrap joins the `kind` network explicitly after creating (or reusing)
+  the cluster; recreate, pivot, and teardown detach before deleting the
+  bootstrap cluster; teardown re-joins first if it needs the internal API
+  endpoint.
 - Kind's internal API endpoint and `krops-registry:5000` then resolve by name.
 - Host-only CAPD endpoint rewrites are skipped because the recorded endpoints
   already resolve on that network.

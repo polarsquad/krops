@@ -77,15 +77,14 @@ needs only the repository checkout and a running engine:
 
 - Docker, or Podman 5.5+; kind creates clusters through the mounted engine
   socket
-- The toolbox image. No semver release has been published yet, so build the
-  current checkout with
+- The toolbox image, `ghcr.io/polarsquad/krops-toolbox:<version>` (Linux
+  amd64 and arm64, published as `X.Y.Z`, `X.Y`, and stable `latest` on
+  matching `v*` tags, with a keyless signature and SPDX SBOM attestation),
+  or build the current checkout with
   `docker build -f bootstrap-rs/Dockerfile -t krops-toolbox:dev .`
 
-A future matching `v*` tag publishes
-`ghcr.io/polarsquad/krops-toolbox` for Linux amd64 and arm64 as `X.Y.Z`,
-`X.Y`, and stable `latest`, with a keyless signature and SPDX SBOM
-attestation. The `aws` environment additionally requires a GitHub PAT with
-read access, AWS credentials and service quotas, and an age private key. The
+The `aws` environment additionally requires a GitHub PAT with read access,
+AWS credentials and service quotas, and an age private key. The
 `local-talos` environment needs the PAT and age key too (it syncs from
 GitHub), plus a reachable Tinkerbell stack and the site values in
 `mgmt/local-talos/clusters/management/cluster.yaml`; see

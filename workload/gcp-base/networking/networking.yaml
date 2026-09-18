@@ -22,7 +22,7 @@ metadata:
   name: psa
   namespace: default
 spec:
-  name: krops-${CLUSTER_NAME}-psa
+  resourceID: krops-${CLUSTER_NAME}-psa
   location: global
   purpose: VPC_PEERING
   addressType: INTERNAL

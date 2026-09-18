@@ -17,10 +17,8 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::process::Command;
 
-use crate::{
-    capture_lossy, kubectl_cmd, run, run_quiet, select_toolbox_kind_kubeconfig,
-    toolbox_join_kind_network, toolbox_leave_kind_network, Config,
-};
+use crate::engine::{self, toolbox_join_kind_network, toolbox_leave_kind_network};
+use crate::{capture_lossy, kubectl_cmd, run, run_quiet, select_toolbox_kind_kubeconfig, Config};
 
 // ── Configuration knobs (teardown.sh `${VAR:-default}` equivalents) ───────────
 
@@ -1909,7 +1907,7 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
         if tcfg.aws_only {
             bail!("AWS_ONLY=1 cannot be combined with the local-host profile\n       Use the AWS profile for AWS-only orphan cleanup");
         }
-        let engine = detect_engine().await;
+        let engine = detect_engine(cfg).await;
         let kind_present = run_quiet("kind", &["get", "clusters"]).await
             && capture_lossy("kind", &["get", "clusters"])
                 .await
@@ -2351,30 +2349,23 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
     Ok(())
 }
 
-/// Detect the container engine the way bootstrap.sh does (docker with
-/// podman re-detection, then podman). None when no engine is running.
-pub async fn detect_engine() -> Option<String> {
-    if let Ok(engine) = std::env::var("CONTAINER_ENGINE") {
-        if !engine.is_empty() {
-            if run_quiet(&engine, &["info"]).await {
-                return Some(engine);
-            }
-            eprintln!(">>> WARNING: {engine} is unavailable; registry cleanup will be skipped");
-            return None;
+/// Detect the container engine, preferring `cfg.container_engine`. None
+/// when no engine is running.
+pub async fn detect_engine(cfg: &Config) -> Option<String> {
+    if let Some(engine) = cfg.container_engine.clone() {
+        if run_quiet(&engine, &["info"]).await {
+            return Some(engine);
         }
+        eprintln!(">>> WARNING: {engine} is unavailable; registry cleanup will be skipped");
+        return None;
     }
-    if run_quiet("docker", &["info"]).await {
-        let version = capture_lossy("docker", &["--version"]).await;
-        if version.to_lowercase().contains("podman") {
-            return Some("podman".into());
-        }
-        return Some("docker".into());
+    let engine = engine::detect_running().await;
+    if engine.is_none() {
+        eprintln!(
+            ">>> WARNING: No running container engine found; registry cleanup will be skipped"
+        );
     }
-    if run_quiet("podman", &["info"]).await {
-        return Some("podman".into());
-    }
-    eprintln!(">>> WARNING: No running container engine found; registry cleanup will be skipped");
-    None
+    engine
 }
 
 #[cfg(test)]
@@ -2400,7 +2391,24 @@ mod tests {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
+        wait_until_executable(&bin);
         bin
+    }
+
+    /// A parallel test's fork can briefly inherit our write fd, making exec fail
+    /// with ETXTBSY; run the no-op probe until it succeeds.
+    fn wait_until_executable(bin: &std::path::Path) {
+        for _ in 0..200 {
+            match std::process::Command::new(bin)
+                .env("STUB_PROBE", "1")
+                .status()
+            {
+                Err(e) if e.raw_os_error() == Some(26) => {
+                    std::thread::sleep(std::time::Duration::from_millis(5))
+                }
+                _ => return,
+            }
+        }
     }
 
     /// A stub whose behavior is chosen per scenario. Records argv to `$STUB_LOG`,
@@ -2412,7 +2420,7 @@ mod tests {
     ) -> std::path::PathBuf {
         let bin = dir.join("kubectl");
         let script = format!(
-            "#!/usr/bin/env sh\necho \"$@\" >> {log}\n{body}\n",
+            "#!/usr/bin/env sh\n[ -n \"${{STUB_PROBE:-}}\" ] && exit 0\necho \"$@\" >> {log}\n{body}\n",
             log = log.display(),
             body = body,
         );

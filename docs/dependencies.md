@@ -25,18 +25,25 @@ Renovate discovers and updates versions in:
   pins consumed by `krops-bootstrap`. One annotation-driven custom manager reads
   the adjacent `# renovate:` metadata. `mise run validate` cross-checks these
   pins against their declarative Helm releases and proxies.
-- `bootstrap-rs/Dockerfile`: digest-pinned build and runtime base images, the
-  mise CLI and Podman remote-client build arguments used by the toolbox, and
-  the inline `uv@` pin in the mise install layer (issue #307): it must move in
-  lockstep with the `mise.toml` pin, because azure-cli's pipx backend resolves
-  its uv dependency against the mise.toml-selected version during the image
-  build.
+- `bootstrap-rs/Dockerfile`: digest-pinned build and runtime base images, and
+  the mise CLI and Podman remote-client build arguments used by the toolbox.
+  The `mise install` layer names tools without versions (`python`, `uv`,
+  etc.), so every pin resolves from the copied `mise.toml` at build time;
+  there is no inline version to keep in lockstep.
 - `mgmt/**` and `workload/**` YAML: Flux, Helm, Kubernetes manifests, chart
   values, and clusterctl provider CRs under `capi-providers/`.
 - `kindest/node` image tags wherever they are referenced in management
   manifests and air-gap scripts.
 - `airgap/images.txt` and `airgap/zarf.yaml`: container image references,
   pinned by digest.
+- `airgap/zarf.yaml` and `airgap/files/clusterctl-providers.yaml`: the CAPI
+  core, kubeadm bootstrap, kubeadm control-plane, and CAPD provider release
+  files, rendered versions, and staged config paths. One custom manager per
+  pattern covers all four via a `depName` alternation (e.g.
+  `kubernetes-sigs/cluster-api-(?:core|bootstrap-kubeadm|...)`) rather than
+  one manager per provider, since the four differed only in that name;
+  `depNameTemplate` resolves the match back to the real
+  `kubernetes-sigs/cluster-api` repo for version lookup.
 - `.github/workflows/`: GitHub Actions references and the Renovate CLI pin used
   by the digest and managed-pin coverage tests.
 - `pivot.sh`: imperative cert-manager and CAPI Operator chart pins, retained
@@ -70,6 +77,14 @@ matched by exact depName, not by registry host, and stay in the separate
 `cluster-api` group. The kind CLI and Talos's own `talosVersion`
 machine-config contract version each follow their own release cadence and
 are intentionally excluded from this group.
+
+The CAPI group spans both the `github-releases`/`github-release-attachments`
+release lookups and the `docker`-datasource digest-pinned images those same
+providers deploy (`registry.k8s.io/cluster-api*`,
+`registry.k8s.io/cluster-api-helm/*`, `gcr.io/k8s-staging-cluster-api/*`), so
+a CAPI version bump lands its release assets and images in one PR instead of
+two. CAPZ's one-minor-at-a-time override (issue #71) only matches the
+`github-releases` datasource, so it is unaffected by the image grouping.
 
 ## Toolbox release version
 
@@ -177,3 +192,11 @@ verify the pairing during review.
 - `*.sops.yaml` `version:` fields, Kubernetes `apiVersion` strings, Helm chart
   `appVersion` values, `bootstrap-rs/Cargo.toml`'s package version, and the
   Zarf package `metadata.version` are not dependency pins.
+- The Zarf CLI pin in `mise.toml` keeps `version` unprefixed and adds `v`
+  literally in `asset_pattern` (issue #324): mise's `{{ version }}` template
+  variable has stripped a leading `v` inconsistently across mise releases, so
+  an unprefixed pin sidesteps that. `asset_pattern` also remaps `arch()` to
+  `amd64`/`arm64`, since Zarf's release assets don't use mise's default
+  `x64`/`arm64` naming. `tests/test-mise-zarf-pin.py` installs the pinned
+  release via mise and checks the reported version, since a template mismatch
+  otherwise fails silently until the pin is exercised.

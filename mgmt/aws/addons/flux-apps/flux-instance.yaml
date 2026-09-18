@@ -5,11 +5,9 @@
 #
 # Each workload cluster runs its own Flux instance syncing the workload/ overlay
 # for its region (workload/eu-north-01, workload/eu-west-01). Those overlays pull in
-# workload/base, which installs the ACK S3 operator and the Bucket CRs.
-#
-# Each ConfigMap also ships a `cluster-vars` ConfigMap into flux-system on the
-# workload cluster; the aws-operators / s3-buckets Flux Kustomizations use it
-# for postBuild variable substitution (region, cluster name, account ID).
+# workload/base, which is empty today: ACK now runs only on the management
+# cluster (mgmt/aws/infrastructure/{ack-controllers,workload-resources}/, #346),
+# so no per-cluster substitution ConfigMap ships here anymore either.
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: v1
 kind: ConfigMap
@@ -22,16 +20,6 @@ data:
     kind: Namespace
     metadata:
       name: flux-system
-    ---
-    apiVersion: v1
-    kind: ConfigMap
-    metadata:
-      name: cluster-vars
-      namespace: flux-system
-    data:
-      AWS_REGION: "eu-north-1"
-      CLUSTER_NAME: "eu-north-1-workload"
-      AWS_ACCOUNT_ID: "120392301094"
     ---
     apiVersion: fluxcd.controlplane.io/v1
     kind: FluxInstance
@@ -75,16 +63,6 @@ data:
     kind: Namespace
     metadata:
       name: flux-system
-    ---
-    apiVersion: v1
-    kind: ConfigMap
-    metadata:
-      name: cluster-vars
-      namespace: flux-system
-    data:
-      AWS_REGION: "eu-west-1"
-      CLUSTER_NAME: "eu-west-1-workload"
-      AWS_ACCOUNT_ID: "120392301094"
     ---
     apiVersion: fluxcd.controlplane.io/v1
     kind: FluxInstance

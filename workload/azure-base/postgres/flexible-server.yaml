@@ -1,8 +1,9 @@
 ---
 # ══════════════════════════════════════════════════════════════════════════════
 # Smallest-footprint PostgreSQL Flexible Server (the RDS instance's
-# counterpart in workload/base/rds-instances/). Private access through the
-# delegated subnet + private DNS zone (workload/azure-base/networking/).
+# counterpart in mgmt/aws/infrastructure/workload-resources/dbinstances.yaml).
+# Private access through the delegated subnet + private DNS zone
+# (workload/azure-base/networking/).
 #
 # Authentication: Entra ID only, password auth disabled, so no master
 # password has to exist anywhere (RDS uses Secrets Manager for the same

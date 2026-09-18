@@ -11,7 +11,7 @@
 #     (clusters/swedencentral/staging/cluster.yaml, operatorSpec.configMaps)
 #     into the swedencentral-workload-oidc ConfigMap, so this file can be
 #     committed before the cluster exists: ASO retries until the ConfigMap
-#     appears, the same way ACK retries PodIdentityAssociations.
+#     appears, the same way ACK retries a Bucket whose controller is not yet Ready.
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: resources.azure.com/v1api20200601
 kind: ResourceGroup

@@ -128,7 +128,8 @@ Additional conventions:
   parent `kustomization.yaml` and order them with `dependsOn` and
   `wait: true`.
 - Per-cluster values come from `postBuild.substituteFrom: cluster-vars`, not
-  from hardcoded strings.
+  from hardcoded strings (management-side per-cluster manifests, such as
+  `mgmt/aws/infrastructure/workload-resources/`, use literals).
 - Dependency versions live in the files that consume them and are updated by
   Renovate. Do not reintroduce a central version list. If you add a new
   pinned dependency, add Renovate coverage for it in the same PR and prove it

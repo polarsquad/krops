@@ -1,7 +1,8 @@
 ---
 # ══════════════════════════════════════════════════════════════════════════════
 # Secure-by-default storage account + blob container (the S3 bucket's
-# counterpart in workload/base/s3-buckets/). Posture:
+# counterpart in mgmt/aws/infrastructure/workload-resources/buckets.yaml).
+# Posture:
 #   - no anonymous blob access, HTTPS only, TLS 1.2 minimum
 #   - shared-key (account key) access disabled: Entra ID authorization only
 #   - blob versioning + 7-day soft delete

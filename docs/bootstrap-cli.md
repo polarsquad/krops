@@ -222,7 +222,7 @@ management cluster to be removed.
   orphan sweep for both workloads and the self-managed management cluster,
   remove CAPI providers and bootstrap Helm releases when the controller host is
   still reachable, and enforce the controller-host deletion guard. The sweep
-  covers pod identity associations, nodegroups, EKS clusters, RDS, CAPA-tagged
+  covers nodegroups, EKS clusters, RDS, CAPA-tagged
   VPC resources, versioned S3 buckets, IAM roles and users, and the
   `clusterawsadm` CloudFormation stack.
 

@@ -16,6 +16,14 @@ import tomllib
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+WORKLOAD_RESOURCES = REPO_ROOT / "mgmt/aws/infrastructure/workload-resources"
+
+
+def spec_values(filename: str, field: str) -> set[str]:
+    """Top-level `spec.<field>` values (2-space indent) from a manifest file."""
+    text = (WORKLOAD_RESOURCES / filename).read_text()
+    return set(re.findall(rf"^  {field}: (\S+)\s*$", text, re.M))
+
 
 # chart key in [charts] -> manifest files that must carry the same version
 CHART_MANIFESTS = {
@@ -176,13 +184,11 @@ def main() -> int:
                     f"environments.{name} teardown cluster-name {cluster_name!r} "
                     f"does not start with its region {region!r}"
                 )
-            # The RDS instance id is krops-<cluster>-db (workload/base/
-            # rds-instances/dbinstance.yaml substitutes CLUSTER_NAME).
             rds = workload.get("rds-instance", "")
-            if cluster_name and rds != f"krops-{cluster_name}-db":
+            if rds not in spec_values("dbinstances.yaml", "dbInstanceIdentifier"):
                 failures.append(
-                    f"environments.{name} teardown rds-instance {rds!r} != "
-                    f"krops-{cluster_name}-db"
+                    f"environments.{name} teardown rds-instance {rds!r} "
+                    "not in dbinstances.yaml"
                 )
             # The EKS name is '<namespace>_<kcp-name>' — only the namespace
             # separator becomes an underscore (teardown.sh documents this
@@ -198,15 +204,16 @@ def main() -> int:
     # Global teardown constants pin to the manifests that define them.
     teardown = config.get("teardown", {})
     if teardown:
-        expected_roles = [
-            "krops-ack-s3-controller",
-            "krops-ack-rds-controller",
-            "krops-ack-iam-controller",
-        ]
-        roles = teardown.get("global-iam-roles", [])
-        for role in expected_roles:
-            if role not in roles:
-                failures.append(f"teardown.global-iam-roles missing {role}")
+        expected_roles = {
+            n for n in spec_values("roles.yaml", "name") if n.startswith("krops-")
+        }
+        roles = set(teardown.get("global-iam-roles", []))
+        for role in sorted(expected_roles - roles):
+            failures.append(f"teardown.global-iam-roles missing {role} (roles.yaml)")
+        for role in sorted(roles - expected_roles):
+            failures.append(
+                f"teardown.global-iam-roles lists {role}, not defined in roles.yaml"
+            )
         reader_user = REPO_ROOT / "mgmt/aws/infrastructure/aws-global-iam/reader-user.yaml"
         users = teardown.get("global-iam-users", [])
         if reader_user.is_file() and "krops-reader" not in users:

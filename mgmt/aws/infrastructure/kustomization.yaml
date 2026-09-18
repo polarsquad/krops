@@ -6,6 +6,6 @@ resources:
   - aws-identity
   - aws-clusters-resources
   - ack-controllers
-  - ack-pod-identity
+  - workload-resources
   - aws-global-iam
   - konflate

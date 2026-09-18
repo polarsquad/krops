@@ -1,0 +1,128 @@
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# Secure-by-default S3 bucket per workload cluster, reconciled by the ACK S3
+# controller on the MANAGEMENT cluster (mgmt/aws/infrastructure/ack-controllers/).
+#
+# One bucket per cluster, named the same way as before the move to the
+# management cluster (krops-<account>-<cluster>-data). There is no
+# cluster-vars ConfigMap on the management cluster (no Flux postBuild
+# substitution here), so the account ID and cluster name are literal —
+# same reason ../aws-global-iam/reader-user.yaml already wildcards the
+# account ID, and the account ID is already a literal in
+# mgmt/aws/addons/flux-apps/flux-instance.yaml.
+#
+# The controller's default region is eu-north-1; the eu-west-1 bucket
+# overrides it with the services.k8s.aws/region annotation, the same
+# mechanism.
+#
+# Security posture (unchanged from the pre-move workload/base/s3-buckets/):
+#   - All public access blocked
+#   - Server-side encryption enforced (SSE-S3 / AES256, bucket keys enabled)
+#   - Versioning enabled
+#   - ACLs disabled (BucketOwnerEnforced)
+#   - Bucket policy denies any request not using TLS
+# ══════════════════════════════════════════════════════════════════════════════
+apiVersion: s3.services.k8s.aws/v1alpha1
+kind: Bucket
+metadata:
+  name: eu-north-1-workload-data
+  namespace: ack-system
+  annotations:
+    services.k8s.aws/adoption-policy: adopt-or-create
+spec:
+  name: krops-120392301094-eu-north-1-workload-data
+  createBucketConfiguration:
+    locationConstraint: eu-north-1
+  publicAccessBlock:
+    blockPublicACLs: true
+    blockPublicPolicy: true
+    ignorePublicACLs: true
+    restrictPublicBuckets: true
+  encryption:
+    rules:
+      - applyServerSideEncryptionByDefault:
+          sseAlgorithm: AES256
+        bucketKeyEnabled: true
+  versioning:
+    status: Enabled
+  ownershipControls:
+    rules:
+      - objectOwnership: BucketOwnerEnforced
+  policy: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Sid": "DenyInsecureTransport",
+          "Effect": "Deny",
+          "Principal": "*",
+          "Action": "s3:*",
+          "Resource": [
+            "arn:aws:s3:::krops-120392301094-eu-north-1-workload-data",
+            "arn:aws:s3:::krops-120392301094-eu-north-1-workload-data/*"
+          ],
+          "Condition": {
+            "Bool": { "aws:SecureTransport": "false" }
+          }
+        }
+      ]
+    }
+  tagging:
+    tagSet:
+      - key: managed-by
+        value: flux-ack
+      - key: cluster
+        value: eu-north-1-workload
+---
+apiVersion: s3.services.k8s.aws/v1alpha1
+kind: Bucket
+metadata:
+  name: eu-west-1-workload-data
+  namespace: ack-system
+  annotations:
+    services.k8s.aws/adoption-policy: adopt-or-create
+    services.k8s.aws/region: eu-west-1
+spec:
+  name: krops-120392301094-eu-west-1-workload-data
+  createBucketConfiguration:
+    locationConstraint: eu-west-1
+  publicAccessBlock:
+    blockPublicACLs: true
+    blockPublicPolicy: true
+    ignorePublicACLs: true
+    restrictPublicBuckets: true
+  encryption:
+    rules:
+      - applyServerSideEncryptionByDefault:
+          sseAlgorithm: AES256
+        bucketKeyEnabled: true
+  versioning:
+    status: Enabled
+  ownershipControls:
+    rules:
+      - objectOwnership: BucketOwnerEnforced
+  policy: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Sid": "DenyInsecureTransport",
+          "Effect": "Deny",
+          "Principal": "*",
+          "Action": "s3:*",
+          "Resource": [
+            "arn:aws:s3:::krops-120392301094-eu-west-1-workload-data",
+            "arn:aws:s3:::krops-120392301094-eu-west-1-workload-data/*"
+          ],
+          "Condition": {
+            "Bool": { "aws:SecureTransport": "false" }
+          }
+        }
+      ]
+    }
+  tagging:
+    tagSet:
+      - key: managed-by
+        value: flux-ack
+      - key: cluster
+        value: eu-west-1-workload

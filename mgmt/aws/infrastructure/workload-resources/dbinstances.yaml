@@ -1,0 +1,70 @@
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# Smallest-footprint PostgreSQL instance per workload cluster, reconciled by
+# the ACK RDS controller on the MANAGEMENT cluster
+# (mgmt/aws/infrastructure/ack-controllers/). The controller's default region
+# is eu-north-1; the eu-west-1 instance overrides it with the
+# services.k8s.aws/region annotation (see buckets.yaml for why).
+#
+# Networking: no dbSubnetGroupName — the instance lands in the region's
+# DEFAULT VPC. CAPA creates the EKS VPC dynamically, so its subnet IDs cannot
+# be declared in Git ahead of time (known limitation, see
+# docs/workload-resources.md).
+#
+# Master password: manageMasterUserPassword — RDS generates the password and
+# stores it in Secrets Manager (secret name prefix "rds!"), so it never enters
+# Git or the cluster, the same posture as Azure (passwordAuth: Disabled) and
+# GCP (IAM-only auth); see docs/workload-resources.md.
+# ══════════════════════════════════════════════════════════════════════════════
+apiVersion: rds.services.k8s.aws/v1alpha1
+kind: DBInstance
+metadata:
+  name: eu-north-1-workload-db
+  namespace: ack-system
+  annotations:
+    services.k8s.aws/adoption-policy: adopt-or-create
+spec:
+  dbInstanceIdentifier: krops-eu-north-1-workload-db
+  engine: postgres
+  engineVersion: "17"
+  # Smallest current-generation instance class (2 vCPU Graviton, 1 GiB RAM)
+  dbInstanceClass: db.t4g.micro
+  # 20 GiB is the gp3 minimum for RDS PostgreSQL
+  allocatedStorage: 20
+  storageType: gp3
+  masterUsername: postgres
+  manageMasterUserPassword: true
+  multiAZ: false
+  publiclyAccessible: false
+  storageEncrypted: true
+  tags:
+    - key: managed-by
+      value: flux-ack
+    - key: cluster
+      value: eu-north-1-workload
+---
+apiVersion: rds.services.k8s.aws/v1alpha1
+kind: DBInstance
+metadata:
+  name: eu-west-1-workload-db
+  namespace: ack-system
+  annotations:
+    services.k8s.aws/adoption-policy: adopt-or-create
+    services.k8s.aws/region: eu-west-1
+spec:
+  dbInstanceIdentifier: krops-eu-west-1-workload-db
+  engine: postgres
+  engineVersion: "17"
+  dbInstanceClass: db.t4g.micro
+  allocatedStorage: 20
+  storageType: gp3
+  masterUsername: postgres
+  manageMasterUserPassword: true
+  multiAZ: false
+  publiclyAccessible: false
+  storageEncrypted: true
+  tags:
+    - key: managed-by
+      value: flux-ack
+    - key: cluster
+      value: eu-west-1-workload

@@ -79,7 +79,7 @@ spec:
   retryInterval: 2m
   timeout: 10m
   prune: true
-  # wait: true so ack-pod-identity only applies once the ACK IAM/EKS
+  # wait: true so workload-resources only applies once the ACK IAM/S3/RDS
   # HelmReleases (and their CRDs) are fully Ready.
   wait: true
   sourceRef:
@@ -94,7 +94,7 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: ack-pod-identity
+  name: workload-resources
   namespace: flux-system
 spec:
   interval: 5m
@@ -105,7 +105,7 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
-  path: ./mgmt/aws/infrastructure/ack-pod-identity
+  path: ./mgmt/aws/infrastructure/workload-resources
   dependsOn:
     - name: ack-controllers
 ---

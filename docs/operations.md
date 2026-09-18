@@ -166,17 +166,11 @@ You also need:
   (fine-grained with read-only Contents permission, or classic with `repo`
   scope). The Flux Operator chart is pulled anonymously.
 - AWS credentials with permission to create EKS clusters, VPCs, and IAM roles.
-  For the ACK controllers the same principal additionally needs
-  `iam:CreateRole`/`PutRolePolicy`/`GetRole`/`TagRole`,
-  `iam:CreateUser`/`PutUserPolicy`/`GetUser`/`GetUserPolicy`/`TagUser`
-  (for the `krops-reader` console user), and
-  `eks:CreatePodIdentityAssociation`/`DescribePodIdentityAssociation`/
-  `DeletePodIdentityAssociation`. The `rds:*` management and
-  `secretsmanager:CreateSecret`/`TagResource`/`RotateSecret` permissions
-  (managed master passwords) used by the workload clusters' ACK RDS
-  controllers are granted through the Git-declared
-  `krops-ack-rds-controller` pod-identity role; no extra static
-  credentials are required for them.
+  The ACK S3, RDS, and IAM controllers run only on the management cluster and
+  share this same static credential (no EKS Pod Identity, no per-cluster IAM
+  role), so the principal additionally needs the policies in
+  [docs/aws-iam.md](./aws-iam.md#minimum-iam-policy-for-the-ack-credential),
+  which also explains the trade-off of one shared, broader credential.
 - The `clusterawsadm` IAM CloudFormation stack provisioned before bootstrap and
   removed by a full AWS teardown:
 
@@ -286,8 +280,8 @@ This initial imperative phase performs these steps:
    and deletes the kind cluster (see [Pivot recovery](#pivot-recovery)).
 
 Everything downstream (providers, EKS clusters, workload Flux instances, the
-ACK operator, IAM role, pod identity bindings, and S3 buckets) reconciles
-from Git with no further manual steps.
+ACK operator, IAM roles, S3 buckets, and RDS instances) reconciles from Git
+with no further manual steps.
 
 The local-host environment performs the cluster, Flux Operator, and FluxInstance
 steps in the `mgmt` management cluster, but does not create GitHub or SOPS
@@ -418,17 +412,19 @@ Flux instance successfully delivered the application.
 For the AWS chain:
 
 ```sh
-# Management cluster after a toolbox run
+# Management cluster after a toolbox run — ACK (S3/RDS/IAM) and every
+# workload cluster's Bucket/DBInstance/Role all live here (#346).
 export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
-kubectl get kustomizations -n flux-system            # all Ready
+kubectl get kustomizations -n flux-system            # all Ready, incl. workload-resources
 kubectl get clusters.cluster.x-k8s.io -A             # Provisioned
+kubectl get buckets.s3.services.k8s.aws -n ack-system
+kubectl get dbinstances.rds.services.k8s.aws -n ack-system
 kubectl get roles.iam.services.k8s.aws -n ack-system
-kubectl get podidentityassociations.eks.services.k8s.aws -n ack-system
 
 # Workload clusters: export kubeconfigs first
 #   mise -E aws run kubeconfigs && export KUBECONFIG=~/.kube/krops-workloads.yaml
 #   kubectl config use-context eu-north-1-workload   (or eu-west-1-workload)
-kubectl get kustomizations -n flux-system            # aws-operators, s3-buckets, rds-instances, iam-roles
+kubectl get kustomizations -n flux-system            # flux-system root only; workload/base is empty
 
 # AWS
 aws s3api get-bucket-encryption    --bucket krops-<account>-eu-north-1-workload-data
@@ -531,12 +527,12 @@ sweep; the environment owns no cloud resources.
 For `aws`, teardown suspends Flux, deletes every workload CAPI Cluster while
 leaving the management Cluster object alone, and waits before touching the
 controller host. It then runs a best-effort AWS sweep for both workload
-regions and the self-managed management cluster. The sweep removes pod
-identity associations, nodegroups, EKS control planes, orphaned RDS instances,
-CAPA-tagged VPC resources in dependency order, versioned S3 buckets, CAPA and
-ACK IAM roles, the `krops-reader` user, and the `clusterawsadm`
-CloudFormation stack. It removes CAPI providers and bootstrap Helm releases
-when the controller host remains reachable.
+regions and the self-managed management cluster. The sweep removes
+nodegroups, EKS control planes, orphaned RDS instances, CAPA-tagged VPC
+resources in dependency order, versioned S3 buckets, CAPA and ACK IAM roles,
+the `krops-reader` user, and the `clusterawsadm` CloudFormation stack. It
+removes CAPI providers and bootstrap Helm releases when the controller host
+remains reachable.
 
 The controller-host guard prevents removal while CAPI workload deletion is
 unconfirmed. Do not bypass it unless you accept orphaned infrastructure. If a
@@ -545,10 +541,11 @@ recovery mode explicit. A missing AWS CLI in normal AWS mode is reported and
 the orphan sweep is skipped; `AWS_ONLY=1` requires the CLI and fails preflight
 without it.
 
-ACK resources can survive if their workload cluster disappears before their
-custom resources finish deleting. The explicit sweep is what removes those
-orphans, including both workload regions and the self-managed management
-cluster.
+ACK's S3 and RDS controllers run only on the management cluster (#346), so
+suspending Flux there before deletion means their `Bucket`/`DBInstance` CRs
+are never pruned gracefully during a full AWS teardown. The explicit sweep is
+what removes those resources, including both workload regions and the
+self-managed management cluster.
 
 ## Validation
 

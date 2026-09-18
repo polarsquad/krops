@@ -703,47 +703,7 @@ async fn eks_exists(cluster: &str, region: &str) -> bool {
     .await
 }
 
-/// 4a. Pod identity associations (only possible while EKS exists).
-pub async fn cleanup_pod_identity_associations(target: &AwsSweepTarget) {
-    if !eks_exists(&target.eks_cluster_name, &target.region).await {
-        println!(
-            "✓   EKS cluster {} not found in {} – no pod identity associations to clean",
-            target.eks_cluster_name, target.region
-        );
-        return;
-    }
-    let mut args = aws_base(&target.region);
-    args.extend_from_slice(&[
-        "eks".into(),
-        "list-pod-identity-associations".into(),
-        "--cluster-name".into(),
-        target.eks_cluster_name.clone(),
-        "--query".into(),
-        "associations[].associationId".into(),
-        "--output".into(),
-        "text".into(),
-    ]);
-    let argrefs: Vec<&str> = args.iter().map(String::as_str).collect();
-    let ids = capture_lossy("aws", &argrefs).await;
-    for id in ids.split_whitespace() {
-        println!(">>>   Deleting pod identity association: {id}");
-        let mut args = aws_base(&target.region);
-        args.extend_from_slice(&[
-            "eks".into(),
-            "delete-pod-identity-association".into(),
-            "--cluster-name".into(),
-            target.eks_cluster_name.clone(),
-            "--association-id".into(),
-            id.into(),
-        ]);
-        let argrefs: Vec<&str> = args.iter().map(String::as_str).collect();
-        if !run_quiet("aws", &argrefs).await {
-            warn(&format!("Failed to delete pod identity association {id}"));
-        }
-    }
-}
-
-/// 4b. Nodegroups: delete in every region first, then wait (EKS refuses
+/// 4a. Nodegroups: delete in every region first, then wait (EKS refuses
 /// cluster deletion while nodegroups exist).
 pub async fn cleanup_nodegroups(target: &AwsSweepTarget) {
     if !eks_exists(&target.eks_cluster_name, &target.region).await {
@@ -816,7 +776,7 @@ pub async fn wait_nodegroups_deleted(target: &AwsSweepTarget) {
     }
 }
 
-/// 4c. EKS cluster deletion + wait (control-plane ENIs block VPC cleanup).
+/// 4b. EKS cluster deletion + wait (control-plane ENIs block VPC cleanup).
 pub async fn cleanup_eks_cluster(target: &AwsSweepTarget) {
     if !eks_exists(&target.eks_cluster_name, &target.region).await {
         println!(
@@ -870,7 +830,7 @@ pub async fn wait_eks_cluster_deleted(target: &AwsSweepTarget) {
     }
 }
 
-/// 4d. RDS instances orphaned when their workload cluster died first.
+/// 4c. RDS instances orphaned when their workload cluster died first.
 pub async fn cleanup_rds_instance(target: &AwsSweepTarget) {
     let mut args = aws_base(&target.region);
     args.extend_from_slice(&[
@@ -929,7 +889,7 @@ pub async fn cleanup_rds_instance(target: &AwsSweepTarget) {
     }
 }
 
-/// 4f. S3 buckets: versioned, so every object version AND delete marker
+/// 4e. S3 buckets: versioned, so every object version AND delete marker
 /// must be purged before the bucket itself can be deleted.
 pub async fn cleanup_s3_bucket(bucket: &str, region: &str) {
     let head = run_quiet(
@@ -1008,7 +968,7 @@ pub async fn cleanup_s3_bucket(bucket: &str, region: &str) {
     }
 }
 
-/// 4g. IAM role (detach policies, instance profiles, inline policies,
+/// 4f. IAM role (detach policies, instance profiles, inline policies,
 /// then the role). Skips silently when the role is absent.
 pub async fn cleanup_iam_role(role: &str) {
     if !run_quiet("aws", &["iam", "get-role", "--role-name", role]).await {
@@ -1144,7 +1104,7 @@ pub async fn cleanup_capa_iam_roles(prefix: &str) {
     }
 }
 
-/// 4g. IAM user (login profile, access keys, inline policies, user).
+/// 4f. IAM user (login profile, access keys, inline policies, user).
 pub async fn cleanup_iam_user(user: &str) {
     if !run_quiet("aws", &["iam", "get-user", "--user-name", user]).await {
         return;
@@ -1213,7 +1173,7 @@ pub async fn cleanup_iam_user(user: &str) {
     }
 }
 
-/// 4h. CloudFormation bootstrap stack.
+/// 4g. CloudFormation bootstrap stack.
 pub async fn cleanup_cfn_stack(stack: &str, region: &str) {
     if !run_quiet(
         "aws",
@@ -1248,7 +1208,7 @@ pub async fn cleanup_cfn_stack(stack: &str, region: &str) {
     }
 }
 
-/// 4e. VPC resources, gated on the CAPA ownership tag (krops scope
+/// 4d. VPC resources, gated on the CAPA ownership tag (krops scope
 /// only): NAT gateways + their EIPs, subnets, IGWs, route tables,
 /// security groups (rules first, then the groups), the VPC itself.
 pub async fn cleanup_vpc_resources(target: &AwsSweepTarget) {
@@ -2221,34 +2181,33 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
                 .join("-");
             targets.push(AwsSweepTarget::mgmt(&region, prefix, eks));
         }
-        // 4a+4b: associations + nodegroups in all regions, then wait.
+        // 4a: nodegroups in all regions, then wait.
         for target in &targets {
             println!(
                 ">>>   [{}] cluster: {}",
                 target.region, target.eks_cluster_name
             );
-            cleanup_pod_identity_associations(target).await;
             cleanup_nodegroups(target).await;
         }
         for target in &targets {
             wait_nodegroups_deleted(target).await;
         }
-        // 4c: EKS clusters, all regions, then wait.
+        // 4b: EKS clusters, all regions, then wait.
         for target in &targets {
             cleanup_eks_cluster(target).await;
         }
         for target in &targets {
             wait_eks_cluster_deleted(target).await;
         }
-        // 4d: RDS.
+        // 4c: RDS.
         for target in &targets {
             cleanup_rds_instance(target).await;
         }
-        // 4e: VPC resources (CAPA-tagged).
+        // 4d: VPC resources (CAPA-tagged).
         for target in &targets {
             cleanup_vpc_resources(target).await;
         }
-        // 4f: S3 buckets.
+        // 4e: S3 buckets.
         let account = capture_lossy(
             "aws",
             &[
@@ -2272,7 +2231,7 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
         } else {
             warn("Could not determine AWS account ID – skipping S3 bucket cleanup");
         }
-        // 4g: IAM (per-cluster prefix sweeps + global lists).
+        // 4f: IAM (per-cluster prefix sweeps + global lists).
         for target in &targets {
             cleanup_capa_iam_roles(&target.cluster_name).await;
         }
@@ -2282,7 +2241,7 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
         for user in &cfg.repo.teardown.global_iam_users {
             cleanup_iam_user(user).await;
         }
-        // 4h: CFN stack.
+        // 4g: CFN stack.
         if let Some(stack) = cfg.repo.teardown.cfn_stack_name.as_deref() {
             let regions: Vec<String> = targets.iter().map(|t| t.region.clone()).collect();
             for region in regions {

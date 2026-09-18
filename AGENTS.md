@@ -13,7 +13,8 @@ resources. There is no app source code here, only declarative infrastructure.
 
 - `mgmt/aws/`: synced by the MANAGEMENT cluster's Flux.
   - `infrastructure/`: cert-manager, CAPI operator, CAPA identity, ACK
-    controllers, pod-identity roles, account-global IAM, konflate.
+    controllers (S3/RDS/IAM), workload-resources (per-cluster Bucket,
+    DBInstance, reader Role), account-global IAM, konflate.
   - `capi-providers/`: capi-system, capa-system, caaph-system.
   - `addons/flux-apps/`: installs Flux on each workload cluster
     (HelmChartProxy + ClusterResourceSets).
@@ -84,7 +85,8 @@ resources. There is no app source code here, only declarative infrastructure.
   `gcp-vars` (flux-system) and the workload `cluster-vars`. Teardown is
   manual until the live acceptance run.
 - `workload/`: synced by each WORKLOAD cluster's Flux.
-  - `base/`: ACK controllers and S3/RDS/IAM custom resources.
+  - `base/`: empty overlay; the AWS resources live in
+    `mgmt/aws/infrastructure/workload-resources/` (#346).
   - `azure-base/`: cert-manager, ASO (workload identity), and the Azure
     resources (VNet + delegated subnet + private DNS, storage account +
     container, PostgreSQL Flexible Server). `swedencentral-01/` points at it.
@@ -196,7 +198,12 @@ Each component pairs a plain kustomize root with a Flux `Kustomization`:
 - Register new components in the parent `kustomization.yaml` (the
   `flux-ks.yaml` entry) and use `dependsOn` / `wait: true` for ordering.
 - Per-cluster values come from `postBuild.substituteFrom: cluster-vars`
-  (`${AWS_REGION}`, `${CLUSTER_NAME}`), not from hardcoding.
+  (`${AZURE_LOCATION}`/`${GCP_REGION}`, `${CLUSTER_NAME}`, ...) on workload
+  clusters that have one, not from hardcoding. The management cluster has no
+  `cluster-vars` ConfigMap (no per-cluster Flux sync target lives there), so
+  management-side, per-cluster manifests (e.g.
+  `mgmt/aws/infrastructure/workload-resources/`) use literal values instead —
+  see `docs/aws-iam.md`.
 - Adding a workload cluster or app is a documented multi-step procedure:
   follow `docs/extending.md` exactly rather than improvising.
 
@@ -282,7 +289,7 @@ Load these only when the task touches their domain:
 - `docs/extending.md`: adding a workload cluster, adding apps, adding other providers (Azure, Talos, k0smotron).
 - `docs/secrets.md`: SOPS + age setup, credential rotation.
 - `docs/konflate.md`: rendered PR review, CI gate, tokens, write-back.
-- `docs/aws-iam.md`: EKS Pod Identity, ACK controller roles, reader user.
+- `docs/aws-iam.md`: ACK on the management cluster only, static credential permissions, reader roles and user.
 - `docs/operations.md`: quotas, configuration, bootstrap, verification.
 - `docs/workload-resources.md`: S3/RDS posture, known limitations.
 - `docs/airgap.md`: Zarf offline bundle for the local-host profile.

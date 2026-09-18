@@ -5,7 +5,7 @@
 #   1. Suspend Flux reconciliation (prevent re-creation of deleted resources)
 #   2. Delete CAPI workload clusters (CAPA tears down all AWS resources per cluster)
 #   3. Wait for CAPI clusters to be fully deprovisioned
-#   4. Clean up orphaned AWS resources (pod identity, nodegroups, EKS, RDS,
+#   4. Clean up orphaned AWS resources (nodegroups, EKS, RDS,
 #      VPCs, S3 buckets, IAM, CFN) — in BOTH regions ($REGIONS)
 #   5. Delete CAPI providers (operator deprovisions controllers)
 #   6. Uninstall the FluxInstance Helm release
@@ -142,10 +142,11 @@ export AWS_PAGER=""
 # ── Configuration ──────────────────────────────────────────────────────────────
 REGIONS="eu-north-1 eu-west-1"
 
-# Global IAM roles (region-independent): the ACK controller pod-identity roles
-# and the per-cluster reader roles created by the workload ACK IAM controllers
-# (krops-${CLUSTER_NAME}-reader, see workload/base/iam-roles/role.yaml)
-GLOBAL_IAM_ROLES="krops-ack-s3-controller krops-ack-rds-controller krops-ack-iam-controller krops-eu-north-1-workload-reader krops-eu-west-1-workload-reader"
+# Global IAM roles (region-independent): the per-cluster reader roles created
+# by the management cluster's ACK IAM controller
+# (krops-${CLUSTER_NAME}-reader, see
+# mgmt/aws/infrastructure/workload-resources/roles.yaml)
+GLOBAL_IAM_ROLES="krops-eu-north-1-workload-reader krops-eu-west-1-workload-reader"
 
 # Global IAM users: the console reader user created by the management
 # cluster's ACK IAM controller (mgmt/aws/infrastructure/aws-global-iam/
@@ -220,8 +221,8 @@ _get_eks_cluster() {
   esac
 }
 
-# CLUSTER_NAME as substituted into the workload manifests (cluster-vars
-# ConfigMap in mgmt/aws/addons/flux-apps/flux-instance.yaml). Used to derive
+# CLUSTER_NAME as used in the literals of
+# mgmt/aws/infrastructure/workload-resources/. Used to derive
 # the S3 bucket name, the CAPA ownership tag, and to sweep CAPA-created IAM
 # roles by name.
 _get_cluster_name() {
@@ -240,9 +241,9 @@ _get_capa_tag_key() {
   echo "sigs.k8s.io/cluster-api-provider-aws/cluster/$(_get_cluster_name "$1")"
 }
 
-# RDS instance identifier created by the ACK RDS controller on each workload
-# cluster: krops-${CLUSTER_NAME}-db (see workload/base/rds-instances/dbinstance.yaml
-# and the cluster-vars ConfigMap in mgmt/aws/addons/flux-apps/flux-instance.yaml).
+# RDS instance identifier created by the ACK RDS controller on the management
+# cluster for each workload cluster: krops-${CLUSTER_NAME}-db (see
+# mgmt/aws/infrastructure/workload-resources/dbinstances.yaml).
 _get_rds_instance() {
   case "$1" in
     eu-north-1) echo "krops-eu-north-1-workload-db" ;;
@@ -254,27 +255,6 @@ _get_rds_instance() {
 # ── AWS orphan cleanup helpers ────────────────────────────────────────────────
 # All helpers gracefully skip if the resource is already gone and never abort
 # the script on failure.
-
-# ── Pod identity associations ──────────────────────────────────────────────────
-_cleanup_pod_identity_associations() {
-  _region="$1"; _cluster="$2"
-
-  # Only possible while the EKS cluster exists
-  if ! aws eks describe-cluster --name "$_cluster" --region "$_region" \
-       >/dev/null 2>&1; then
-    success "EKS cluster $_cluster not found in $_region – no pod identity associations to clean"
-    return 0
-  fi
-
-  for _assoc_id in $(aws eks list-pod-identity-associations \
-      --cluster-name "$_cluster" --region "$_region" \
-      --query 'associations[].associationId' --output text 2>/dev/null || true); do
-    info "  Deleting pod identity association: $_assoc_id"
-    aws eks delete-pod-identity-association \
-      --cluster-name "$_cluster" --association-id "$_assoc_id" --region "$_region" \
-      >/dev/null 2>&1 || warn "  Failed to delete pod identity association $_assoc_id"
-  done
-}
 
 # ── Nodegroups ─────────────────────────────────────────────────────────────────
 _cleanup_nodegroups() {
@@ -377,11 +357,13 @@ _cleanup_rds_instance() {
     2>/dev/null || warn "  Failed to delete RDS instance $_rds_db"
 }
 
-# ── S3 buckets (created by the ACK S3 controller on workload clusters) ─────────
-# Like the RDS instances, the Bucket CRs live on the workload clusters, so the
-# buckets are orphaned when the clusters are deleted. Buckets are versioned
-# (see workload/base/s3-buckets/bucket.yaml), so every object version AND delete
-# marker must be purged before the bucket itself can be deleted.
+# ── S3 buckets (created by the ACK S3 controller on the management cluster) ────
+# Like the RDS instances, this sweep bypasses Flux/ACK entirely: step 1
+# suspends Flux and scales the ACK controllers to zero, so the Bucket CR (now declared on the
+# management cluster, see mgmt/aws/infrastructure/workload-resources/buckets.yaml)
+# is never pruned gracefully during a full AWS teardown. Buckets are
+# versioned, so every object version AND delete marker must be purged before
+# the bucket itself can be deleted.
 _cleanup_s3_bucket() {
   _bucket="$1"; _bucket_region="$2"
 
@@ -719,6 +701,12 @@ if [ "${AWS_ONLY:-0}" != "1" ]; then
   else
     warn "No Flux Kustomizations found – skipping suspension"
   fi
+  # Suspending Flux does not stop the ACK controllers, which would recreate
+  # whatever the AWS sweep deletes while the Bucket/DBInstance/Role CRs remain.
+  if kubectl get namespace ack-system >/dev/null 2>&1; then
+    kubectl scale deployment --all -n ack-system --replicas=0 \
+      || warn "Could not scale ACK controllers down – continuing anyway"
+  fi
 else
   warn "AWS_ONLY mode – skipping Flux suspension"
 fi
@@ -792,31 +780,29 @@ fi
 #
 # Sub-steps (each runs across ALL regions in $REGIONS before moving on, so
 # both regions' slow deletions overlap instead of blocking each other):
-#   4a. Pod identity associations  – ACK controllers (EKS API, needs cluster)
-#   4b. Nodegroups                 – delete in both regions, then wait: EKS
+#   4a. Nodegroups                 – delete in both regions, then wait: EKS
 #                                   refuses to delete a cluster with nodegroups
-#   4c. EKS clusters               – delete in both regions, then wait: the
+#   4b. EKS clusters               – delete in both regions, then wait: the
 #                                   control plane ENIs block VPC cleanup
-#   4d. RDS instances              – ACK-created DBInstances (orphaned when the
-#                                   workload cluster dies before the CR prunes)
-#   4e. VPC resources              – subnets, IGW, NAT+EIPs, route tables, SGs,
+#   4c. RDS instances              – ACK-created DBInstances (declared on the
+#                                   management cluster; swept directly since
+#                                   Flux is suspended before teardown)
+#   4d. VPC resources              – subnets, IGW, NAT+EIPs, route tables, SGs,
 #                                   VPC – scoped to CAPA-tagged VPCs only
-#   4f. S3 buckets                 – ACK-created versioned data buckets
-#   4g. IAM roles + users          – CAPA per-cluster roles (prefix sweep)
-#                                   + ACK controller roles
+#   4e. S3 buckets                 – ACK-created versioned data buckets
+#   4f. IAM roles + users          – CAPA per-cluster roles (prefix sweep)
 #                                   + ACK-created krops-*-reader roles
 #                                   + the krops-reader console user
-#   4h. CloudFormation stack       – clusterawsadm bootstrap stack
+#   4g. CloudFormation stack       – clusterawsadm bootstrap stack
 
 step_aws_cleanup() {
   info "Cleaning up orphaned AWS resources in regions: $REGIONS"
 
-  # ── 4a+4b: pod identity associations, then kick off nodegroup deletion ─────
+  # ── 4a: kick off nodegroup deletion in both regions ────────────────────────
   for _region in $REGIONS; do
     _eks_cluster=$(_get_eks_cluster "$_region")
     info "  [$_region] cluster: $_eks_cluster"
 
-    _cleanup_pod_identity_associations "$_region" "$_eks_cluster"
     _cleanup_nodegroups "$_region" "$_eks_cluster"
   done
 
@@ -825,7 +811,7 @@ step_aws_cleanup() {
     _wait_nodegroups_deleted "$_region" "$(_get_eks_cluster "$_region")"
   done
 
-  # ── 4c: EKS clusters – delete in both regions, then wait for both ──────────
+  # ── 4b: EKS clusters – delete in both regions, then wait for both ──────────
   for _region in $REGIONS; do
     _cleanup_eks_cluster "$_region" "$(_get_eks_cluster "$_region")"
   done
@@ -833,17 +819,17 @@ step_aws_cleanup() {
     _wait_eks_cluster_deleted "$_region" "$(_get_eks_cluster "$_region")"
   done
 
-  # ── 4d: RDS instances (ACK-created, live in each region's default VPC) ─────
+  # ── 4c: RDS instances (ACK-created, live in each region's default VPC) ─────
   for _region in $REGIONS; do
     _cleanup_rds_instance "$_region" "$(_get_rds_instance "$_region")"
   done
 
-  # ── 4e: VPC resources (CAPA-tagged only – krops scope) ───────────────────
+  # ── 4d: VPC resources (CAPA-tagged only – krops scope) ───────────────────
   for _region in $REGIONS; do
     _cleanup_vpc_resources "$_region" "$(_get_cluster_name "$_region")"
   done
 
-  # ── 4f: S3 buckets (krops-${ACCOUNT_ID}-${CLUSTER_NAME}-data) ────────────
+  # ── 4e: S3 buckets (krops-${ACCOUNT_ID}-${CLUSTER_NAME}-data) ────────────
   _account_id=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || true)
   if [ -n "$_account_id" ]; then
     for _region in $REGIONS; do
@@ -853,7 +839,7 @@ step_aws_cleanup() {
     warn "  Could not determine AWS account ID – skipping S3 bucket cleanup"
   fi
 
-  # ── 4g: IAM roles + users ───────────────────────────────────────────────────
+  # ── 4f: IAM roles + users ───────────────────────────────────────────────────
   for _region in $REGIONS; do
     _cleanup_capa_iam_roles "$(_get_cluster_name "$_region")"
   done
@@ -864,7 +850,7 @@ step_aws_cleanup() {
     _cleanup_iam_user "$_user"
   done
 
-  # ── 4h: CloudFormation stack ────────────────────────────────────────────────
+  # ── 4g: CloudFormation stack ────────────────────────────────────────────────
   for _region in $REGIONS; do
     _cleanup_cfn_stack "$_region" "$CFN_STACK_NAME"
   done

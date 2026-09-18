@@ -45,20 +45,17 @@ capi-operator = "0.28.0"
 # against the Git manifests that define the same names.
 # CloudFormation stack created by `clusterawsadm bootstrap iam`.
 cfn-stack-name = "cluster-api-provider-aws-sigs-k8s-io"
-# Region-independent IAM roles: the ACK controller pod-identity roles
-# (mgmt/aws/infrastructure/ack-pod-identity/) and the per-cluster reader
-# roles created by the workload ACK IAM controllers.
+# Region-independent IAM roles: the per-cluster reader roles created by the
+# management cluster's ACK IAM controller
+# (mgmt/aws/infrastructure/workload-resources/roles.yaml).
 global-iam-roles = [
-  "krops-ack-s3-controller",
-  "krops-ack-rds-controller",
-  "krops-ack-iam-controller",
   "krops-eu-north-1-workload-reader",
   "krops-eu-west-1-workload-reader",
 ]
 # The console reader user created by the management cluster's ACK IAM
 # controller (mgmt/aws/infrastructure/aws-global-iam/reader-user.yaml).
 global-iam-users = ["krops-reader"]
-# S3 bucket pattern (workload/base/s3-buckets/bucket.yaml).
+# S3 bucket pattern (mgmt/aws/infrastructure/workload-resources/buckets.yaml).
 s3-bucket-pattern = "krops-{account_id}-{cluster_name}-data"
 
 [environments.local-host]
@@ -120,8 +117,8 @@ manifest = "mgmt/aws/infrastructure/aws-identity/identity.yaml"
 mgmt-eks-cluster-name = "default_eu-north-1-management-control-plane"
 mgmt-iam-role-prefix = "eu-north-1-management"
 # Workload clusters the orphan sweep visits (order: file order = sweep
-# order). Names mirror the Kustomization namePrefixes and the cluster-vars
-# substitutions in mgmt/aws/addons/flux-apps/flux-instance.yaml.
+# order). Names mirror the literals in
+# mgmt/aws/infrastructure/workload-resources/.
 [[environments.aws.teardown.aws-workloads]]
 region = "eu-north-1"
 cluster-name = "eu-north-1-workload"

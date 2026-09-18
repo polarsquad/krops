@@ -1,16 +1,21 @@
 ---
 # ══════════════════════════════════════════════════════════════════════════════
-# ACK IAM + EKS controllers on the MANAGEMENT cluster.
+# ACK IAM, S3, and RDS controllers — all on the MANAGEMENT cluster only.
 #
-# Purpose: declaratively create the IAM role and the EKS PodIdentityAssociations
-# that let the ACK S3 controllers on the WORKLOAD clusters authenticate via
-# EKS Pod Identity — no static AWS credentials ever land on workload clusters.
+# No workload cluster runs an ACK controller or holds AWS credentials. Every
+# krops-managed AWS resource (per-cluster S3 bucket, RDS instance, reader IAM
+# role — see mgmt/aws/infrastructure/workload-resources/) is created by these
+# controllers, tagged with the owning cluster's name.
 #
-# These management-side controllers authenticate with the same SOPS-encrypted
-# credential pattern used by capa-system (aws-credentials.sops.yaml).
+# Authentication: the same SOPS-encrypted static credentials used by
+# capa-system (aws-credentials.sops.yaml). EKS Pod Identity is not used here:
+# it would only help a controller running on a specific EKS cluster
+# authenticate to AWS, which is not this controller's problem — it runs once,
+# calls the AWS API directly, and is not scoped to any one cluster.
 #
-# The kind management cluster runs on kind (not EKS), so IRSA/Pod Identity is
-# not available here; static credentials via SOPS is the established pattern.
+# The credential's own IAM permissions must cover this direct S3/RDS
+# management (see docs/aws-iam.md); this is broader than the narrowly-scoped,
+# per-controller IAM roles the old per-workload-cluster design used.
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
@@ -26,13 +31,24 @@ spec:
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
 metadata:
-  name: ack-eks-chart
+  name: ack-s3-chart
   namespace: ack-system
 spec:
   interval: 1h
-  url: oci://public.ecr.aws/aws-controllers-k8s/eks-chart
+  url: oci://public.ecr.aws/aws-controllers-k8s/s3-chart
   ref:
-    tag: "1.23.0"
+    tag: "1.11.0"
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: ack-rds-chart
+  namespace: ack-system
+spec:
+  interval: 1h
+  url: oci://public.ecr.aws/aws-controllers-k8s/rds-chart
+  ref:
+    tag: "1.12.0"
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -61,14 +77,39 @@ spec:
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: ack-eks-controller
+  name: ack-s3-controller
   namespace: ack-system
 spec:
   interval: 10m
   timeout: 5m
   chartRef:
     kind: OCIRepository
-    name: ack-eks-chart
+    name: ack-s3-chart
+  install:
+    crds: CreateReplace
+  upgrade:
+    crds: CreateReplace
+  values:
+    aws:
+      # Default region; eu-west-1 resources override it with the
+      # services.k8s.aws/region annotation on the CR.
+      region: eu-north-1
+      credentials:
+        secretName: aws-credentials
+        secretKey: credentials
+        profile: default
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: ack-rds-controller
+  namespace: ack-system
+spec:
+  interval: 10m
+  timeout: 5m
+  chartRef:
+    kind: OCIRepository
+    name: ack-rds-chart
   install:
     crds: CreateReplace
   upgrade:

@@ -1,7 +1,9 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-resources:
-  - aws-operators/flux-ks.yaml
-  - s3-buckets/flux-ks.yaml
-  - rds-instances/flux-ks.yaml
-  - iam-roles/flux-ks.yaml
+# Empty on purpose: ACK now runs only on the management cluster
+# (mgmt/aws/infrastructure/{ack-controllers,workload-resources}/, #346).
+# Workload clusters still run their own Flux instance (delivered by
+# mgmt/aws/addons/flux-apps/), ready for a future application workload —
+# see workload/local-host/podinfo/ for the pattern — but reconcile nothing
+# today.
+resources: []

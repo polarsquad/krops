@@ -1,0 +1,132 @@
+---
+# ══════════════════════════════════════════════════════════════════════════════
+# Per-cluster read-only IAM role, reconciled by the ACK IAM controller on the
+# MANAGEMENT cluster (mgmt/aws/infrastructure/ack-controllers/). IAM is a
+# global service, so the cluster name is part of the role name to keep the
+# two clusters from fighting over one role.
+#
+# Trust policy: the account root — any principal in the account that is itself
+# allowed to call sts:AssumeRole on this role can assume it. The account ID is
+# literal (see buckets.yaml for why).
+#
+# Permissions are read-only, scoped to the resources this repo creates on BOTH
+# clusters (krops-* S3 buckets and RDS instances): only RDS Describe actions
+# that support resource-level scoping are used — no blanket rds:Describe* on *.
+# ══════════════════════════════════════════════════════════════════════════════
+apiVersion: iam.services.k8s.aws/v1alpha1
+kind: Role
+metadata:
+  name: eu-north-1-workload-reader
+  namespace: ack-system
+  annotations:
+    services.k8s.aws/adoption-policy: adopt-or-create
+spec:
+  name: krops-eu-north-1-workload-reader
+  description: "Read-only access to krops S3 buckets and RDS instances"
+  assumeRolePolicyDocument: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Principal": { "AWS": "arn:aws:iam::120392301094:root" },
+          "Action": "sts:AssumeRole"
+        }
+      ]
+    }
+  inlinePolicies:
+    krops-read-only: |
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "ReadKropsBuckets",
+            "Effect": "Allow",
+            "Action": [
+              "s3:ListBucket",
+              "s3:GetBucket*",
+              "s3:GetObject",
+              "s3:GetObjectVersion",
+              "s3:GetEncryptionConfiguration",
+              "s3:GetLifecycleConfiguration"
+            ],
+            "Resource": [
+              "arn:aws:s3:::krops-*",
+              "arn:aws:s3:::krops-*/*"
+            ]
+          },
+          {
+            "Sid": "ReadKropsInstances",
+            "Effect": "Allow",
+            "Action": [
+              "rds:DescribeDBInstances",
+              "rds:ListTagsForResource"
+            ],
+            "Resource": "arn:aws:rds:*:120392301094:db:krops-*"
+          }
+        ]
+      }
+  tags:
+    - key: managed-by
+      value: flux-ack
+    - key: cluster
+      value: eu-north-1-workload
+---
+apiVersion: iam.services.k8s.aws/v1alpha1
+kind: Role
+metadata:
+  name: eu-west-1-workload-reader
+  namespace: ack-system
+  annotations:
+    services.k8s.aws/adoption-policy: adopt-or-create
+spec:
+  name: krops-eu-west-1-workload-reader
+  description: "Read-only access to krops S3 buckets and RDS instances"
+  assumeRolePolicyDocument: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Principal": { "AWS": "arn:aws:iam::120392301094:root" },
+          "Action": "sts:AssumeRole"
+        }
+      ]
+    }
+  inlinePolicies:
+    krops-read-only: |
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "ReadKropsBuckets",
+            "Effect": "Allow",
+            "Action": [
+              "s3:ListBucket",
+              "s3:GetBucket*",
+              "s3:GetObject",
+              "s3:GetObjectVersion",
+              "s3:GetEncryptionConfiguration",
+              "s3:GetLifecycleConfiguration"
+            ],
+            "Resource": [
+              "arn:aws:s3:::krops-*",
+              "arn:aws:s3:::krops-*/*"
+            ]
+          },
+          {
+            "Sid": "ReadKropsInstances",
+            "Effect": "Allow",
+            "Action": [
+              "rds:DescribeDBInstances",
+              "rds:ListTagsForResource"
+            ],
+            "Resource": "arn:aws:rds:*:120392301094:db:krops-*"
+          }
+        ]
+      }
+  tags:
+    - key: managed-by
+      value: flux-ack
+    - key: cluster
+      value: eu-west-1-workload

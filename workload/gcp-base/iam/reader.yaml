@@ -1,7 +1,8 @@
 ---
 # ══════════════════════════════════════════════════════════════════════════════
 # Per-cluster read-only identity (issue #72, the AWS IAM reader-role and
-# workload/base/iam-roles/ counterparts). A service account per cluster with
+# mgmt/aws/infrastructure/workload-resources/roles.yaml counterparts). A
+# service account per cluster with
 # storage.objectViewer on this cluster's bucket and cloudsql.instanceUser on
 # the project (the IAM-database-auth login role, which carries
 # cloudsql.instances.login), plus a token-creator grant ON this per-cluster

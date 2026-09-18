@@ -251,7 +251,7 @@ teardown controls, toolbox release, and current parity status.
 | [docs/bootstrap-cli.md](docs/bootstrap-cli.md) | The `krops-bootstrap` lifecycle CLI: toolbox distribution, interface, `bootstrap.toml`, pivot, teardown, parity status |
 | [docs/dependencies.md](docs/dependencies.md) | Renovate-managed dependency updates: covered surfaces, update procedure, intentional differences |
 | [docs/architecture.md](docs/architecture.md) | Architecture diagram, reconciliation order, how workload apps are delivered |
-| [docs/aws-iam.md](docs/aws-iam.md) | EKS Pod Identity, ACK controller IAM roles, per-cluster reader roles, the `krops-reader` console user |
+| [docs/aws-iam.md](docs/aws-iam.md) | ACK on the management cluster only, static credential permissions, per-cluster reader roles, the `krops-reader` console user |
 | [docs/workload-resources.md](docs/workload-resources.md) | S3 bucket security posture, RDS instances, known limitations |
 | [docs/konflate.md](docs/konflate.md) | Rendered Flux PR review: GitHub Actions gate, in-cluster instance, write-back to PRs, tokens |
 | [docs/secrets.md](docs/secrets.md) | SOPS + age secret management, key setup, credential rotation |
@@ -283,9 +283,11 @@ teardown controls, toolbox release, and current parity status.
 ├── renovate.json5                 Hosted Renovate discovery and grouping rules
 ├── mgmt/aws/                      Synced by the MANAGEMENT cluster's Flux
 │   ├── infrastructure/           cert-manager, CAPI operator, CAPA identity,
-│   │                              ACK controllers, pod-identity roles,
-│   │                              account-global IAM (reader console user),
-│   │                              konflate (rendered Flux PR review)
+│   │                              ACK controllers (S3/RDS/IAM, run here only),
+│   │                              per-workload-cluster Bucket/DBInstance/
+│   │                              reader-Role CRs, account-global IAM
+│   │                              (reader console user), konflate (rendered
+│   │                              Flux PR review)
 │   ├── capi-providers/           capi-system, capa-system (SOPS creds),
 │   │                              caaph-system
 │   ├── addons/flux-apps/         Installs Flux on each workload cluster
@@ -308,8 +310,10 @@ teardown controls, toolbox release, and current parity status.
 │   └── clusters/                 management (self-managed)
 ├── mgmt/azure/                    AKS management cluster (CAPZ + ASO)
 └── workload/                     Synced by each WORKLOAD cluster's Flux
-    ├── base/                     ACK S3/RDS/IAM controllers, Bucket CRs,
-    │                              DBInstance CRs, reader Role CRs
+    ├── base/                     Empty (AWS): ACK now runs only on the
+    │                              management cluster (mgmt/aws/infrastructure/
+    │                              workload-resources/), ready for a future
+    │                              app workload
     ├── azure-base/               cert-manager, ASO, and the Azure workload
     │                              resources (VNet, storage, PostgreSQL)
     ├── local-host/               OCI-synced Podinfo workload overlay

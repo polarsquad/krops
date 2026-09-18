@@ -1,7 +1,7 @@
 ---
 # ══════════════════════════════════════════════════════════════════════════════
-# Identity for the ASO controllers and CAPZ (the Azure counterpart of
-# mgmt/aws/infrastructure/ack-pod-identity/).
+# Identity for the ASO controllers and CAPZ (the Azure counterpart of the
+# AWS ACK controllers' static credentials, mgmt/aws/infrastructure/ack-controllers/).
 #
 # Reconciled by the ASO bundled with CAPZ on this (management) cluster:
 #   - the shared resource group and BOTH user-assigned identities are created

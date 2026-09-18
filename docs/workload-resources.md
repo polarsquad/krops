@@ -1,13 +1,14 @@
 # Workload resources
 
-What the ACK controllers on each workload cluster create in AWS. For how the
-controllers authenticate (and the per-cluster reader roles / console user),
-see [AWS authentication & IAM](./aws-iam.md).
+What the ACK controllers on the management cluster create in AWS for each
+workload cluster (#346). For how the controllers authenticate (and the
+per-cluster reader roles / console user), see
+[AWS authentication & IAM](./aws-iam.md).
 
 ## Bucket security posture
 
-`workload/base/s3-buckets/bucket.yaml` creates one bucket per cluster
-(`krops-<account>-<cluster>-data`) with:
+`mgmt/aws/infrastructure/workload-resources/buckets.yaml` creates one bucket
+per cluster (`krops-<account>-<cluster>-data`) with:
 
 - all public access blocked
 - server-side encryption enforced (SSE-S3/AES256, bucket keys)
@@ -17,15 +18,17 @@ see [AWS authentication & IAM](./aws-iam.md).
 
 ## RDS instances
 
-`workload/base/rds-instances/dbinstance.yaml` creates one PostgreSQL 17 instance
-per cluster (`krops-<cluster>-db`) in that cluster's own region; the ACK
-RDS controller runs with `aws.region: ${AWS_REGION}`:
+`mgmt/aws/infrastructure/workload-resources/dbinstances.yaml` creates one
+PostgreSQL 17 instance per cluster (`krops-<cluster>-db`) in that cluster's
+own region; the ACK RDS controller defaults to `eu-north-1` and the
+eu-west-1 instance overrides it with the `services.k8s.aws/region`
+annotation:
 
 - `db.t4g.micro`, 20 GiB gp3, single-AZ (smallest footprint)
 - not publicly accessible, storage encrypted
 - master password managed by RDS (`manageMasterUserPassword: true`) and stored
-  in Secrets Manager; workload clusters have no SOPS key, so an in-Git
-  password secret is not an option
+  in Secrets Manager, so the password never enters Git or the cluster (same
+  posture as Azure and GCP)
 
 > **Known limitation**: the `DBInstance` sets no `dbSubnetGroupName`, so the
 > instance lands in the region's **default VPC**, not the EKS VPC. CAPA

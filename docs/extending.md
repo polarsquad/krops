@@ -5,32 +5,52 @@
 1. Create `mgmt/aws/clusters/<region>/<env>/` with a `cluster.yaml`,
    `kustomization.yaml` (set `namePrefix`), and `capi-nameref.yaml` (so CAPI
    cross-references get the prefix applied; see the existing regions).
-2. Label the `Cluster` with `fluxcd: enabled` **and** `region: <region>`, and
-   include the `eks-pod-identity-agent` addon in the `AWSManagedControlPlane`.
+2. Label the `Cluster` with `fluxcd: enabled` **and** `region: <region>`.
 3. Register it in `mgmt/aws/clusters/<region>/kustomization.yaml` and add a
    `Kustomization` entry in `mgmt/aws/clusters/flux-ks.yaml` with
    `dependsOn: [capa-system]`.
 4. In `mgmt/aws/addons/flux-apps/flux-instance.yaml`, add a per-region
-   FluxInstance ConfigMap (sync path `workload/<region>-01`, plus `cluster-vars`)
-   and a matching `ClusterResourceSet`.
-5. Add a `PodIdentityAssociation` for the new cluster in
-   `mgmt/aws/infrastructure/ack-pod-identity/pod-identity-associations.yaml`
-   (use the `services.k8s.aws/region` annotation for non-default regions).
-6. Create `workload/<region>-01/kustomization.yaml` pointing at `../base`.
+   FluxInstance ConfigMap (sync path `workload/<region>-01`) and a matching
+   `ClusterResourceSet`.
+5. Add the cluster's `Bucket`, `DBInstance`, and reader `Role` to
+   `mgmt/aws/infrastructure/workload-resources/` (use the
+   `services.k8s.aws/region` annotation for non-default regions — see
+   [docs/aws-iam.md](./aws-iam.md)).
+6. Create `workload/<region>-01/kustomization.yaml` pointing at `../base`
+   (empty today — see "Adding apps to the workload clusters").
 7. Run `mise run validate`, commit, and push.
 
 ## Adding apps to the workload clusters
 
-Follow the `aws-operators` / `s3-buckets` pattern in `workload/base/`:
+`workload/base/` is empty (#346: ACK now runs only on the management
+cluster, see "Adding AWS resources" below). Follow the local-host Podinfo
+pattern (`workload/local-host/podinfo/`) for an app that should run
+per-workload-cluster rather than on the management cluster:
 
 1. Create `workload/base/<app>/` with a `kustomization.yaml` listing the app's
    manifests, and a `flux-ks.yaml` defining the Flux `Kustomization`
-   (path `./workload/base/<app>`; add `dependsOn` and `wait: true` as needed;
-   use `postBuild.substituteFrom: cluster-vars` for per-cluster values like
-   `${AWS_REGION}` and `${CLUSTER_NAME}`).
+   (path `./workload/base/<app>`; add `dependsOn` and `wait: true` as needed).
 2. Register the `flux-ks.yaml` in `workload/base/kustomization.yaml`.
 3. Run `mise run validate`, commit, and push. Every workload cluster picks it
    up on its next sync.
+
+## Adding AWS resources (ACK, management-cluster-only)
+
+Since #346, ACK's S3, RDS, and IAM controllers run once, on the management
+cluster, and manage resources for every workload cluster directly — they are
+not workload-cluster apps. To add a new AWS resource:
+
+1. Add the CR to `mgmt/aws/infrastructure/workload-resources/` (a new file,
+   or append to `buckets.yaml`/`dbinstances.yaml`/`roles.yaml` if it's another
+   instance of an existing kind), one per workload cluster it applies to.
+2. There is no `cluster-vars` ConfigMap on the management cluster: use literal
+   values for the account ID, region, and cluster name, and the
+   `services.k8s.aws/region` annotation for anything outside `eu-north-1`
+   (see [docs/aws-iam.md](./aws-iam.md)).
+3. If the resource type is new (not S3/RDS/IAM), add its ACK controller
+   HelmRelease to `mgmt/aws/infrastructure/ack-controllers/helm.yaml` and
+   widen the static credential's IAM policy to cover it.
+4. Run `mise run validate`, commit, and push.
 
 ## Using other providers
 
@@ -73,9 +93,11 @@ CAPA is the provider this repo already runs; use it as the template:
 - `aws-credentials.sops.yaml` carries `AWS_B64ENCODED_CREDENTIALS`, produced
   by `mise run aws-credentials` (rotation: [docs/secrets.md](./secrets.md)).
 - Cluster definitions in `mgmt/aws/clusters/<region>/<env>/` use
-  `AWSManagedControlPlane` + `AWSManagedMachinePool` (EKS). Per-cluster IAM
-  for the ACK controllers is wired through
-  `mgmt/aws/infrastructure/ack-pod-identity/` (see
+  `AWSManagedControlPlane` + `AWSManagedMachinePool` (EKS). ACK's S3, RDS, and
+  IAM controllers run only on the management cluster
+  (`mgmt/aws/infrastructure/ack-controllers/`) and create each workload
+  cluster's resources from
+  `mgmt/aws/infrastructure/workload-resources/` (see
   [docs/aws-iam.md](./aws-iam.md)).
 
 ### Azure (CAPZ)

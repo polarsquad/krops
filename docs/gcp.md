@@ -9,7 +9,7 @@ that reconciles GCP resources from `workload/gcp-base/` (PR 2).
 |---|---|---|
 | CAPA, `AWSManagedControlPlane` | CAPZ, `AzureASOManagedControlPlane` | CAPG v1.13.1, `GCPManagedControlPlane` (GKE) |
 | ACK controllers on workload clusters | ASO 2.19.0 Helm release | Config Connector (KCC 1.156.0) Helm release |
-| EKS Pod Identity | Entra Workload Identity | Workload Identity Federation (WIF pool `krops`) |
+| Static SOPS credential (no per-cluster identity) | Entra Workload Identity | Workload Identity Federation (WIF pool `krops`) |
 | S3 bucket | Storage account + blob container | Storage bucket (versioning, uniform access, PAP) |
 | RDS PostgreSQL | PostgreSQL Flexible Server | Cloud SQL (private IP, IAM auth only) |
 | IAM reader role | none yet (follow-up) | `krops-reader` GSA + per-cluster reader GSA |

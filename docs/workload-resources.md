@@ -89,6 +89,13 @@ whose member is the project-level `krops-reader` GSA. The per-cluster GSA
 is also the Cloud SQL `SQLUser`, so the effective database identity is the
 per-cluster reader; the human path is human IAM account to `krops-reader`
 (imperative token-creator grant from gcp-bootstrap) to the per-cluster
-reader (the grant above). `tests/test-gcp-identity-chain.py` (in `mise run
+reader (the grant above). The project-level `roles/cloudsql.viewer` grant
+(read access to the instance in the console and API) sits alongside
+`cloudsql.instanceUser`. The account ID must fit 30 characters: for the
+22-character cluster name, `krops-<cluster>-r` is exactly 30, while
+`-reader` (35) and `-rd` (31) do not fit, and the identity chain test fails
+on a longer cluster name instead of the GCP API. The `iam` Kustomization
+depends on `storage` (the bucket the viewer grant references) and `postgres`
+(the SQLUser the `instanceUser` grant serves). `tests/test-gcp-identity-chain.py` (in `mise run
 validate` and CI) cross-checks the identity couplings between these and
 `mgmt/gcp/`.

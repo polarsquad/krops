@@ -35,7 +35,7 @@ mgmt-context = "krops-mgmt"
 # renovate: datasource=docker depName=ghcr.io/controlplaneio-fluxcd/charts/flux-operator
 flux-operator = "0.58.0"
 # renovate: datasource=helm registryUrl=https://charts.jetstack.io depName=cert-manager
-cert-manager = "1.21.1"
+cert-manager = "1.21.2"
 # renovate: datasource=helm registryUrl=https://kubernetes-sigs.github.io/cluster-api-operator depName=cluster-api-operator
 capi-operator = "0.28.0"
 

@@ -46,7 +46,7 @@ authenticates).
 bucket: uniform bucket-level access on (no object ACLs), versioning on,
 no public access.
 
-### Cloud SQL (private IP, IAM auth only)
+### Cloud SQL (private IP, IAM auth)
 
 `workload/gcp-base/postgres/postgres.yaml` creates one PostgreSQL 17
 instance per cluster (`krops-<cluster>-db`), zonal, with:
@@ -54,13 +54,19 @@ instance per cluster (`krops-<cluster>-db`), zonal, with:
 - private IP only (`ipv4Enabled: false`, no public address), the private IP
   reaching the workload VPC through the Private Service Access range and
   VPC peering in `workload/gcp-base/networking/`
-- `requireSsl: true` + `sslMode: ENCRYPTED_ONLY`
-- IAM authentication only (`cloudsql.iam_authentication: on`): the reader
-  user is the per-cluster reader service account, so no password exists
-  anywhere. AWS and Azure take the same posture by different mechanisms:
-  RDS uses `manageMasterUserPassword` (the password is generated and held
-  in Secrets Manager, not in Git or the cluster) and the Azure flexible
-  server sets `passwordAuth: Disabled` (Entra ID only)
+- `sslMode: ENCRYPTED_ONLY` (the deprecated `requireSsl` is not set)
+- `edition: ENTERPRISE`, set explicitly: the shared-core `db-f1-micro` tier
+  only exists on the Enterprise edition, and PostgreSQL 17 can otherwise
+  default to Enterprise Plus
+- IAM database authentication (`cloudsql.iam_authentication: on`): the reader
+  user is the per-cluster reader service account, and no `rootPassword` or
+  user password is set in Git or the cluster. The flag enables IAM login but
+  does not disable password login, and Cloud SQL has no instance-level switch
+  for that, so the built-in `postgres` user still exists; it has no password
+  set here and nothing in the repo uses it. The AWS and Azure counterparts
+  are stricter: RDS uses `manageMasterUserPassword` (the password is
+  generated and held in Secrets Manager) and the Azure flexible server sets
+  `passwordAuth: Disabled` (Entra ID only)
 
 Connection:
 

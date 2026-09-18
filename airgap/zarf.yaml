@@ -35,6 +35,7 @@ components:
       - name: cert-manager
         namespace: cert-manager
         url: https://charts.jetstack.io
+        # renovate: datasource=helm registryUrl=https://charts.jetstack.io depName=cert-manager
         version: v1.21.2
         valuesFiles:
           - values/cert-manager.yaml
@@ -114,13 +115,9 @@ components:
       - ghcr.io/fluxcd/notification-controller:v1.9.3@sha256:071c351a0fb163eeb6a2bb82f1e894f51b6b0734216d2e97d3d99c9ab9d710b9
 
   # CAPI core: 13 CRDs (Cluster, Machine, MachineDeployment, ClusterClass,
-  # ClusterResourceSet, ...) + the capi-controller-manager. Zarf fetches the
-  # v1.14.2 release asset (SHA-256 verified) and renders it with clusterctl
-  # during deploy, the same pattern CAAPH uses below (the capi-operator
-  # normally fetches and renders it online; it is absent in the gap). The
-  # clusterctl binary and clusterctl-providers.yaml are staged here, not
-  # per-component: capi-providers and caaph reuse them from
-  # /tmp/krops-airgap later in the same deploy run.
+  # ClusterResourceSet, ...) + the capi-controller-manager, rendered with
+  # clusterctl at deploy time. See docs/airgap.md's "Empirical findings" #1
+  # for why, and for what this component stages for capi-providers/caaph.
   - name: capi-core
     required: true
     files:
@@ -136,6 +133,9 @@ components:
         executable: true
       - source: files/clusterctl-providers.yaml
         target: /tmp/krops-airgap/clusterctl-providers.yaml
+      - source: scripts/resolve-clusterctl.sh
+        target: /tmp/krops-airgap/scripts/resolve-clusterctl.sh
+        executable: true
       # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-core
       - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.2/core-components.yaml
         shasum: b2fff42cb5e35440ed963a463c5ab128004481b5a4336ea0005812be2ff7e2a8
@@ -149,24 +149,13 @@ components:
         after:
           - description: Render and apply the core CAPI provider
             cmd: |
-              os=$(uname -s | tr '[:upper:]' '[:lower:]')
-              arch=$(uname -m)
-              case "$arch" in
-                arm64|aarch64) ;;
-                *)
-                  echo "ERROR: the capi-core air-gap component requires an arm64 deploy host; got $arch" >&2
-                  exit 1
-                  ;;
-              esac
-              clusterctl=/tmp/krops-airgap/bin/clusterctl-"$os"-arm64
-              [ -x "$clusterctl" ] || { echo "ERROR: bundled clusterctl is missing or not executable: $clusterctl" >&2; exit 1; }
+              . /tmp/krops-airgap/scripts/resolve-clusterctl.sh
               rendered=/tmp/krops-airgap/capi/core.rendered.yaml
               # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-core
               "$clusterctl" generate provider --core cluster-api:v1.14.2 \
                 --config /tmp/krops-airgap/clusterctl-providers.yaml \
                 --write-to "$rendered" &&
-              sed -E 's/--feature-gates=.*/--feature-gates=ClusterTopology=true/' "$rendered" > "$rendered.patched" &&
-              mv "$rendered.patched" "$rendered" &&
+              patch_feature_gates "$rendered" &&
               kubectl apply -f "$rendered"
             maxTotalSeconds: 120
     images:
@@ -177,10 +166,9 @@ components:
         name: capi-controller-manager
         namespace: capi-system
 
-  # CAPI providers: bootstrap, control-plane, and CAPD infrastructure. Zarf
-  # fetches each v1.14.2 release asset (SHA-256 verified) and renders it with
-  # clusterctl during deploy, reusing the clusterctl binary and
-  # clusterctl-providers.yaml staged by the capi-core component above.
+  # CAPI providers: bootstrap, control-plane, and CAPD infrastructure,
+  # rendered with clusterctl at deploy time. See docs/airgap.md's "Empirical
+  # findings" #1; reuses what capi-core (above) staged.
   - name: capi-providers
     required: true
     files:
@@ -213,21 +201,8 @@ components:
         after:
           - description: Render and apply the kubeadm bootstrap, kubeadm control-plane, and CAPD providers
             cmd: |
-              os=$(uname -s | tr '[:upper:]' '[:lower:]')
-              arch=$(uname -m)
-              case "$arch" in
-                arm64|aarch64) ;;
-                *)
-                  echo "ERROR: the capi-providers air-gap component requires an arm64 deploy host; got $arch" >&2
-                  exit 1
-                  ;;
-              esac
-              clusterctl=/tmp/krops-airgap/bin/clusterctl-"$os"-arm64
-              [ -x "$clusterctl" ] || { echo "ERROR: bundled clusterctl is missing or not executable: $clusterctl" >&2; exit 1; }
+              . /tmp/krops-airgap/scripts/resolve-clusterctl.sh
               config=/tmp/krops-airgap/clusterctl-providers.yaml
-              patch_feature_gates() {
-                sed -E 's/--feature-gates=.*/--feature-gates=ClusterTopology=true/' "$1" > "$1.patched" && mv "$1.patched" "$1"
-              }
               # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-bootstrap-kubeadm
               "$clusterctl" generate provider --bootstrap kubeadm:v1.14.2 \
                 --config "$config" --write-to /tmp/krops-airgap/capi/bootstrap.rendered.yaml &&
@@ -262,8 +237,8 @@ components:
         name: capd-controller-manager
         namespace: capd-system
 
-  # CAAPH provider. Reuses the clusterctl binary and clusterctl-providers.yaml
-  # staged by the capi-core component above (this component runs after it).
+  # CAAPH provider, rendered with clusterctl. See docs/airgap.md's "Empirical
+  # findings" #1; reuses what capi-core (above) staged.
   - name: caaph
     required: true
     actions:
@@ -271,17 +246,7 @@ components:
         after:
           - description: Render and apply the staged CAAPH provider
             cmd: |
-              os=$(uname -s | tr '[:upper:]' '[:lower:]')
-              arch=$(uname -m)
-              case "$arch" in
-                arm64|aarch64) ;;
-                *)
-                  echo "ERROR: the CAAPH air-gap component requires an arm64 deploy host; got $arch" >&2
-                  exit 1
-                  ;;
-              esac
-              clusterctl=/tmp/krops-airgap/bin/clusterctl-"$os"-arm64
-              [ -x "$clusterctl" ] || { echo "ERROR: bundled clusterctl is missing or not executable: $clusterctl" >&2; exit 1; }
+              . /tmp/krops-airgap/scripts/resolve-clusterctl.sh
               # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-addon-provider-helm
               "$clusterctl" generate provider --addon helm:v0.6.4 \
                 --config /tmp/krops-airgap/clusterctl-providers.yaml \

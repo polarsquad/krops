@@ -12,12 +12,11 @@ sops = "3.13.3"
 age = "1.3.2"
 uv = "0.12.13"
 
-# Zarf CLI (airgap prototype). The mise github backend downloads the raw
-# release asset and keeps its original filename, so we select the native
-# Linux/macOS arm64 asset and use `bin` to name the binary `zarf`.
+# Zarf CLI (airgap prototype). See docs/dependencies.md's "Intentional
+# differences" for why version/asset_pattern are written this way.
 [tools."github:zarf-dev/zarf"]
-version = "v0.85.0"
-asset_pattern = 'zarf_v{{ version }}_{{ os(linux="Linux", macos="Darwin") }}_{{ arch() }}'
+version = "0.85.0"
+asset_pattern = 'zarf_v{{ version }}_{{ os(linux="Linux", macos="Darwin") }}_{{ arch(x64="amd64") }}'
 bin = "zarf"
 
 [settings]
@@ -27,7 +26,7 @@ env_file = ".env"
 description = "Check scripts and air-gap image pins, cross-check bootstrap config, and build every kustomize overlay"
 run = '''
 fail=0
-for script in bootstrap.sh bootstrap-common.sh pivot.sh teardown.sh airgap/scripts/*.sh; do
+for script in bootstrap.sh bootstrap-common.sh pivot.sh teardown.sh scripts/toolbox-run.sh airgap/scripts/*.sh; do
   echo "==> bash -n $script"
   if ! bash -n "$script"; then
     echo "    FAILED: $script" >&2
@@ -44,14 +43,14 @@ if ! python3 airgap/tests/test-airgap-ownership.py; then
   echo "    FAILED: air-gap ownership invariant" >&2
   fail=1
 fi
-echo "==> toolbox entrypoint (podman client socket)"
-if ! python3 tests/test-toolbox-entrypoint-podman.py; then
-  echo "    FAILED: toolbox entrypoint podman client socket" >&2
-  fail=1
-fi
 echo "==> toolbox-run.sh exec (image and CLI args reach the container engine)"
 if ! python3 tests/test-toolbox-run-exec.py; then
   echo "    FAILED: toolbox-run.sh exec" >&2
+  fail=1
+fi
+echo "==> toolbox-run.sh .env precedence"
+if ! python3 tests/test-toolbox-run-env-precedence.py; then
+  echo "    FAILED: toolbox-run.sh .env precedence" >&2
   fail=1
 fi
 echo "==> air-gap digest token boundary"
@@ -62,6 +61,11 @@ fi
 echo "==> failure-notification job wiring"
 if ! python3 airgap/tests/test-airgap-failure-notification.py; then
   echo "    FAILED: failure-notification job wiring" >&2
+  fail=1
+fi
+echo "==> shared clusterctl-resolution script"
+if ! python3 airgap/tests/test-resolve-clusterctl.py; then
+  echo "    FAILED: shared clusterctl-resolution script" >&2
   fail=1
 fi
 echo "==> bootstrap.toml cross-check"

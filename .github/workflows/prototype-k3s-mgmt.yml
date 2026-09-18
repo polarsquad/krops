@@ -1,0 +1,71 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: prototype - k3s management cluster
+
+# Manual-only prototype (#333): does MGMT_CLUSTER_ENGINE=k3s work as a
+# management-cluster substrate in place of kind? See
+# docs/airgap.md#empirical-findings-why-the-package-looks-the-way-it-does.
+# Kept separate from air-gapped.yml so this experiment can't affect the
+# daily scheduled run either way.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-k3s:
+    name: Build and deploy with a k3s management cluster
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5001:5000
+        options: >-
+          --health-cmd "wget --spider --quiet http://localhost:5000/v2/"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Install mise
+        uses: jdx/mise-action@v4.3.0
+        with:
+          version: 2026.9.7
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Build air-gap bundle
+        run: airgap/scripts/build-package.sh
+        env:
+          AIRGAP_CLUSTER_NAME: airgap-wl
+          OCI_REGISTRY: localhost:5001
+          WORKLOAD_REGISTRY_HOST: krops-registry-airgap
+          ZARF_KEYLESS_SIGNING: "1"
+
+      - name: Deploy with a k3s management cluster
+        env:
+          SKIP_OFFLINE_CHECK: "1"
+          MGMT_CLUSTER_ENGINE: k3s
+          AIRGAP_VERIFY_REF: ${{ github.ref }}
+        run: |
+          airgap/scripts/offline-run.sh airgap/zarf-package-krops-airgap-*.tar.zst
+
+      - name: Store deployment evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: k3s-prototype-results
+          path: |
+            /tmp/airgap-offline-run.log
+            /tmp/airgap-offline-summary.txt
+            /tmp/airgap-sbom.*
+            /tmp/airgap-cert-manager-debug.txt
+          if-no-files-found: warn
+          retention-days: 1

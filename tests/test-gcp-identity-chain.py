@@ -24,6 +24,8 @@ KCC_WORKLOAD = REPO_ROOT / "workload/gcp-base/kcc/configconnector.yaml"
 READER = REPO_ROOT / "workload/gcp-base/iam/reader.yaml"
 SQL = REPO_ROOT / "workload/gcp-base/postgres/postgres.yaml"
 CLUSTER_VARS = REPO_ROOT / "mgmt/gcp/addons/flux-apps/flux-instance.yaml"
+# Project numbers are 12 digits today; leave headroom.
+BUCKET_PROJECT_NUMBER_DIGITS = 19
 KCC_WORKLOAD_SA = "cnrm-system/cnrm-controller-manager"
 # Per-cluster reader GSA accountId template (the -reader / -rd forms are 35 /
 # 31 chars, over GCP's 30-char service account ID limit; -r is 30 and fits).
@@ -268,6 +270,14 @@ def main() -> int:
             ref = d["spec"]["instanceRef"]["name"]
             if ref not in instances:
                 failures.append(f"(h) {SQL.relative_to(REPO_ROOT)}: {d['kind']} instanceRef `{ref}` matches no SQLInstance metadata.name {sorted(instances)}")
+
+    # ── (j) the bucket name fits GCP's 63-character limit for the real cluster
+    # name and a generous project number. ──────────────────────────────────
+    bucket = next(d for d in docs(REPO_ROOT / "workload/gcp-base/storage/bucket.yaml") if d.get("kind") == "StorageBucket")
+    if cluster_name is not None:
+        name = bucket["spec"]["resourceID"].replace("${GCP_PROJECT_NUMBER}", "9" * BUCKET_PROJECT_NUMBER_DIGITS).replace("${CLUSTER_NAME}", cluster_name)
+        if len(name) > 63:
+            failures.append(f"(j) bucket name `{name}` is {len(name)} chars; GCS bucket names are capped at 63")
 
     if failures:
         print("gcp identity chain FAILED:")

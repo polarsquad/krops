@@ -167,7 +167,7 @@
 
   <rect x="584" y="830" width="412" height="60" rx="8" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
   <text x="604" y="855" font-family="DejaVu Sans Mono" font-size="15" font-weight="bold" fill="#E8A868">Cloud SQL PostgreSQL 17</text>
-  <text x="604" y="876" font-family="DejaVu Sans" font-size="13.5" fill="#D4E2DA">krops-europe-north1-workload-db &#183; private IP, IAM auth only</text>
+  <text x="604" y="876" font-family="DejaVu Sans" font-size="13.5" fill="#D4E2DA">krops-europe-north1-workload-db &#183; private IP, IAM auth</text>
 
   <!-- gcp logo glyph -->
   <g transform="translate(930, 915)">

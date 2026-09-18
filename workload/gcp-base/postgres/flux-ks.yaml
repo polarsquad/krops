@@ -1,7 +1,7 @@
 ---
 # ══════════════════════════════════════════════════════════════════════════════
 # Flux Kustomization: the workload cluster's Cloud SQL instance (private IP,
-# IAM auth only). dependsOn: networking so the PSA range + VPC peering
+# IAM auth). dependsOn: networking so the PSA range + VPC peering
 # (the privateNetworkRef target) exists before the instance is created.
 # timeout: 30m because instance creation takes 10-20 min.
 # ══════════════════════════════════════════════════════════════════════════════

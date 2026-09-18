@@ -385,7 +385,7 @@ flowchart TD
         GSAS["krops-capg / krops-kcc / krops-reader GSAs"]
         VPC[(VPC + PSA range: krops-europe-north1-workload-psa)]
         BUCKET[(Storage bucket: krops-&lt;number&gt;-europe-north1-workload-data)]
-        SQL[(Cloud SQL: krops-europe-north1-workload-db<br/>private IP, IAM auth only)]
+        SQL[(Cloud SQL: krops-europe-north1-workload-db<br/>private IP, IAM auth)]
     end
 
     EUNC -->|CAPG provisions| GKE

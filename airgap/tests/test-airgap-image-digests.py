@@ -227,7 +227,12 @@ def main() -> int:
                     continue
                 digest = match.group("digest")
                 if digest is None:
-                    failures.append(f"{relative}:{number}: unpinned image: {reference}")
+                    detail = reference
+                    if match.group("name") == "sha256" and re.fullmatch(
+                        r"[a-f0-9]+", match.group("tag") or ""
+                    ):
+                        detail = f"{reference} (malformed digest length in: {line.strip()})"
+                    failures.append(f"{relative}:{number}: unpinned image: {detail}")
                     continue
                 key = (match.group("name"), match.group("tag"))
                 seen[key].append((digest, relative, number))

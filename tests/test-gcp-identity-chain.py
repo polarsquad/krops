@@ -213,13 +213,20 @@ def main() -> int:
                 f"(g) per-cluster reader accountId `{sa_name}` is {len(sa_name)} chars; "
                 f"GCP service account IDs are capped at 30")
 
+    # KCC takes the GCP account ID from metadata.name (there is no accountId
+    # field); a bare `krops-reader` would collide with the human GSA.
     reader_sa = [d for d in docs(READER) if d.get("kind") == "IAMServiceAccount"]
     if len(reader_sa) != 1:
         failures.append(f"{READER.relative_to(REPO_ROOT)}: expected 1 IAMServiceAccount, got {len(reader_sa)}")
-    elif reader_sa[0]["spec"].get("accountId") != READER_ACCOUNT:
+    elif reader_sa[0]["metadata"]["name"] != READER_ACCOUNT:
         failures.append(
-            f"{READER.relative_to(REPO_ROOT)}: accountId must be `{READER_ACCOUNT}` "
-            f"(GCP 30-char limit), got {reader_sa[0]['spec'].get('accountId')}")
+            f"{READER.relative_to(REPO_ROOT)}: IAMServiceAccount metadata.name must be `{READER_ACCOUNT}` "
+            f"(the account ID, GCP 30-char limit), got {reader_sa[0]['metadata']['name']}")
+    for d in docs(READER):
+        ref = d.get("spec", {}).get("resourceRef", {})
+        if ref.get("kind") == "IAMServiceAccount" and ref.get("name") != READER_ACCOUNT:
+            failures.append(
+                f"{READER.relative_to(REPO_ROOT)}: {d['metadata']['name']} resourceRef must name `{READER_ACCOUNT}`, got {ref.get('name')}")
 
     for role in ("roles/storage.objectViewer", "roles/cloudsql.instanceUser"):
         grants = [d for d in docs(READER) if d.get("kind") == "IAMPolicyMember" and d["spec"].get("role") == role]
@@ -236,14 +243,31 @@ def main() -> int:
     else:
         u = sql_users[0]["spec"]
         want = f"{READER_ACCOUNT}@${{GCP_PROJECT}}.iam"
-        if u.get("name") != want:
+        if u.get("resourceID") != want:
             failures.append(
-                f"(g) {SQL.relative_to(REPO_ROOT)}: SQLUser name must be the per-cluster "
-                f"reader GSA email in PostgreSQL's truncated form `{want}`, got {u.get('name')}")
+                f"(g) {SQL.relative_to(REPO_ROOT)}: SQLUser resourceID must be the per-cluster "
+                f"reader GSA email in PostgreSQL's truncated form `{want}`, got {u.get('resourceID')}")
         if u.get("type") != "CLOUD_IAM_SERVICE_ACCOUNT":
             failures.append(f"{SQL.relative_to(REPO_ROOT)}: SQLUser type must be CLOUD_IAM_SERVICE_ACCOUNT")
         if "host" in u:
             failures.append(f"{SQL.relative_to(REPO_ROOT)}: SQLUser host is MySQL-only; drop it for PostgreSQL")
+
+    # ── (h) KCC schema: these kinds name the GCP object with resourceID (or
+    # metadata.name), not spec.name / spec.accountId, which the CRDs lack; and
+    # instanceRef must name the SQLInstance's Kubernetes object. ───────────
+    forbidden = {"IAMServiceAccount": "accountId", "ComputeAddress": "name",
+                 "SQLInstance": "name", "SQLDatabase": "name", "SQLUser": "name"}
+    for path, doc in all_docs(REPO_ROOT / "workload/gcp-base"):
+        field = forbidden.get(doc.get("kind"))
+        if field and field in doc.get("spec", {}):
+            failures.append(f"(h) {path}: {doc['kind']} has no spec.{field}; use resourceID or metadata.name")
+    sql_docs = docs(SQL)
+    instances = {d["metadata"]["name"] for d in sql_docs if d.get("kind") == "SQLInstance"}
+    for d in sql_docs:
+        if d.get("kind") in ("SQLDatabase", "SQLUser"):
+            ref = d["spec"]["instanceRef"]["name"]
+            if ref not in instances:
+                failures.append(f"(h) {SQL.relative_to(REPO_ROOT)}: {d['kind']} instanceRef `{ref}` matches no SQLInstance metadata.name {sorted(instances)}")
 
     if failures:
         print("gcp identity chain FAILED:")

@@ -31,6 +31,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # visible.
 _PACKAGE_FILES_EVENT = "packageFiles with updates"
 
+# Shared across test scripts so repeat lookups hit cache, not GitHub (AGENTS.md).
+RENOVATE_CACHE_DIR = Path(tempfile.gettempdir()) / "krops-renovate-harness-cache"
+
 
 class RenovateResult:
     """Parsed outcome of one harness Renovate run."""
@@ -99,6 +102,7 @@ def run_renovate(fixture_files, transform=None, repo_root=REPO_ROOT):
     """
     fixture_files = sorted(fixture_files)
     env = os.environ.copy()
+    env.setdefault("RENOVATE_CACHE_DIR", str(RENOVATE_CACHE_DIR))
     env.update(
         {
             "LOG_FORMAT": "json",

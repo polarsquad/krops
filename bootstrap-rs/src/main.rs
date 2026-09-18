@@ -18,6 +18,7 @@
 //! a generic bootstrap engine and krops is its first consumer.
 
 mod config;
+mod engine;
 mod teardown;
 
 use config::{BootstrapConfig, Environment, SyncSource};
@@ -562,7 +563,7 @@ fn is_executable_file(p: &Path) -> bool {
 /// Secret safety: no secret material is ever passed on argv anywhere in this
 /// program (secrets travel via stdin manifests), so command lines are safe to
 /// echo verbatim in errors.
-async fn run(cmd: &str, args: &[&str]) -> Result<()> {
+pub(crate) async fn run(cmd: &str, args: &[&str]) -> Result<()> {
     let status = Command::new(cmd)
         .args(args)
         .status()
@@ -699,65 +700,16 @@ async fn preflight_checks(cfg: &Config, http: &reqwest::Client) -> Result<Prefli
         None
     };
 
-    // Detect and select a running container engine. Note: when using podman via
-    // the docker CLI shim (e.g., on macOS), `docker --version` reports podman;
-    // we check for that case first.
-    let engine = match cfg.container_engine.clone() {
-        Some(e) => e,
-        None => {
-            if command_exists("docker") && run_quiet("docker", &["info"]).await {
-                let version = capture_lossy("docker", &["--version"]).await;
-                if version.to_lowercase().contains("podman") {
-                    "podman".to_string()
-                } else {
-                    "docker".to_string()
-                }
-            } else if command_exists("podman") && run_quiet("podman", &["info"]).await {
-                "podman".to_string()
-            } else {
-                bail!("No running container engine found (tried docker and podman)");
-            }
-        }
-    };
-
-    let detected_engine_sock = match engine.as_str() {
-        "docker" => {
-            if !run_quiet("docker", &["info"]).await {
-                bail!("Docker daemon not running");
-            }
-            "/var/run/docker.sock".to_string()
-        }
-        "podman" => {
-            if !run_quiet("podman", &["info"]).await {
-                bail!("Podman is not running (is 'podman machine' started?)");
-            }
-            std::env::set_var("KIND_EXPERIMENTAL_PROVIDER", "podman");
-            let mut sock = capture_lossy(
-                "podman",
-                &["info", "--format", "{{.Host.RemoteSocket.Path}}"],
-            )
-            .await
-            .trim()
-            .trim_start_matches("unix://")
-            .to_string();
-            if sock.is_empty() {
-                sock = "/run/podman/podman.sock".to_string();
-                eprintln!(
-                    ">>> WARNING: Could not detect the podman API socket path; assuming {sock}"
-                );
-            }
-            sock
-        }
-        other => bail!("Unsupported CONTAINER_ENGINE '{other}' (expected 'docker' or 'podman')"),
-    };
-    // A containerized client can mount the API socket at /var/run/docker.sock
-    // while sibling containers need the daemon-side source path. The launcher
-    // supplies that source as ENGINE_SOCK, especially for remote Podman.
-    let engine_sock = cfg.engine_sock.clone().unwrap_or(detected_engine_sock);
+    let resolved = engine::resolve(
+        cfg.container_engine.clone(),
+        cfg.engine_sock.clone(),
+        cfg.toolbox,
+    )
+    .await?;
 
     Ok(Preflight {
-        engine,
-        engine_sock,
+        engine: resolved.engine,
+        engine_sock: resolved.engine_sock,
         github,
     })
 }
@@ -862,83 +814,28 @@ pub(crate) async fn select_toolbox_kind_kubeconfig(cfg: &Config) -> Result<()> {
     Ok(())
 }
 
-/// The toolbox container's own ID (Docker/Podman write it to /etc/hostname).
-fn toolbox_container_id() -> Option<String> {
-    std::fs::read_to_string("/etc/hostname")
-        .ok()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-}
-
-/// Attach the toolbox container to the kind network so kind-network
-/// endpoints (the internal API server, krops-registry:5000) resolve.
-/// Idempotent: docker exits 0 on re-attach, but podman errors with "is
-/// already connected", so failures are retried against a captured-error
-/// check instead of string-matching the (inherited) stderr.
-pub(crate) async fn toolbox_join_kind_network(cfg: &Config, engine: &str) -> Result<()> {
-    if !cfg.toolbox {
-        return Ok(());
-    }
-    let Some(id) = toolbox_container_id() else {
-        bail!("KROPS_TOOLBOX=1 but /etc/hostname is unreadable; cannot join the kind network");
-    };
-    let out = Command::new(engine)
-        .args(["network", "connect", "kind", &id])
-        .stderr(Stdio::piped())
-        .output()
-        .await
-        .with_context(|| format!("failed to spawn '{engine}'"))?;
-    if out.status.success() {
-        return Ok(());
-    }
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    // docker: "already exists in network"; podman: "is already connected"
-    // (or "already connected" on newer releases).
-    if stderr.to_lowercase().contains("already") {
-        return Ok(());
-    }
-    bail!(
-        "'{engine} network connect kind {id}' failed with {}:\n{}",
-        out.status,
-        stderr.trim_end()
-    );
-}
-
-/// Best-effort detach before `kind delete cluster`: kind removes the network
-/// after the last node, and an attached toolbox would keep it alive.
-pub(crate) async fn toolbox_leave_kind_network(cfg: &Config, engine: &str) {
-    if !cfg.toolbox {
-        return;
-    }
-    if let Some(id) = toolbox_container_id() {
-        let _ = run(engine, &["network", "disconnect", "kind", &id]).await;
-    }
-}
-
 /// Ensure the kind 'mgmt' cluster exists and is healthy.
 ///
 /// Default: reuse an existing cluster after validating that its context is
 /// reachable and all nodes go Ready; this makes reruns non-destructive and
 /// lets a partially failed bootstrap resume. With --recreate (or when no
 /// cluster exists) the cluster is (re)built from the rendered config.
-async fn ensure_kind_cluster(cfg: &Config, engine_sock: &str) -> Result<()> {
+async fn ensure_kind_cluster(cfg: &Config, engine: &str, engine_sock: &str) -> Result<()> {
     let kind_cluster = &cfg.repo.bootstrap.kind_cluster;
     let kind_context = &cfg.repo.bootstrap.kind_context;
     let clusters = capture_lossy("kind", &["get", "clusters"]).await;
     let exists = clusters.lines().any(|l| l.trim() == kind_cluster);
     let node_ready_timeout = format!("--timeout={NODE_READY_TIMEOUT}");
-    let engine = detect_engine_for_network(cfg).await;
 
     if exists && !cfg.recreate {
         println!(
             ">>> Reusing existing kind cluster '{kind_cluster}' (pass --recreate to replace it)..."
         );
         println!(">>> Validating existing cluster health...");
-        if let Some(engine) = engine.as_deref() {
-            // Idempotent (already-attached is success) and must precede the
-            // kubeconfig selection: the internal endpoint only resolves
-            // once the toolbox is on the kind network.
-            toolbox_join_kind_network(cfg, engine).await?;
+        {
+            // Must precede the kubeconfig selection: the internal endpoint
+            // only resolves once the toolbox is on the kind network.
+            engine::toolbox_join_kind_network(cfg, engine).await?;
             select_toolbox_kind_kubeconfig(cfg).await?;
         }
         if !run_quiet("kubectl", &["config", "use-context", kind_context]).await {
@@ -975,9 +872,7 @@ async fn ensure_kind_cluster(cfg: &Config, engine_sock: &str) -> Result<()> {
 
     if exists {
         println!(">>> Cluster '{kind_cluster}' exists and --recreate was given – recreating...");
-        if let Some(engine) = engine.as_deref() {
-            toolbox_leave_kind_network(cfg, engine).await;
-        }
+        engine::toolbox_leave_kind_network(cfg, engine).await;
         run("kind", &["delete", "cluster", "--name", kind_cluster]).await?;
     }
 
@@ -997,9 +892,7 @@ async fn ensure_kind_cluster(cfg: &Config, engine_sock: &str) -> Result<()> {
         &kind_config,
     )
     .await?;
-    if let Some(engine) = engine.as_deref() {
-        toolbox_join_kind_network(cfg, engine).await?;
-    }
+    engine::toolbox_join_kind_network(cfg, engine).await?;
     select_toolbox_kind_kubeconfig(cfg).await?;
 
     println!(">>> Waiting for cluster node to be ready...");
@@ -1652,19 +1545,6 @@ async fn watch_local_reconciliation(cfg: &Config, engine: &str) -> Result<()> {
 // The move stays re-runnable: objects are deleted from the source only after
 // they were created on the target, so kind stays authoritative until Phase 6.
 
-/// The engine binary toolbox network attach/detach must invoke. Host runs
-/// never need it; toolbox runs use the selected engine from preflight.
-async fn detect_engine_for_network(cfg: &Config) -> Option<String> {
-    if !cfg.toolbox {
-        return None;
-    }
-    Some(
-        cfg.container_engine
-            .clone()
-            .unwrap_or_else(|| "docker".to_string()),
-    )
-}
-
 /// One readiness probe of the local registry /v2/ endpoint (script: `curl
 /// --fail`): any response below 400 counts as serving. The toolbox reaches
 /// the registry by network name instead of the published localhost port.
@@ -2315,6 +2195,7 @@ async fn pivot_delete_bootstrap_cluster(
     cfg: &Config,
     http: &reqwest::Client,
     kc: &str,
+    engine: &str,
 ) -> Result<()> {
     if cfg.pivot_skip_delete {
         println!(">>> PIVOT_SKIP_DELETE=1: keeping the kind bootstrap cluster for inspection");
@@ -2352,11 +2233,8 @@ async fn pivot_delete_bootstrap_cluster(
 
     println!(">>> Deleting the kind bootstrap cluster...");
     // The toolbox must leave the kind network first: kind removes the
-    // network with the last node, and an attached toolbox container would
-    // keep it alive (same guard as --recreate and teardown).
-    if let Some(engine) = detect_engine_for_network(cfg).await {
-        toolbox_leave_kind_network(cfg, &engine).await;
-    }
+    // network with the last node, and an attached toolbox would keep it alive.
+    engine::toolbox_leave_kind_network(cfg, engine).await;
     run(
         "kind",
         &[
@@ -2440,7 +2318,7 @@ async fn run_pivot(cfg: &Config, preflight: &Preflight, http: &reqwest::Client) 
     pivot_seed_target(cfg, preflight, registry_config.path(), &kc).await?;
 
     // ── Phase 6: delete the bootstrap cluster ─────────────────────────────
-    pivot_delete_bootstrap_cluster(cfg, http, &kc).await?;
+    pivot_delete_bootstrap_cluster(cfg, http, &kc, &preflight.engine).await?;
     Ok(())
 }
 
@@ -2448,6 +2326,11 @@ async fn run_pivot(cfg: &Config, preflight: &Preflight, http: &reqwest::Client) 
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Must run before any engine probe below, in either subcommand branch.
+    engine::ensure_toolbox_container_host(
+        std::env::var("KROPS_TOOLBOX").is_ok_and(|value| value == "1"),
+    );
+
     // Load the repository config first: profile names, defaults, and chart
     // pins all come from it (BOOTSTRAP_CONFIG overrides the location).
     let repo = BootstrapConfig::locate_and_load()?;
@@ -2523,7 +2406,7 @@ async fn run_bootstrap(cfg: &Config, http: &reqwest::Client) -> Result<()> {
     );
 
     // Step 1: ensure the kind management cluster (reuse by default; --recreate replaces).
-    ensure_kind_cluster(cfg, &preflight.engine_sock).await?;
+    ensure_kind_cluster(cfg, &preflight.engine, &preflight.engine_sock).await?;
 
     // Optional provider hook (issue #236): runs on both the fresh-create and
     // healthy-reuse paths so a rerun re-asserts the setup (e.g. azure Arc

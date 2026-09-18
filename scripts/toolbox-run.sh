@@ -1,30 +1,18 @@
 #!/usr/bin/env bash
-# toolbox-run.sh – thin wrapper that runs the krops toolbox container
-# (issue #104). The raw `docker run`/`podman run` invocation in
-# docs/operations.md is the primary interface; `mise run bootstrap|pivot|
-# teardown` call this wrapper for hosts that already have mise.
-#
-# What the wrapper adds over the raw invocation:
-#   - host-side engine detection (docker, or podman 5.5+)
-#   - the socket mount source and the daemon-side ENGINE_SOCK the toolbox
-#     needs (they differ on macOS Docker Desktop and podman machine)
-#   - .env passthrough with proper quote stripping (docker/podman --env-file
-#     keep quotes verbatim; the repo's .env uses KEY="value")
-#   - a persistent, repo-local kubeconfig dir (.kube/) so the internal kind
-#     kubeconfig and the exported mgmt kubeconfig survive across runs
+# toolbox-run.sh – thin wrapper that runs the krops toolbox container.
+# See docs/operations.md ("Toolbox container") for what it adds over the
+# raw `docker run`/`podman run` invocation.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
-
-TOOLBOX_IMAGE="${TOOLBOX_IMAGE:-ghcr.io/polarsquad/krops-toolbox:latest}"
 
 usage() {
   cat >&2 <<EOF
 Usage: scripts/toolbox-run.sh <bootstrap|pivot|teardown> [extra krops-bootstrap args]
 
 Env:
-  TOOLBOX_IMAGE   image reference (default: ${TOOLBOX_IMAGE};
+  TOOLBOX_IMAGE   image reference (default: ${TOOLBOX_IMAGE:-ghcr.io/polarsquad/krops-toolbox:latest};
                   build locally with: docker build -f bootstrap-rs/Dockerfile \\
                     -t krops-toolbox:dev . && TOOLBOX_IMAGE=krops-toolbox:dev)
   KROPS_PROFILE aws | azure | gcp | local-host | local-talos
@@ -36,6 +24,37 @@ EOF
 [ $# -ge 1 ] || usage
 LIFECYCLE="$1"
 shift
+
+# ── .env passthrough with quote stripping ─────────────────────────────────────
+# Loaded before engine/socket resolution below; process env wins over .env.
+# Never log these values.
+if [ -f .env ]; then
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      ''|'#'*) continue ;;
+    esac
+    case "$line" in
+      *=*) ;;
+      *) continue ;;
+    esac
+    key="${line%%=*}"
+    value="${line#*=}"
+    case "$value" in
+      \"*\") value="${value#\"}"; value="${value%\"}" ;;
+      \'*\') value="${value#\'}"; value="${value%\'}" ;;
+    esac
+    # Only accept valid, non-empty identifiers not starting with a digit;
+    # skip garbage lines instead of exporting them.
+    case "$key" in
+      ''|[0-9]*|*[!A-Za-z0-9_]*) continue ;;
+    esac
+    if [ -z "${!key+x}" ]; then
+      export "$key=$value"
+    fi
+  done < .env
+fi
+
+TOOLBOX_IMAGE="${TOOLBOX_IMAGE:-ghcr.io/polarsquad/krops-toolbox:latest}"
 
 # ── Engine detection (bootstrap.sh parity) ────────────────────────────────────
 if [ -z "${CONTAINER_ENGINE:-}" ]; then
@@ -82,28 +101,6 @@ esac
 # fallbacks cannot know the Linux-rootless session socket or a non-default
 # Docker context path.
 export ENGINE_SOCK="$ENGINE_SOCK_IN"
-
-# ── .env passthrough with quote stripping ─────────────────────────────────────
-# Load KEY="value" / KEY='value' / KEY=value lines into this shell so the
-# single -e KEY pass-through below forwards them. Never log these values.
-if [ -f .env ]; then
-  while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in
-      ''|'#'*) continue ;;
-    esac
-    key="${line%%=*}"
-    value="${line#*=}"
-    case "$value" in
-      \"*\") value="${value#\"}"; value="${value%\"}" ;;
-      \'*\') value="${value#\'}"; value="${value%\'}" ;;
-    esac
-    # Only export valid identifiers; skip garbage lines.
-    case "$key" in
-      ''|*[!A-Za-z0-9_]*) continue ;;
-    esac
-    export "$key=$value"
-  done < .env
-fi
 
 # Forward lifecycle knobs and credentials into the container.
 PASS_ENV=(

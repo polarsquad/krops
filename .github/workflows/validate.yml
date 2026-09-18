@@ -59,6 +59,16 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: python3 tests/test-cert-manager-kubernetes-support.py --changed-from "$BASE_SHA"
 
+  airgap-image-existence:
+    name: Air-gap image existence
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Verify every pinned digest is pullable
+        run: python3 airgap/tests/test-airgap-image-existence.py
+
   kustomize-build:
     name: Build kustomize overlays
     runs-on: ubuntu-latest
@@ -160,6 +170,23 @@ jobs:
 
       - name: KCC operator pin cross-check
         run: python3 tests/test-kcc-operator-pin.py
+
+  python-lint:
+    name: Lint Python (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.1.0
+        with:
+          version: "0.12.13"
+
+      - name: ruff check (unused imports, subprocess.run check=)
+        run: |
+          uv sync --locked
+          uv run ruff check .
 
   yaml-lint:
     name: Lint YAML

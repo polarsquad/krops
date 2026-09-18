@@ -11,6 +11,7 @@ dependencies = [
 [dependency-groups]
 dev = [
   "pytest==9.1.1",
+  "ruff==0.16.8",
 ]
 
 [tool.uv]
@@ -19,3 +20,9 @@ package = false
 [tool.pytest.ini_options]
 pythonpath = ["tools"]
 testpaths = ["tests"]
+
+[tool.ruff.lint]
+# F401: unused imports. PLW1510: subprocess.run() must state check= explicitly
+# (the default silently swallows non-zero exit codes). Not a general style
+# linter for this repo.
+select = ["F401", "PLW1510"]

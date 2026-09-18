@@ -31,6 +31,7 @@ def main() -> int:
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
+        check=False,
     )
     if result.returncode != 0:
         print(f"zarf mise pin FAILED: `mise x -- zarf version` exited {result.returncode}")

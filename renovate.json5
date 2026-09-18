@@ -475,50 +475,13 @@
       "autoReplaceStringTemplate": "{{{header}}}{{{indent}}}- source: {{{urlPrefix}}}{{{newValue}}}/{{{asset}}}\n{{{indent}}}  shasum: {{{newDigest}}}"
     },
     // ── CAPI provider (core, bootstrap, control-plane, CAPD) Zarf release
-    // files. Each uses a distinguishing per-provider depName in the file
-    // comment (not the literal "kubernetes-sigs/cluster-api" the manager
-    // above already matches) so the two managers can't double-match the same
-    // text span; depNameTemplate resolves it back to the real upstream repo
-    // for version lookup and CAPI-family grouping. ───────────────────────
+    // files (see docs/dependencies.md's "Managed surfaces") ──────────────
     {
       "customType": "regex",
-      "description": "CAPI core-provider Zarf release files with verified checksums and staged-version paths",
+      "description": "CAPI provider (core, bootstrap-kubeadm, control-plane-kubeadm, CAPD) Zarf release files with verified checksums and staged-version paths",
       "managerFilePatterns": ["/(^|/)airgap/zarf\\.yaml$/"],
       "matchStrings": [
-        "(?<header># renovate: datasource=(?<datasource>github-release-attachments) depName=(?<depName>kubernetes-sigs/cluster-api-core)\\n)(?<indent>\\s*)- source: (?<urlPrefix>https://github\\.com/[^/]+/[^/]+/releases/download/)(?<currentValue>v[^/]+)/(?<asset>[^\\n]+)\\n\\s*shasum: (?<currentDigest>[a-f0-9]{64})\\n\\s*target: (?<targetPrefix>[^\\n]*?/)(?:v[^/]+)/(?<targetAsset>[^\\n]+)"
-      ],
-      "depNameTemplate": "kubernetes-sigs/cluster-api",
-      "versioningTemplate": "loose",
-      "autoReplaceStringTemplate": "{{{header}}}{{{indent}}}- source: {{{urlPrefix}}}{{{newValue}}}/{{{asset}}}\n{{{indent}}}  shasum: {{{newDigest}}}\n{{{indent}}}  target: {{{targetPrefix}}}{{{newValue}}}/{{{targetAsset}}}"
-    },
-    {
-      "customType": "regex",
-      "description": "CAPI bootstrap-kubeadm provider Zarf release files with verified checksums and staged-version paths",
-      "managerFilePatterns": ["/(^|/)airgap/zarf\\.yaml$/"],
-      "matchStrings": [
-        "(?<header># renovate: datasource=(?<datasource>github-release-attachments) depName=(?<depName>kubernetes-sigs/cluster-api-bootstrap-kubeadm)\\n)(?<indent>\\s*)- source: (?<urlPrefix>https://github\\.com/[^/]+/[^/]+/releases/download/)(?<currentValue>v[^/]+)/(?<asset>[^\\n]+)\\n\\s*shasum: (?<currentDigest>[a-f0-9]{64})\\n\\s*target: (?<targetPrefix>[^\\n]*?/)(?:v[^/]+)/(?<targetAsset>[^\\n]+)"
-      ],
-      "depNameTemplate": "kubernetes-sigs/cluster-api",
-      "versioningTemplate": "loose",
-      "autoReplaceStringTemplate": "{{{header}}}{{{indent}}}- source: {{{urlPrefix}}}{{{newValue}}}/{{{asset}}}\n{{{indent}}}  shasum: {{{newDigest}}}\n{{{indent}}}  target: {{{targetPrefix}}}{{{newValue}}}/{{{targetAsset}}}"
-    },
-    {
-      "customType": "regex",
-      "description": "CAPI control-plane-kubeadm provider Zarf release files with verified checksums and staged-version paths",
-      "managerFilePatterns": ["/(^|/)airgap/zarf\\.yaml$/"],
-      "matchStrings": [
-        "(?<header># renovate: datasource=(?<datasource>github-release-attachments) depName=(?<depName>kubernetes-sigs/cluster-api-control-plane-kubeadm)\\n)(?<indent>\\s*)- source: (?<urlPrefix>https://github\\.com/[^/]+/[^/]+/releases/download/)(?<currentValue>v[^/]+)/(?<asset>[^\\n]+)\\n\\s*shasum: (?<currentDigest>[a-f0-9]{64})\\n\\s*target: (?<targetPrefix>[^\\n]*?/)(?:v[^/]+)/(?<targetAsset>[^\\n]+)"
-      ],
-      "depNameTemplate": "kubernetes-sigs/cluster-api",
-      "versioningTemplate": "loose",
-      "autoReplaceStringTemplate": "{{{header}}}{{{indent}}}- source: {{{urlPrefix}}}{{{newValue}}}/{{{asset}}}\n{{{indent}}}  shasum: {{{newDigest}}}\n{{{indent}}}  target: {{{targetPrefix}}}{{{newValue}}}/{{{targetAsset}}}"
-    },
-    {
-      "customType": "regex",
-      "description": "CAPI infrastructure-docker (CAPD) provider Zarf release files with verified checksums and staged-version paths",
-      "managerFilePatterns": ["/(^|/)airgap/zarf\\.yaml$/"],
-      "matchStrings": [
-        "(?<header># renovate: datasource=(?<datasource>github-release-attachments) depName=(?<depName>kubernetes-sigs/cluster-api-infrastructure-docker)\\n)(?<indent>\\s*)- source: (?<urlPrefix>https://github\\.com/[^/]+/[^/]+/releases/download/)(?<currentValue>v[^/]+)/(?<asset>[^\\n]+)\\n\\s*shasum: (?<currentDigest>[a-f0-9]{64})\\n\\s*target: (?<targetPrefix>[^\\n]*?/)(?:v[^/]+)/(?<targetAsset>[^\\n]+)"
+        "(?<header># renovate: datasource=(?<datasource>github-release-attachments) depName=(?<depName>kubernetes-sigs/cluster-api-(?:core|bootstrap-kubeadm|control-plane-kubeadm|infrastructure-docker))\\n)(?<indent>\\s*)- source: (?<urlPrefix>https://github\\.com/[^/]+/[^/]+/releases/download/)(?<currentValue>v[^/]+)/(?<asset>[^\\n]+)\\n\\s*shasum: (?<currentDigest>[a-f0-9]{64})\\n\\s*target: (?<targetPrefix>[^\\n]*?/)(?:v[^/]+)/(?<targetAsset>[^\\n]+)"
       ],
       "depNameTemplate": "kubernetes-sigs/cluster-api",
       "versioningTemplate": "loose",
@@ -527,51 +490,15 @@
     // ── versions rendered by each provider's Zarf deployment action ──────
     {
       "customType": "regex",
-      "description": "CAPI core-provider version rendered by the Zarf deployment action",
+      "description": "CAPI provider (core, bootstrap-kubeadm, control-plane-kubeadm, CAPD) version rendered by the Zarf deployment action",
       "managerFilePatterns": ["/(^|/)airgap/zarf\\.yaml$/"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>github-releases) depName=(?<depName>kubernetes-sigs/cluster-api-core)\\n\\s*\\\"\\$clusterctl\\\" generate provider --core cluster-api:v(?<currentValue>[^\\s\\\\]+)"
+        "# renovate: datasource=(?<datasource>github-releases) depName=(?<depName>kubernetes-sigs/cluster-api-(?:core|bootstrap-kubeadm|control-plane-kubeadm|infrastructure-docker))\\n\\s*\\\"\\$clusterctl\\\" generate provider (?<providerSpec>--core cluster-api|--bootstrap kubeadm|--control-plane kubeadm|--infrastructure docker):v(?<currentValue>[^\\s\\\\]+)"
       ],
       "depNameTemplate": "kubernetes-sigs/cluster-api",
       "extractVersionTemplate": "^v(?<version>.+)",
       "versioningTemplate": "semver-coerced",
-      "autoReplaceStringTemplate": "# renovate: datasource={{{datasource}}} depName=kubernetes-sigs/cluster-api-core\n              \"$clusterctl\" generate provider --core cluster-api:v{{newValue}}"
-    },
-    {
-      "customType": "regex",
-      "description": "CAPI bootstrap-kubeadm provider version rendered by the Zarf deployment action",
-      "managerFilePatterns": ["/(^|/)airgap/zarf\\.yaml$/"],
-      "matchStrings": [
-        "# renovate: datasource=(?<datasource>github-releases) depName=(?<depName>kubernetes-sigs/cluster-api-bootstrap-kubeadm)\\n\\s*\\\"\\$clusterctl\\\" generate provider --bootstrap kubeadm:v(?<currentValue>[^\\s\\\\]+)"
-      ],
-      "depNameTemplate": "kubernetes-sigs/cluster-api",
-      "extractVersionTemplate": "^v(?<version>.+)",
-      "versioningTemplate": "semver-coerced",
-      "autoReplaceStringTemplate": "# renovate: datasource={{{datasource}}} depName=kubernetes-sigs/cluster-api-bootstrap-kubeadm\n              \"$clusterctl\" generate provider --bootstrap kubeadm:v{{newValue}}"
-    },
-    {
-      "customType": "regex",
-      "description": "CAPI control-plane-kubeadm provider version rendered by the Zarf deployment action",
-      "managerFilePatterns": ["/(^|/)airgap/zarf\\.yaml$/"],
-      "matchStrings": [
-        "# renovate: datasource=(?<datasource>github-releases) depName=(?<depName>kubernetes-sigs/cluster-api-control-plane-kubeadm)\\n\\s*\\\"\\$clusterctl\\\" generate provider --control-plane kubeadm:v(?<currentValue>[^\\s\\\\]+)"
-      ],
-      "depNameTemplate": "kubernetes-sigs/cluster-api",
-      "extractVersionTemplate": "^v(?<version>.+)",
-      "versioningTemplate": "semver-coerced",
-      "autoReplaceStringTemplate": "# renovate: datasource={{{datasource}}} depName=kubernetes-sigs/cluster-api-control-plane-kubeadm\n              \"$clusterctl\" generate provider --control-plane kubeadm:v{{newValue}}"
-    },
-    {
-      "customType": "regex",
-      "description": "CAPI infrastructure-docker (CAPD) provider version rendered by the Zarf deployment action",
-      "managerFilePatterns": ["/(^|/)airgap/zarf\\.yaml$/"],
-      "matchStrings": [
-        "# renovate: datasource=(?<datasource>github-releases) depName=(?<depName>kubernetes-sigs/cluster-api-infrastructure-docker)\\n\\s*\\\"\\$clusterctl\\\" generate provider --infrastructure docker:v(?<currentValue>[^\\s\\\\]+)"
-      ],
-      "depNameTemplate": "kubernetes-sigs/cluster-api",
-      "extractVersionTemplate": "^v(?<version>.+)",
-      "versioningTemplate": "semver-coerced",
-      "autoReplaceStringTemplate": "# renovate: datasource={{{datasource}}} depName=kubernetes-sigs/cluster-api-infrastructure-docker\n              \"$clusterctl\" generate provider --infrastructure docker:v{{newValue}}"
+      "autoReplaceStringTemplate": "# renovate: datasource={{{datasource}}} depName={{{depName}}}\n              \"$clusterctl\" generate provider {{{providerSpec}}}:v{{newValue}}"
     },
     {
       "customType": "regex",
@@ -588,46 +515,10 @@
     // providers above (CAAPH's own entry is the manager just above) ──────
     {
       "customType": "regex",
-      "description": "CAPI core-provider clusterctl config staged release path",
+      "description": "CAPI provider (core, bootstrap-kubeadm, control-plane-kubeadm, CAPD) clusterctl config staged release path",
       "managerFilePatterns": ["/(^|/)airgap/files/clusterctl-providers\\.yaml$/"],
       "matchStrings": [
-        "(?<header># renovate: datasource=(?<datasource>github-releases) depName=(?<depName>kubernetes-sigs/cluster-api-core)\\n)\\s*url: (?<urlPrefix>.*?/)(?<currentValue>v[^/]+)/(?<asset>[^\\n]+)"
-      ],
-      "depNameTemplate": "kubernetes-sigs/cluster-api",
-      "extractVersionTemplate": "^v(?<version>.+)",
-      "versioningTemplate": "semver-coerced",
-      "autoReplaceStringTemplate": "{{{header}}}    url: {{{urlPrefix}}}v{{newValue}}/{{{asset}}}"
-    },
-    {
-      "customType": "regex",
-      "description": "CAPI bootstrap-kubeadm provider clusterctl config staged release path",
-      "managerFilePatterns": ["/(^|/)airgap/files/clusterctl-providers\\.yaml$/"],
-      "matchStrings": [
-        "(?<header># renovate: datasource=(?<datasource>github-releases) depName=(?<depName>kubernetes-sigs/cluster-api-bootstrap-kubeadm)\\n)\\s*url: (?<urlPrefix>.*?/)(?<currentValue>v[^/]+)/(?<asset>[^\\n]+)"
-      ],
-      "depNameTemplate": "kubernetes-sigs/cluster-api",
-      "extractVersionTemplate": "^v(?<version>.+)",
-      "versioningTemplate": "semver-coerced",
-      "autoReplaceStringTemplate": "{{{header}}}    url: {{{urlPrefix}}}v{{newValue}}/{{{asset}}}"
-    },
-    {
-      "customType": "regex",
-      "description": "CAPI control-plane-kubeadm provider clusterctl config staged release path",
-      "managerFilePatterns": ["/(^|/)airgap/files/clusterctl-providers\\.yaml$/"],
-      "matchStrings": [
-        "(?<header># renovate: datasource=(?<datasource>github-releases) depName=(?<depName>kubernetes-sigs/cluster-api-control-plane-kubeadm)\\n)\\s*url: (?<urlPrefix>.*?/)(?<currentValue>v[^/]+)/(?<asset>[^\\n]+)"
-      ],
-      "depNameTemplate": "kubernetes-sigs/cluster-api",
-      "extractVersionTemplate": "^v(?<version>.+)",
-      "versioningTemplate": "semver-coerced",
-      "autoReplaceStringTemplate": "{{{header}}}    url: {{{urlPrefix}}}v{{newValue}}/{{{asset}}}"
-    },
-    {
-      "customType": "regex",
-      "description": "CAPI infrastructure-docker (CAPD) provider clusterctl config staged release path",
-      "managerFilePatterns": ["/(^|/)airgap/files/clusterctl-providers\\.yaml$/"],
-      "matchStrings": [
-        "(?<header># renovate: datasource=(?<datasource>github-releases) depName=(?<depName>kubernetes-sigs/cluster-api-infrastructure-docker)\\n)\\s*url: (?<urlPrefix>.*?/)(?<currentValue>v[^/]+)/(?<asset>[^\\n]+)"
+        "(?<header># renovate: datasource=(?<datasource>github-releases) depName=(?<depName>kubernetes-sigs/cluster-api-(?:core|bootstrap-kubeadm|control-plane-kubeadm|infrastructure-docker))\\n)\\s*url: (?<urlPrefix>.*?/)(?<currentValue>v[^/]+)/(?<asset>[^\\n]+)"
       ],
       "depNameTemplate": "kubernetes-sigs/cluster-api",
       "extractVersionTemplate": "^v(?<version>.+)",
@@ -708,14 +599,18 @@
       "groupName": "flux"
     },
     {
+      // See docs/dependencies.md's "Managed surfaces" for what this spans.
       "description": "Group the CAPI family (core, kubeadm, CAPD, CAPA, CAAPH, CAPZ)",
-      "matchDatasources": ["github-releases", "github-release-attachments"],
+      "matchDatasources": ["docker", "github-releases", "github-release-attachments"],
       "matchPackageNames": [
         "kubernetes-sigs/cluster-api",
         "kubernetes-sigs/cluster-api-provider-aws",
         "kubernetes-sigs/cluster-api-addon-provider-helm",
         "kubernetes-sigs/cluster-api-provider-azure",
-        "kubernetes-sigs/cluster-api-provider-gcp"
+        "kubernetes-sigs/cluster-api-provider-gcp",
+        "/^registry\\.k8s\\.io/cluster-api/",
+        "/^registry\\.k8s\\.io/cluster-api-helm/",
+        "/^gcr\\.io/k8s-staging-cluster-api/"
       ],
       "groupName": "cluster-api"
     },

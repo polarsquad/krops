@@ -37,6 +37,14 @@ Renovate discovers and updates versions in:
   manifests and air-gap scripts.
 - `airgap/images.txt` and `airgap/zarf.yaml`: container image references,
   pinned by digest.
+- `airgap/zarf.yaml` and `airgap/files/clusterctl-providers.yaml`: the CAPI
+  core, kubeadm bootstrap, kubeadm control-plane, and CAPD provider release
+  files, rendered versions, and staged config paths. One custom manager per
+  pattern covers all four via a `depName` alternation (e.g.
+  `kubernetes-sigs/cluster-api-(?:core|bootstrap-kubeadm|...)`) rather than
+  one manager per provider, since the four differed only in that name;
+  `depNameTemplate` resolves the match back to the real
+  `kubernetes-sigs/cluster-api` repo for version lookup.
 - `.github/workflows/`: GitHub Actions references and the Renovate CLI pin used
   by the digest and managed-pin coverage tests.
 - `pivot.sh`: imperative cert-manager and CAPI Operator chart pins, retained
@@ -70,6 +78,14 @@ matched by exact depName, not by registry host, and stay in the separate
 `cluster-api` group. The kind CLI and Talos's own `talosVersion`
 machine-config contract version each follow their own release cadence and
 are intentionally excluded from this group.
+
+The CAPI group spans both the `github-releases`/`github-release-attachments`
+release lookups and the `docker`-datasource digest-pinned images those same
+providers deploy (`registry.k8s.io/cluster-api*`,
+`registry.k8s.io/cluster-api-helm/*`, `gcr.io/k8s-staging-cluster-api/*`), so
+a CAPI version bump lands its release assets and images in one PR instead of
+two. CAPZ's one-minor-at-a-time override (issue #71) only matches the
+`github-releases` datasource, so it is unaffected by the image grouping.
 
 ## Toolbox release version
 

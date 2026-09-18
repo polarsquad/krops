@@ -44,6 +44,18 @@ files.
 The locally built `localhost:5001/krops-airgap:latest` config artifact is the
 only documented exception because it is created immediately before packaging.
 
+The digest must be exactly 64 hex characters; `airgap/tests/test-digest-regex.py`
+regression-tests that boundary in both directions (63 and 65 characters) and
+in both reference forms (`name:tag@sha256:...` and the tag-less
+`name@sha256:...`). This offline check only confirms a digest is
+*shaped* correctly, not that it exists. `airgap/tests/test-airgap-image-existence.py`
+covers that: it queries each shape-valid pin's registry with `docker buildx
+imagetools inspect` to confirm the manifest is real and pullable, catching a
+well-formed but wrong digest. It only runs against pins that already parse as
+shape-valid (a malformed digest is never queried), and needs registry
+network access, so it runs as its own CI job rather than in `mise run
+validate`.
+
 ### Image pin ownership
 
 `zarf.yaml` is the authoritative artifact listing for the bundle: every image

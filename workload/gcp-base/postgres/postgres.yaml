@@ -3,9 +3,7 @@
 # Application database (issue #72, the RDS and PostgreSQL Flexible Server
 # counterparts). Cloud SQL PostgreSQL 17, zonal, private IP only (no public
 # address; the private IP peers into the workload VPC through the PSA range
-# in networking/), IAM authentication only (no rootPassword anywhere: the
-# IAM-only flag is on and the reader user is a service account), encrypted
-# TLS required.
+# in networking/), IAM database authentication for the reader user, TLS required.
 #
 # settings.diskType PD_HDD + db-f1-micro keep the default bill small; the
 # tier is a documented knob, not a pin. deletionProtectionEnabled stays
@@ -23,13 +21,13 @@ spec:
   databaseVersion: POSTGRES_17
   deletionProtectionEnabled: false
   settings:
+    edition: ENTERPRISE
     tier: "db-f1-micro"
     availabilityType: ZONAL
     diskSize: 10
     diskType: PD_HDD
     ipConfiguration:
       ipv4Enabled: false
-      requireSsl: true
       sslMode: ENCRYPTED_ONLY
       privateNetworkRef:
         external: "projects/${GCP_PROJECT}/global/networks/${GCP_NETWORK}"

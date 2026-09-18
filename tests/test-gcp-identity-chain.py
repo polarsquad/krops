@@ -271,6 +271,18 @@ def main() -> int:
             if ref not in instances:
                 failures.append(f"(h) {SQL.relative_to(REPO_ROOT)}: {d['kind']} instanceRef `{ref}` matches no SQLInstance metadata.name {sorted(instances)}")
 
+    # ── (i) the iam Kustomization orders after what its grants reference, and
+    # the reader.yaml rationale is documented. ─────────────────────────────
+    iam_ks = docs(REPO_ROOT / "workload/gcp-base/iam/flux-ks.yaml")[0]
+    deps = {d["name"] for d in iam_ks["spec"].get("dependsOn", [])}
+    for wanted in ("kcc", "storage", "postgres"):
+        if wanted not in deps:
+            failures.append(f"(i) workload/gcp-base/iam/flux-ks.yaml: dependsOn must include `{wanted}`, got {sorted(deps)}")
+    wl_doc = (REPO_ROOT / "docs/workload-resources.md").read_text()
+    for needed in ("roles/cloudsql.viewer", "`-reader` (35)"):
+        if needed not in wl_doc:
+            failures.append(f"(i) docs/workload-resources.md must document `{needed}`")
+
     # ── (j) the bucket name fits GCP's 63-character limit for the real cluster
     # name and a generous project number. ──────────────────────────────────
     bucket = next(d for d in docs(REPO_ROOT / "workload/gcp-base/storage/bucket.yaml") if d.get("kind") == "StorageBucket")

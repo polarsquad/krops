@@ -2,7 +2,8 @@
 # ══════════════════════════════════════════════════════════════════════════════
 # Flux Kustomization: the per-cluster reader service account and its grants.
 # dependsOn: storage so the bucket the objectViewer grant references exists
-# first (and after kcc for the CRDs).
+# first, and postgres so the SQLUser the instanceUser grant serves exists
+# (and after kcc for the CRDs).
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -22,6 +23,7 @@ spec:
   dependsOn:
     - name: kcc
     - name: storage
+    - name: postgres
   postBuild:
     substituteFrom:
       - kind: ConfigMap

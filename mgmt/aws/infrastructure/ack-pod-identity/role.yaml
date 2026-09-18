@@ -64,7 +64,10 @@ spec:
               "s3:PutMetricsConfiguration",
               "s3:GetIntelligentTieringConfiguration",
               "s3:PutIntelligentTieringConfiguration",
-              "s3:ListBucket"
+              "s3:ListBucket",
+              "s3:TagResource",
+              "s3:UntagResource",
+              "s3:ListTagsForResource"
             ],
             "Resource": "arn:aws:s3:::krops-*"
           }

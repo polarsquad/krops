@@ -49,6 +49,11 @@ if ! python3 tests/test-toolbox-entrypoint-podman.py; then
   echo "    FAILED: toolbox entrypoint podman client socket" >&2
   fail=1
 fi
+echo "==> toolbox-run.sh exec (image and CLI args reach the container engine)"
+if ! python3 tests/test-toolbox-run-exec.py; then
+  echo "    FAILED: toolbox-run.sh exec" >&2
+  fail=1
+fi
 echo "==> air-gap digest token boundary"
 if ! python3 airgap/tests/test-digest-regex.py; then
   echo "    FAILED: air-gap digest token boundary" >&2

@@ -153,12 +153,7 @@ case "$LIFECYCLE" in
   *)         usage ;;
 esac
 
-# CLOUDSDK_CONFIG is canonical-by-design: it is always the repo-local
-# .gcloud/ (inside the /workspace mount above), shared with the host mise
-# gcp env, not an operator value. The duplicate -e after PASS_ENV is
-# intentional; the container engine takes the last value, so an operator-set
-# CLOUDSDK_CONFIG (forwarded in PASS_ENV) is overridden here. Keep the two
-# in sync if the mount path ever changes.
+# The duplicate CLOUDSDK_CONFIG below is intentional; see docs/operations.md.
 exec "$CONTAINER_ENGINE" run --rm ${TTY_ARGS[@]+"${TTY_ARGS[@]}"} \
   -v "$REPO_ROOT:/workspace" \
   -w /workspace \

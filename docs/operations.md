@@ -88,6 +88,14 @@ outer quote stripping, and passes only this allowlist into the container:
 - AWS: `AWS_REGION`, `AWS_PROFILE`, `AWS_ACCESS_KEY_ID`,
   `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`
 
+`CLOUDSDK_CONFIG` is forwarded twice: once through the GCP allowlist entry
+(an operator-set value, if any), then again as an explicit `-e
+CLOUDSDK_CONFIG=/workspace/.gcloud` appended after it. The container engine
+takes the last value for a repeated `-e` key, so the explicit one wins by
+design: the toolbox always uses the repo-local `.gcloud/` directory (inside
+the `/workspace` mount), shared with the host `mise -E gcp` session, never an
+operator override. Keep the two in sync if the mount path ever changes.
+
 It does not pass `BOOTSTRAP_CONFIG`, `REGISTRY_READY_RETRIES`,
 `LOCAL_RECONCILE_TIMEOUT`, `MGMT_KUBECONFIG`, `MGMT_READY_TIMEOUT`,
 `MGMT_POLL_INTERVAL`, `BOOTSTRAP_KUBECONTEXT`, or the teardown controls

@@ -154,3 +154,11 @@ verify the pairing during review.
 - `*.sops.yaml` `version:` fields, Kubernetes `apiVersion` strings, Helm chart
   `appVersion` values, `bootstrap-rs/Cargo.toml`'s package version, and the
   Zarf package `metadata.version` are not dependency pins.
+- The Zarf CLI pin in `mise.toml` keeps `version` unprefixed and adds `v`
+  literally in `asset_pattern` (issue #324): mise's `{{ version }}` template
+  variable has stripped a leading `v` inconsistently across mise releases, so
+  an unprefixed pin sidesteps that. `asset_pattern` also remaps `arch()` to
+  `amd64`/`arm64`, since Zarf's release assets don't use mise's default
+  `x64`/`arm64` naming. `tests/test-mise-zarf-pin.py` installs the pinned
+  release via mise and checks the reported version, since a template mismatch
+  otherwise fails silently until the pin is exercised.

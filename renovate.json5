@@ -148,13 +148,13 @@
     },
     {
       "customType": "regex",
-      "description": "mise: zarf CLI pin (github backend, v-prefixed)",
+      "description": "mise: zarf CLI pin (github backend)",
       "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
-      "matchStrings": ["version = \"v(?<currentValue>[^\"]+)\""],
+      "matchStrings": ["version = \"(?<currentValue>[^\"]+)\""],
       "depNameTemplate": "zarf-dev/zarf",
       "datasourceTemplate": "github-releases",
       "extractVersionTemplate": "^v(?<version>.+)",
-      "autoReplaceStringTemplate": "version = \"v{{newValue}}\""
+      "autoReplaceStringTemplate": "version = \"{{newValue}}\""
     },
     {
       "customType": "regex",

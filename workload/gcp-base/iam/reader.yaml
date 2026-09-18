@@ -9,7 +9,7 @@
 # human identity can impersonate the per-cluster reader and read the bucket /
 # database through it (least privilege per cluster, like the AWS reader role).
 #
-# accountId length: GCP caps service account IDs at 30 characters. The full
+# Account ID length (the metadata.name, which KCC uses as the account ID): GCP caps service account IDs at 30 characters. The full
 # cluster name is 22 chars, so `krops-${CLUSTER_NAME}-r` is 30 and is the
 # longest reader-style name that fits (`-reader` is 35, `-rd` is 31). The
 # identity chain test asserts the length so a longer cluster name fails the
@@ -20,10 +20,9 @@
 apiVersion: iam.cnrm.cloud.google.com/v1
 kind: IAMServiceAccount
 metadata:
-  name: krops-reader
+  name: krops-${CLUSTER_NAME}-r
   namespace: default
 spec:
-  accountId: "krops-${CLUSTER_NAME}-r"
   displayName: "krops reader (${CLUSTER_NAME})"
 ---
 apiVersion: iam.cnrm.cloud.google.com/v1
@@ -76,4 +75,4 @@ spec:
   member: "serviceAccount:krops-reader@${GCP_PROJECT}.iam.gserviceaccount.com"
   resourceRef:
     kind: IAMServiceAccount
-    name: krops-reader
+    name: krops-${CLUSTER_NAME}-r

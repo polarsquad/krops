@@ -18,7 +18,7 @@ metadata:
   name: app-db
   namespace: default
 spec:
-  name: "krops-${CLUSTER_NAME}-db"
+  resourceID: "krops-${CLUSTER_NAME}-db"
   region: "${GCP_REGION}"
   databaseVersion: POSTGRES_17
   deletionProtectionEnabled: false
@@ -48,8 +48,8 @@ spec:
   charset: "UTF8"
   collation: ""
   instanceRef:
-    name: "krops-${CLUSTER_NAME}-db"
-  name: "app"
+    name: app-db
+  resourceID: "app"
 ---
 # Per-cluster reader service account (iam/ creates it and grants it
 # storage.objectViewer on the bucket and cloudsql.instanceUser on the
@@ -63,10 +63,10 @@ spec:
 apiVersion: sql.cnrm.cloud.google.com/v1beta1
 kind: SQLUser
 metadata:
-  name: krops-reader
+  name: app-db-reader
   namespace: default
 spec:
   instanceRef:
-    name: "krops-${CLUSTER_NAME}-db"
-  name: "krops-${CLUSTER_NAME}-r@${GCP_PROJECT}.iam"
+    name: app-db
+  resourceID: "krops-${CLUSTER_NAME}-r@${GCP_PROJECT}.iam"
   type: CLOUD_IAM_SERVICE_ACCOUNT

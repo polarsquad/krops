@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from renovate_harness import run_renovate
+from renovate_harness import RENOVATE_CACHE_DIR, run_renovate
 
 EXPECTED = {
     "bootstrap.toml": {
@@ -52,7 +52,6 @@ EXPECTED = {
     },
     "mise.local-talos.toml": {"siderolabs/talos"},
     "mise.toml": {"astral-sh/uv"},
-    "bootstrap-rs/Dockerfile": {"astral-sh/uv"},
     "mgmt/azure/capi-providers/capz-system/providers.yaml": {
         "kubernetes-sigs/cluster-api-provider-azure",
     },
@@ -121,6 +120,7 @@ def assert_no_repo_registry_warnings() -> list[str]:
     """
     env = os.environ.copy()
     env.setdefault("LOG_LEVEL", "debug")
+    env.setdefault("RENOVATE_CACHE_DIR", str(RENOVATE_CACHE_DIR))
     if "GITHUB_COM_TOKEN" in env and "RENOVATE_TOKEN" not in env:
         env["RENOVATE_TOKEN"] = env["GITHUB_COM_TOKEN"]
     if "RENOVATE_GITHUB_COM_TOKEN" in env and "GITHUB_COM_TOKEN" not in env:

@@ -80,7 +80,7 @@ both the connect path and the impersonation.
 ### Per-cluster reader identity
 
 `workload/gcp-base/iam/reader.yaml` creates the per-cluster reader service
-account (`krops-<cluster>-r`; the accountId is capped at GCP's 30-char
+account (`krops-<cluster>-r`; the account ID, taken from the resource's `metadata.name`, is capped at GCP's 30-char
 service-account ID limit) with `storage.objectViewer` on the bucket and
 `cloudsql.instanceUser` on the project (the IAM database-auth login role,
 which carries `cloudsql.instances.login`), plus a

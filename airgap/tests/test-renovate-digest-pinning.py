@@ -41,12 +41,28 @@ def main() -> int:
         )
         if dependencies:
             missing[package_file] = dependencies
+    tag_changes = {
+        package_file: changes
+        for package_file in EXPECTED_FILES
+        if (
+            changes := result.pin_digests_changing_tag(
+                package_file, EXCLUDED_DEP_NAMES
+            )
+        )
+    }
+    inconsistent = result.inconsistent_pin_digests(EXPECTED_FILES)
     missing_extractions = {}
     for package_file, dep_names in REQUIRED_DEP_NAMES.items():
         dependencies = dep_names - result.dep_names(package_file)
         if dependencies:
             missing_extractions[package_file] = sorted(dependencies)
-    if result.returncode or missing or missing_extractions:
+    if (
+        result.returncode
+        or missing
+        or missing_extractions
+        or tag_changes
+        or inconsistent
+    ):
         print("Renovate digest-pinning integration check failed", file=sys.stderr)
         print(f"exit code: {result.returncode}", file=sys.stderr)
         for package_file, dependencies in sorted(missing_extractions.items()):
@@ -59,6 +75,10 @@ def main() -> int:
                 f"{package_file}: missing digest pin for {dependencies}",
                 file=sys.stderr,
             )
+        for package_file, changes in sorted(tag_changes.items()):
+            print(f"{package_file}: pin changes the tag {changes}", file=sys.stderr)
+        for reference, by_file in sorted(inconsistent.items()):
+            print(f"{reference}: differing digests {by_file}", file=sys.stderr)
         result.print_diagnostics()
         return 1
 

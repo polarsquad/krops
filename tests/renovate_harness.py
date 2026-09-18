@@ -83,6 +83,33 @@ class RenovateResult:
             )
         ]
 
+    def pin_digests_changing_tag(self, package_file, excluded_dep_names=None):
+        """pinDigest updates whose newValue differs from the current tag."""
+        excluded_dep_names = set(excluded_dep_names or ())
+        return [
+            f"{dep.get('depName')}:{dep.get('currentValue')} -> {update.get('newValue')}"
+            for dep in self.deps_by_file[package_file]
+            if dep.get("depName") not in excluded_dep_names
+            for update in dep.get("updates", [])
+            if update.get("updateType") == "pinDigest"
+            and update.get("newValue") != dep.get("currentValue")
+        ]
+
+    def inconsistent_pin_digests(self, package_files):
+        """Image refs given different pinDigest digests across the files."""
+        digests = {}
+        for package_file in package_files:
+            for dep in self.deps_by_file[package_file]:
+                for update in dep.get("updates", []):
+                    if update.get("updateType") == "pinDigest":
+                        key = f"{dep.get('depName')}:{dep.get('currentValue')}"
+                        digests.setdefault(key, {})[package_file] = update.get("newDigest")
+        return {
+            key: by_file
+            for key, by_file in digests.items()
+            if len(set(by_file.values())) > 1
+        }
+
     def print_diagnostics(self, stream=None):
         stream = stream or sys.stderr
         if self.diagnostics:

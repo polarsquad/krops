@@ -78,6 +78,26 @@ if ! python3 airgap/tests/test-airgap-debug-capture.py; then
   echo "    FAILED: cert-manager debug capture on deploy failure" >&2
   fail=1
 fi
+echo "==> cert-manager digest values match the bundle"
+if ! python3 airgap/tests/test-airgap-cert-manager-digest-values.py; then
+  echo "    FAILED: cert-manager digest values match the bundle" >&2
+  fail=1
+fi
+echo "==> pin_image_digests rewrites and rejects unpinned images"
+if ! python3 airgap/tests/test-airgap-pin-image-digests.py; then
+  echo "    FAILED: pin_image_digests" >&2
+  fail=1
+fi
+echo "==> host-daemon images are saved and referenced by tag"
+if ! python3 airgap/tests/test-airgap-host-image-tags.py; then
+  echo "    FAILED: host-daemon image tags" >&2
+  fail=1
+fi
+echo "==> air-gapped workflow triggers, guards, and timeouts"
+if ! python3 airgap/tests/test-airgap-workflow-config.py; then
+  echo "    FAILED: workflow config" >&2
+  fail=1
+fi
 echo "==> bootstrap.toml cross-check"
 if ! python3 tests/test-bootstrap-config.py; then
   echo "    FAILED: bootstrap.toml cross-check" >&2

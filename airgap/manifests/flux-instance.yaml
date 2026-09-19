@@ -11,12 +11,12 @@
 #     to HTTPS client" against the plain-HTTP Zarf registry).
 #
 #   - spec.distribution.registry stays ghcr.io/fluxcd, and the four controller
-#     images are pinned back to TAGS via the kustomize patches below. The
-#     embedded distribution pins controller images to multi-arch manifest-list
-#     digests; Zarf's image pipeline carries single-arch manifests, so those
-#     digests do not resolve in the internal registry ("not found" pull
-#     errors, verified empirically). Tag references are rewritten by the Zarf
-#     agent to the <tag>-zarf-<hash> tags that DO exist in the registry.
+#     images are pinned to their bundled digests via the kustomize patches
+#     below. The embedded distribution pins multi-arch manifest-list digests
+#     that Zarf's single-arch registry does not hold. Zarf stores a tag@sha256
+#     bundle image by digest only, and its agent rewrites a tag-only pod image
+#     to a <tag>-zarf-<hash> name that was never pushed, so the patches
+#     reference the bundled tag@sha256 (docs/airgap.md finding 8).
 #
 #   - spec.sync.url points at the Zarf internal registry's in-cluster service
 #     DNS name (###ZARF_CONST_REGISTRY_INTERNAL###). The nodeport address
@@ -70,26 +70,26 @@ spec:
         patch: |-
           - op: replace
             path: /spec/template/spec/containers/0/image
-            value: ghcr.io/fluxcd/source-controller:v1.9.4
+            value: ghcr.io/fluxcd/source-controller:v1.9.4@sha256:8a8ed0a57b8b86f561d5a4309a69f65e62f0cebe4de8801593c5ff35a3bc3c23
       - target:
           kind: Deployment
           name: kustomize-controller
         patch: |-
           - op: replace
             path: /spec/template/spec/containers/0/image
-            value: ghcr.io/fluxcd/kustomize-controller:v1.9.4
+            value: ghcr.io/fluxcd/kustomize-controller:v1.9.4@sha256:2b8bec54ffb6caf421bd2a6c005d27f567d5dd4db7feb55794fb51fcabd69b8f
       - target:
           kind: Deployment
           name: helm-controller
         patch: |-
           - op: replace
             path: /spec/template/spec/containers/0/image
-            value: ghcr.io/fluxcd/helm-controller:v1.6.3
+            value: ghcr.io/fluxcd/helm-controller:v1.6.3@sha256:16ada99456385100698a5d7adf90aba8a2089d987ab541c9566b6d7b0e897038
       - target:
           kind: Deployment
           name: notification-controller
         patch: |-
           - op: replace
             path: /spec/template/spec/containers/0/image
-            value: ghcr.io/fluxcd/notification-controller:v1.9.3
+            value: ghcr.io/fluxcd/notification-controller:v1.9.3@sha256:071c351a0fb163eeb6a2bb82f1e894f51b6b0734216d2e97d3d99c9ab9d710b9
   wait: true

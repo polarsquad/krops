@@ -19,10 +19,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    if: >-
-      github.event.repository.fork == false &&
-      (github.ref_name == github.event.repository.default_branch ||
-       github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 15
     services:
@@ -70,7 +66,7 @@ jobs:
     name: Deploy without external egress
     needs: build
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
@@ -92,6 +88,7 @@ jobs:
         env:
           SKIP_OFFLINE_CHECK: "1"
           AIRGAP_VERIFY_REF: ${{ github.ref }}
+          AIRGAP_VERIFY_REPO: ${{ github.repository }}
         run: |
           set -uo pipefail
 
@@ -180,6 +177,7 @@ jobs:
             /tmp/airgap-public-egress.pcap
             /tmp/airgap-public-egress.txt
             /tmp/airgap-cert-manager-debug.txt
+            /tmp/airgap-workload-debug.txt
           if-no-files-found: warn
           retention-days: 1
 

@@ -28,17 +28,26 @@ def main() -> int:
             "${AIRGAP_VERIFY_REF:-refs/heads/main}, not a hardcoded ref"
         )
 
+    if "${AIRGAP_VERIFY_REPO:-polarsquad/krops}" not in script:
+        failures.append(
+            f"{OFFLINE_RUN_SH}: --certificate-identity must take the repository from "
+            "${AIRGAP_VERIFY_REPO:-polarsquad/krops}"
+        )
+
     workflow = AIR_GAPPED_YML.read_text()
     step_blocks = re.split(r"\n(?=      - name:)", workflow)
     offenders = [
         block for block in step_blocks
         if "offline-run.sh" in block
-        and "AIRGAP_VERIFY_REF: ${{ github.ref }}" not in block
+        and not (
+            "AIRGAP_VERIFY_REF: ${{ github.ref }}" in block
+            and "AIRGAP_VERIFY_REPO: ${{ github.repository }}" in block
+        )
     ]
     if offenders:
         failures.append(
             f"{AIR_GAPPED_YML}: {len(offenders)} step(s) invoke offline-run.sh "
-            "without setting AIRGAP_VERIFY_REF: ${{ github.ref }}"
+            "without setting AIRGAP_VERIFY_REF and AIRGAP_VERIFY_REPO"
         )
 
     if failures:

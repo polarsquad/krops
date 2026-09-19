@@ -34,6 +34,14 @@ jobs:
         run: python3 airgap/tests/test-resolve-clusterctl.py
       - name: Verify cert-manager debug capture on deploy failure (#329)
         run: python3 airgap/tests/test-airgap-debug-capture.py
+      - name: Verify cert-manager pods pin the bundled image digests
+        run: python3 airgap/tests/test-airgap-cert-manager-digest-values.py
+      - name: Verify pin_image_digests rewrites and rejects unpinned images
+        run: python3 airgap/tests/test-airgap-pin-image-digests.py
+      - name: Verify host-daemon images are saved and referenced by tag
+        run: python3 airgap/tests/test-airgap-host-image-tags.py
+      - name: Verify the air-gapped workflow triggers, guards, and timeouts
+        run: python3 airgap/tests/test-airgap-workflow-config.py
 
   zarf-mise-pin:
     name: Zarf mise asset pin

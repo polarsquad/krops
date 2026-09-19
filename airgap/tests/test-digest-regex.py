@@ -30,6 +30,8 @@ def main() -> int:
             f"ghcr.io/example/toolongdigestonly@sha256:{'d'*65}\n"
             f"ghcr.io/example/tooshortdigestonly@sha256:{'e'*63}\n"
             f"ghcr.io/example/digestonly@sha256:{'f'*64}\n")
+        (root / "airgap/manifests").mkdir()
+        (root / "airgap/manifests/flux-instance.yaml").write_text("kind: FluxInstance\n")
         (root / "airgap/scripts").mkdir(exist_ok=True)
         (root / "airgap/scripts/noop.sh").write_text("#!/usr/bin/env sh\ntrue\n")
         r = run_gate(root)

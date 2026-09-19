@@ -289,6 +289,44 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
    node status to `/tmp/airgap-cert-manager-debug.txt` when that step fails,
    while the kind cluster is still up on the runner, uploaded alongside the
    deployment evidence.
+8. **A `tag@sha256` bundle image and a tag-only pod image do not meet in the
+   registry.** Zarf stores the bundled image by digest only
+   (`<repo>@sha256:...`, no tag), while the agent rewrites a tag-only pod image
+   to `<tag>-zarf-<crc>`, which was never pushed. Pods sat in ImagePullBackOff
+   (`NotFound`) until the Helm timeout, from the digest pins in #189 until the
+   fix. Every pod image therefore references the digest the bundle carries:
+   the cert-manager and flux-operator chart values set it, the FluxInstance
+   controller patches carry it, and `pin_image_digests`
+   (`airgap/scripts/resolve-clusterctl.sh`) rewrites the `clusterctl`-rendered
+   CAPI and CAAPH manifests from `images.txt`, failing if an image is left
+   unpinned. Zarf only creates the `private-registry` pull secret in namespaces
+   it knows from charts, so `copy_registry_secret` copies it from `flux-system`
+   into the provider namespaces those actions create. `airgap/tests/test-airgap-cert-manager-digest-values.py` and
+   `test-airgap-pin-image-digests.py` guard this. Renovate does not update the
+   values or patches, so bump them together with `images.txt`. This also
+   supersedes finding 3's tag pins: the bundled digests are the manifest-list
+   digests, which the pipeline keeps intact.
+9. **Host-daemon images resolve by tag, never by digest.** kind, CAPD
+   (node, load balancer, `preLoadImages`) and the `krops-registry` container
+   use images loaded with `docker load`, which carry no RepoDigests, so a
+   `name@sha256` reference never resolves locally and docker silently pulls it
+   from the internet. A connected runner hides this (the isolated job logged
+   `Unable to find image 'registry:2@sha256:...' locally` and pulled it); an
+   air gap fails. `build-package.sh` therefore pulls each image by its pinned
+   digest, aliases the digest-less name onto it, saves that alias, and fails if
+   the archive lacks it. The consumers use the digest-less name:
+   `stage-and-create-cluster.sh` strips the digest at use, and
+   `build-config-artifact.sh` strips it from the artifact's `customImage`,
+   `preLoadImages`, and workload Flux controller patches (the committed sources keep the digests for Renovate). The
+   digest guarantee holds because the alias points at the image pulled by
+   digest.
+10. **The `kindest/node` image does not bake the pause image kubeadm expects.**
+   v1.37.0 bakes `registry.k8s.io/pause:3.10`, while its kubeadm lists
+   `pause:3.10.2`, so `kubeadm init` on a CAPD node tries to pull it and hangs
+   until the bootstrap deadline (the run's step 8 failure, found from the
+   workload-cluster debug capture in `/tmp/airgap-workload-debug.txt`).
+   `pause:3.10.2` is now in `workload-pod-images.tar` and the artifact's
+   `preLoadImages`. Re-check this list whenever the node image is bumped.
 
 ## Known limitations / follow-ups
 

@@ -66,6 +66,8 @@ components:
         namespace: flux-system
         url: oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator
         version: 0.58.0
+        valuesFiles:
+          - values/flux-operator.yaml
     images:
       - ghcr.io/controlplaneio-fluxcd/flux-operator:v0.58.0@sha256:1c919ce1e28716f817ded65c06df0b7a8269542387d5a2ce50212450473c6209
     healthChecks:
@@ -106,8 +108,8 @@ components:
             cmd: kubectl apply -f /tmp/krops-airgap/flux-instance.yaml
             maxTotalSeconds: 120
           - description: Wait for Flux to be Ready (controllers + sync)
-            cmd: kubectl -n flux-system wait --for=condition=Ready fluxinstance/flux --timeout=10m
-            maxTotalSeconds: 640
+            cmd: kubectl -n flux-system wait --for=condition=Ready fluxinstance/flux --timeout=1m
+            maxTotalSeconds: 70
     images:
       - ghcr.io/fluxcd/source-controller:v1.9.4@sha256:8a8ed0a57b8b86f561d5a4309a69f65e62f0cebe4de8801593c5ff35a3bc3c23
       - ghcr.io/fluxcd/kustomize-controller:v1.9.4@sha256:2b8bec54ffb6caf421bd2a6c005d27f567d5dd4db7feb55794fb51fcabd69b8f
@@ -133,6 +135,8 @@ components:
         executable: true
       - source: files/clusterctl-providers.yaml
         target: /tmp/krops-airgap/clusterctl-providers.yaml
+      - source: images.txt
+        target: /tmp/krops-airgap/images.txt
       - source: scripts/resolve-clusterctl.sh
         target: /tmp/krops-airgap/scripts/resolve-clusterctl.sh
         executable: true
@@ -150,12 +154,14 @@ components:
           - description: Render and apply the core CAPI provider
             cmd: |
               . /tmp/krops-airgap/scripts/resolve-clusterctl.sh
+              copy_registry_secret capi-system || exit 1
               rendered=/tmp/krops-airgap/capi/core.rendered.yaml
               # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-core
               "$clusterctl" generate provider --core cluster-api:v1.14.2 \
                 --config /tmp/krops-airgap/clusterctl-providers.yaml \
                 --write-to "$rendered" &&
               patch_feature_gates "$rendered" &&
+              pin_image_digests "$rendered" &&
               kubectl apply -f "$rendered"
             maxTotalSeconds: 120
     images:
@@ -203,20 +209,24 @@ components:
             cmd: |
               . /tmp/krops-airgap/scripts/resolve-clusterctl.sh
               config=/tmp/krops-airgap/clusterctl-providers.yaml
+              copy_registry_secret capi-kubeadm-bootstrap-system capi-kubeadm-control-plane-system capd-system &&
               # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-bootstrap-kubeadm
               "$clusterctl" generate provider --bootstrap kubeadm:v1.14.2 \
                 --config "$config" --write-to /tmp/krops-airgap/capi/bootstrap.rendered.yaml &&
               patch_feature_gates /tmp/krops-airgap/capi/bootstrap.rendered.yaml &&
+              pin_image_digests /tmp/krops-airgap/capi/bootstrap.rendered.yaml &&
               kubectl apply -f /tmp/krops-airgap/capi/bootstrap.rendered.yaml &&
               # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-control-plane-kubeadm
               "$clusterctl" generate provider --control-plane kubeadm:v1.14.2 \
                 --config "$config" --write-to /tmp/krops-airgap/capi/control-plane.rendered.yaml &&
               patch_feature_gates /tmp/krops-airgap/capi/control-plane.rendered.yaml &&
+              pin_image_digests /tmp/krops-airgap/capi/control-plane.rendered.yaml &&
               kubectl apply -f /tmp/krops-airgap/capi/control-plane.rendered.yaml &&
               # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-infrastructure-docker
               "$clusterctl" generate provider --infrastructure docker:v1.14.2 \
                 --config "$config" --write-to /tmp/krops-airgap/capi/infrastructure.rendered.yaml &&
               patch_feature_gates /tmp/krops-airgap/capi/infrastructure.rendered.yaml &&
+              pin_image_digests /tmp/krops-airgap/capi/infrastructure.rendered.yaml &&
               kubectl apply -f /tmp/krops-airgap/capi/infrastructure.rendered.yaml
             maxTotalSeconds: 180
     images:
@@ -247,10 +257,12 @@ components:
           - description: Render and apply the staged CAAPH provider
             cmd: |
               . /tmp/krops-airgap/scripts/resolve-clusterctl.sh
+              copy_registry_secret caaph-system &&
               # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-addon-provider-helm
               "$clusterctl" generate provider --addon helm:v0.6.4 \
                 --config /tmp/krops-airgap/clusterctl-providers.yaml \
                 --write-to /tmp/krops-airgap/caaph/addon-components.rendered.yaml &&
+              pin_image_digests /tmp/krops-airgap/caaph/addon-components.rendered.yaml &&
               kubectl apply -f /tmp/krops-airgap/caaph/addon-components.rendered.yaml
             maxTotalSeconds: 120
     files:

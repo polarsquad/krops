@@ -77,6 +77,30 @@ fi
 mv "${init_outputs[0]}" airgap/archives/zarf-init-arm64.tar.zst
 rm -rf "$INIT_STAGING"
 
+# Host-daemon consumers (kind, CAPD, the registry container, preLoadImages)
+# reference these images by tag: a loaded image has no RepoDigests, so a
+# digest reference never resolves locally and docker silently pulls instead,
+# which an air gap cannot do. Pull by digest (the pin), alias the digest-less
+# name onto that image, save the alias, and fail if the archive lacks it.
+save_host_images() {
+  out=$1
+  shift
+  aliases=()
+  for ref in "$@"; do
+    docker tag "$ref" "${ref%@*}"
+    aliases+=("${ref%@*}")
+  done
+  docker save -o "$out" "${aliases[@]}"
+  for alias in "${aliases[@]}"; do
+    short=${alias#docker.io/}
+    short=${short#library/}
+    tar -xOf "$out" manifest.json | grep -q -e "\"$alias\"" -e "\"$short\"" -e "\"docker.io/$short\"" || {
+      echo "ERROR: $out does not carry the tag $alias" >&2
+      exit 1
+    }
+  done
+}
+
 HOST_IMAGES=(
   kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
   kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
@@ -86,13 +110,14 @@ HOST_IMAGES=(
 for img in "${HOST_IMAGES[@]}"; do
   docker pull --platform linux/arm64 "$img" >/dev/null
 done
-docker save -o airgap/archives/kindest_node_v1.37.0_mgmt.tar kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
-docker save -o airgap/archives/kindest_node_v1.37.0.tar kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
-docker save -o airgap/archives/kindest_haproxy_v20230606-42a2262b.tar kindest/haproxy:v20230606-42a2262b@sha256:001a06433666046dea44567c7d7c6adfc2ac0edb556576f6da507ff0b0f063d3
-docker save -o airgap/archives/docker.io_library_registry_2.tar docker.io/library/registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+save_host_images airgap/archives/kindest_node_v1.37.0_mgmt.tar kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+save_host_images airgap/archives/kindest_node_v1.37.0.tar kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+save_host_images airgap/archives/kindest_haproxy_v20230606-42a2262b.tar kindest/haproxy:v20230606-42a2262b@sha256:001a06433666046dea44567c7d7c6adfc2ac0edb556576f6da507ff0b0f063d3
+save_host_images airgap/archives/docker.io_library_registry_2.tar docker.io/library/registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
 echo "    saved Zarf init package and host-daemon image archives"
 
 WORKLOAD_IMAGES=(
+  registry.k8s.io/pause:3.10.2@sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4
   docker.io/kindest/kindnetd:v20260528-9350166c@sha256:92f49a1b2c9242058481fc3e13412c19a62cfeb090717dad4598719d32351f1f
   ghcr.io/controlplaneio-fluxcd/flux-operator:v0.58.0@sha256:1c919ce1e28716f817ded65c06df0b7a8269542387d5a2ce50212450473c6209
   ghcr.io/fluxcd/source-controller:v1.9.4@sha256:8a8ed0a57b8b86f561d5a4309a69f65e62f0cebe4de8801593c5ff35a3bc3c23
@@ -104,7 +129,7 @@ WORKLOAD_IMAGES=(
 for img in "${WORKLOAD_IMAGES[@]}"; do
   docker pull --platform linux/arm64 "$img" >/dev/null
 done
-docker save -o airgap/archives/workload-pod-images.tar "${WORKLOAD_IMAGES[@]}"
+save_host_images airgap/archives/workload-pod-images.tar "${WORKLOAD_IMAGES[@]}"
 echo "    saved airgap/archives/workload-pod-images.tar"
 
 # OCI charts the workload cluster needs in the gap (seeded into krops-registry
@@ -112,7 +137,11 @@ echo "    saved airgap/archives/workload-pod-images.tar"
 # and the podinfo chart (workload HelmRelease).
 mkdir -p airgap/archives/charts
 helm pull oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator --version 0.58.0 -d airgap/archives/charts
-helm pull oci://ghcr.io/stefanprodan/charts/podinfo --version 6.14.0 -d airgap/archives/charts
+# The version comes from the workload tree that will request it, so the seeded
+# chart cannot drift from the OCIRepository tag.
+podinfo_chart_version=$(sed -nE 's/^ *tag: "?([0-9][^"]*)"?.*/\1/p' workload/local-host/podinfo/helm.yaml | head -1)
+[ -n "$podinfo_chart_version" ] || { echo "ERROR: no podinfo chart tag in workload/local-host/podinfo/helm.yaml" >&2; exit 1; }
+helm pull oci://ghcr.io/stefanprodan/charts/podinfo --version "$podinfo_chart_version" -d airgap/archives/charts
 echo "    staged charts: $(ls airgap/archives/charts/)"
 
 echo "==> 4/5 zarf package create (SBOM generation enabled)"

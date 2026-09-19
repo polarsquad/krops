@@ -70,7 +70,7 @@ jobs:
     name: Deploy without external egress
     needs: build
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
@@ -180,6 +180,7 @@ jobs:
             /tmp/airgap-public-egress.pcap
             /tmp/airgap-public-egress.txt
             /tmp/airgap-cert-manager-debug.txt
+            /tmp/airgap-workload-debug.txt
           if-no-files-found: warn
           retention-days: 1
 

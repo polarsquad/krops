@@ -127,7 +127,7 @@ fi
 
 step "3. zarf init"
 if ( cd "$AIRGAP_DIR" && "$ZARF" init "$ARCHIVES/zarf-init-arm64.tar.zst" \
-       --registry-mode=nodeport --components="" --confirm ); then
+       --registry-mode=nodeport --components="" --timeout 1m --confirm ); then
   pass "zarf init"
 else
   fail "zarf init"
@@ -135,7 +135,7 @@ else
 fi
 
 step "4. zarf package deploy"
-if ( cd "$AIRGAP_DIR" && "$ZARF" package deploy "$PACKAGE" --confirm ); then
+if ( cd "$AIRGAP_DIR" && "$ZARF" package deploy "$PACKAGE" --timeout 1m --confirm ); then
   pass "zarf package deploy"
 else
   fail "zarf package deploy"
@@ -193,8 +193,8 @@ step "7. verify mgmt Flux kustomizations"
 step "8. verify CAPD workload cluster provisions offline"
 wl_ready=$("$KUBECTL" --context "$MGMT_CTX" get clusters.cluster.x-k8s.io airgap-wl -n default \
   -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null)
-# wait up to 10m for Available
-for i in $(seq 1 40); do
+# wait up to 20m for Available
+for i in $(seq 1 80); do
   [ "$wl_ready" = "True" ] && break
   sleep 15
   wl_ready=$("$KUBECTL" --context "$MGMT_CTX" get clusters.cluster.x-k8s.io airgap-wl -n default \
@@ -204,9 +204,32 @@ if [ "$wl_ready" = "True" ]; then
   pass "workload cluster airgap-wl Available"
 else
   fail "workload cluster airgap-wl not Available"
+  # Captured while the kind cluster and CAPD containers are still up.
+  {
+    echo "===== workload cluster resources ====="
+    "$KUBECTL" --context "$MGMT_CTX" get clusters,machines,dockerclusters,dockermachines,kubeadmcontrolplanes,machinedeployments -A -o wide
+    echo "===== describe cluster, machines, dockermachines ====="
+    "$KUBECTL" --context "$MGMT_CTX" -n default describe clusters,machines,dockerclusters,dockermachines
+    echo "===== CAPD and CAPI controller logs ====="
+    "$KUBECTL" --context "$MGMT_CTX" -n capd-system logs deploy/capd-controller-manager --tail=200
+    "$KUBECTL" --context "$MGMT_CTX" -n capi-system logs deploy/capi-controller-manager --tail=100
+    "$KUBECTL" --context "$MGMT_CTX" -n capi-kubeadm-control-plane-system logs deploy/capi-kubeadm-control-plane-controller-manager --tail=100
+    echo "===== docker ps -a / images ====="
+    "$DOCKER" ps -a
+    "$DOCKER" images
+    for c in $("$DOCKER" ps -a --format '{{.Names}}' | grep '^airgap-wl'); do
+      echo "===== docker logs $c ====="
+      "$DOCKER" logs --tail 40 "$c"
+    done
+    echo "===== management cluster events ====="
+    "$KUBECTL" --context "$MGMT_CTX" get events -A --sort-by=.lastTimestamp | tail -80
+  } > /tmp/airgap-workload-debug.txt 2>&1
 fi
 
 step "9. verify workload nodes Ready + per-cluster Flux + podinfo"
+if [ "$wl_ready" != "True" ]; then
+  fail "workload checks skipped: airgap-wl is not Available"
+else
 port=$("$DOCKER" port airgap-wl-lb 6443/tcp 2>/dev/null | head -1 | sed 's/.*://')
 if [ -n "$port" ]; then
   "$KUBECTL" --context "$MGMT_CTX" get secret -n default airgap-wl-kubeconfig \
@@ -234,8 +257,26 @@ if [ -n "$port" ]; then
     podinfo=$("$KUBECTL" --kubeconfig="$WL_KCFG" -n podinfo get pods --no-headers 2>/dev/null | grep -c " Running ")
   done
   [ "${podinfo:-0}" -ge 1 ] && pass "podinfo Running on workload cluster" || fail "podinfo not Running"
+
+  if [ "$wlf" != "True" ] || [ "${podinfo:-0}" -lt 1 ]; then
+    {
+      echo "===== workload cluster pods ====="
+      "$KUBECTL" --kubeconfig="$WL_KCFG" get pods -A -o wide
+      echo "===== workload cluster pod descriptions (flux-system, podinfo) ====="
+      "$KUBECTL" --kubeconfig="$WL_KCFG" -n flux-system describe pods
+      "$KUBECTL" --kubeconfig="$WL_KCFG" -n podinfo describe pods
+      echo "===== workload Flux objects ====="
+      "$KUBECTL" --kubeconfig="$WL_KCFG" get ocirepositories,kustomizations,helmreleases -A
+      echo "===== workload cluster events ====="
+      "$KUBECTL" --kubeconfig="$WL_KCFG" get events -A --sort-by=.lastTimestamp | tail -80
+      echo "===== management HelmChartProxies and HelmReleaseProxies ====="
+      "$KUBECTL" --context "$MGMT_CTX" get helmchartproxies,helmreleaseproxies -A -o yaml
+      "$KUBECTL" --context "$MGMT_CTX" -n caaph-system logs deploy/caaph-controller-manager --tail=100
+    } >> /tmp/airgap-workload-debug.txt 2>&1
+  fi
 else
   fail "could not determine airgap-wl LB port"
+fi
 fi
 
 step "OFFLINE RUN COMPLETE"

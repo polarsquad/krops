@@ -1,0 +1,4 @@
+# Values for the flux-operator chart, deployed by Zarf in the airgap.
+# The tag carries the digest bundled in airgap/images.txt; see docs/airgap.md.
+image:
+  tag: v0.58.0@sha256:1c919ce1e28716f817ded65c06df0b7a8269542387d5a2ce50212450473c6209

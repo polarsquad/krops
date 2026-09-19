@@ -174,6 +174,8 @@ EOF
 #   - docker.io/kindest/kindnetd:v20260528-9350166c: the vendored CNI pins
 #     this tag but the v1.37.0 node bakes v20260820; the CNI pull hangs
 #     offline so nodes never become Ready.
+#   - registry.k8s.io/pause:3.10.2: kubeadm v1.37.0 expects it, but the node
+#     bakes 3.10, so `kubeadm init` pulls it and hangs offline.
 # The flux controllers + podinfo are pre-loaded so the per-cluster Flux needs
 # no internet. All entries load from the host Docker daemon
 # (stage-and-create-cluster.sh loads workload-pod-images.tar).
@@ -182,6 +184,7 @@ import sys
 path = sys.argv[1]
 txt = open(path).read()
 preload = """          preLoadImages:
+            - registry.k8s.io/pause:3.10.2@sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4
             - docker.io/kindest/kindnetd:v20260528-9350166c@sha256:92f49a1b2c9242058481fc3e13412c19a62cfeb090717dad4598719d32351f1f
             - ghcr.io/controlplaneio-fluxcd/flux-operator:v0.58.0@sha256:1c919ce1e28716f817ded65c06df0b7a8269542387d5a2ce50212450473c6209
             - ghcr.io/fluxcd/source-controller:v1.9.4@sha256:8a8ed0a57b8b86f561d5a4309a69f65e62f0cebe4de8801593c5ff35a3bc3c23
@@ -198,6 +201,25 @@ txt = txt.replace(anchor, anchor + preload)
 open(path, "w").write(txt)
 print(f"patched {path}: preLoadImages added to {count} DevMachineTemplates")
 PY
+
+# The nodes' images come from the host daemon, where a loaded image resolves
+# by tag but never by digest (see build-package.sh save_host_images), so the
+# artifact refers to customImage, preLoadImages, and the workload Flux
+# controller patches by tag. Every one of them
+# was pulled by its pinned digest into the archive.
+sed -E -i.bak '/customImage:|^ +- [a-z0-9.\/-]+(:[^@ ]+)@sha256:/ s/@sha256:[a-f0-9]{64}//' "$LH/clusters/docker/cluster-class.yaml"
+rm -f "$LH/clusters/docker/cluster-class.yaml.bak"
+# The workload FluxInstance's controller images are preloaded the same way.
+sed -E -i.bak 's#(value: ghcr\.io/fluxcd/[a-z-]+:[^@ ]+)@sha256:[a-f0-9]{64}#\1#' "$LH/addons/flux-apps/flux-instance.yaml"
+rm -f "$LH/addons/flux-apps/flux-instance.yaml.bak"
+! grep -q 'value: ghcr.io/fluxcd/.*@sha256:' "$LH/addons/flux-apps/flux-instance.yaml" || {
+  echo "ERROR: digest references left in the workload flux-instance.yaml" >&2
+  exit 1
+}
+! grep -E 'customImage:|^ +- ' "$LH/clusters/docker/cluster-class.yaml" | grep -q '@sha256:' || {
+  echo "ERROR: digest references left in the artifact's cluster-class.yaml" >&2
+  exit 1
+}
 
 # Workload tree: rewrite the podinfo chart OCI URL to krops-registry (seeded in
 # the gap) and mark the OCIRepository insecure (plain HTTP). The FluxInstance

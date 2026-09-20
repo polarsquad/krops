@@ -86,3 +86,6 @@ nav:
   - WireMock e2e spike findings (AWS): wiremock-e2e-spike-findings-aws.md
   - WireMock e2e spike findings (Azure): wiremock-e2e-spike-findings-azure.md
   - WireMock e2e spike findings (GCP): wiremock-e2e-spike-findings-gcp.md
+  - Proposals:
+      - Overview: proposals/README.md
+      - Air-gap bundle update architectures: proposals/airgap-update-architectures.md

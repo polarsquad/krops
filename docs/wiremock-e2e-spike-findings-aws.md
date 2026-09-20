@@ -99,7 +99,9 @@ Two notes on trust and TLS:
 - `SSL_CERT_FILE` is honored by Go's `crypto/x509` (`SystemCertPool`), which
   the AWS SDK Go v2 default HTTP client uses. The controller images are
   distroless (no CA bundle, no shell), so the env var plus a mounted file is
-  the working lever; `AWS_CA_BUNDLE` is not honored by AWS SDK Go v2.
+  the working lever. `AWS_CA_BUNDLE` is also honored by AWS SDK Go v2 (the
+  config package reads it into `CustomCABundle`); `SSL_CERT_FILE` was used
+  here because it needs no SDK involvement and applies to any Go binary.
 - WireMock 3.13.2's `--key-manager-password` defaults to the literal string
   `password` independently of `--keystore-password`. A keystore whose key
   entry password differs from that default fails at boot with

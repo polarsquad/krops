@@ -83,3 +83,4 @@ nav:
   - PR review with konflate: konflate.md
   - Dependencies: dependencies.md
   - Air-gapped krops: airgap.md
+  - WireMock e2e spike findings (AWS): wiremock-e2e-spike-findings-aws.md

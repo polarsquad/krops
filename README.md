@@ -337,6 +337,7 @@ teardown controls, toolbox release, and current parity status.
 | [docs/azure.md](docs/azure.md) | Azure environment: subscription prep, credentials, AKS clusters, ASO on workload clusters, upgrades |
 | [docs/gcp.md](docs/gcp.md) | GCP environment: project prep, WIF credentials (no keys), GKE clusters, Config Connector on the workload cluster, upgrades |
 | [docs/airgap.md](docs/airgap.md) | Zarf air-gap bundle: package build, offline deploy, verification checklist, update drill |
+| [docs/proposals/](docs/proposals/README.md) | Design proposals under review (not yet decided or implemented) |
 
 ## Repository layout
 

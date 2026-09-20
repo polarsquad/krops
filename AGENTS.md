@@ -160,6 +160,8 @@ resources. There is no app source code here, only declarative infrastructure.
   `scripts/toolbox-run.sh` (issue #104); the scripts remain the native path
   for development.
 - `docs/`: detailed documentation (see the table in README.md).
+  `docs/proposals/` holds design proposals under review (not yet decided or
+  implemented); the docs site assembler includes that folder.
 - `mise.toml`: pinned tool versions and all task entrypoints.
   `mise.aws.toml` is the AWS tool layer (aws-cli, clusterawsadm),
   activated with `MISE_ENV=aws`. `mise.azure.toml` (azure-cli) and

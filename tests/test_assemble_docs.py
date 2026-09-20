@@ -86,3 +86,20 @@ def test_assemble_builds_docs_dir(tmp_path):
     assert (out / "assets" / "css" / "krops.css").exists()
     assert not (out / "scratch.png").exists()
     assert not (out / "stale").exists()
+
+
+def test_assemble_includes_proposals_folder(tmp_path):
+    krops = tmp_path / "krops"
+    (krops / "docs" / "proposals").mkdir(parents=True)
+    (krops / "README.md").write_text("# krops\n")
+    text = f"# P\n[abs]({GH}/blob/main/bootstrap.toml) [sib](q.md) [s](#x)\n"
+    (krops / "docs" / "proposals" / "p.md").write_text(text)
+    (krops / "docs" / "proposals" / "notes.txt").write_text("skip")
+    src = tmp_path / "src"
+    src.mkdir()
+    out = tmp_path / "build" / "docs"
+
+    assemble(krops=krops, src=src, out=out)
+
+    assert (out / "proposals" / "p.md").read_text() == text
+    assert not (out / "proposals" / "notes.txt").exists()

@@ -181,17 +181,18 @@ You also need:
   (fine-grained with read-only Contents permission, or classic with `repo`
   scope). The Flux Operator chart is pulled anonymously.
 - AWS credentials with permission to create EKS clusters, VPCs, and IAM roles.
-  For the ACK controllers the same principal additionally needs
-  `iam:CreateRole`/`PutRolePolicy`/`GetRole`/`TagRole`,
+  The same principal runs every ACK controller on the management cluster
+  (issue #346), so it additionally needs the union of the three former
+  per-controller pod-identity role policies: S3 bucket management scoped to
+  `krops-*`, RDS instance management scoped to `krops-*` (plus
+  `secretsmanager:CreateSecret`/`TagResource`/`RotateSecret` on `rds!*` for
+  managed master passwords and `kms:CreateGrant`/`ListGrants`/`RevokeGrant`
+  with `kms:GrantIsForAWSResource`), and IAM role management scoped to
+  `krops-*` (`iam:CreateRole`/`PutRolePolicy`/`GetRole`/`TagRole`) plus
   `iam:CreateUser`/`PutUserPolicy`/`GetUser`/`GetUserPolicy`/`TagUser`
-  (for the `krops-reader` console user), and
-  `eks:CreatePodIdentityAssociation`/`DescribePodIdentityAssociation`/
-  `DeletePodIdentityAssociation`. The `rds:*` management and
-  `secretsmanager:CreateSecret`/`TagResource`/`RotateSecret` permissions
-  (managed master passwords) used by the workload clusters' ACK RDS
-  controllers are granted through the Git-declared
-  `krops-ack-rds-controller` pod-identity role; no extra static
-  credentials are required for them.
+  (for the `krops-reader` console user). This is a deliberate
+  least-privilege trade-off: one static principal now holds the union —
+  see [aws-iam.md](./aws-iam.md) for the exact action lists.
 - The `clusterawsadm` IAM CloudFormation stack provisioned before bootstrap and
   removed by a full AWS teardown:
 
@@ -253,11 +254,23 @@ You also need:
 | Quota | Code | Needed | Why |
 |---|---|---|---|
 | EC2-VPC Elastic IPs (per region) | `L-0263D0A3` | ≥ 6 free in `eu-north-1`, ≥ 3 free in `eu-west-1` | One EIP per NAT gateway (3 AZs): two clusters in `eu-north-1` (management + workload), one in `eu-west-1` |
+| VPCs per region | `L-F678F1CE` | 8 in `eu-north-1` (raised from the default 5) | One VPC per cluster plus pre-existing non-krops VPCs. e2e account 120392301094: `eu-north-1` quota raised to 8 (5 in use, headroom 3), `eu-west-1` at 3/5 (headroom 2) |
 
 The check is per region, and the default regional limit is 5, so a clean
 account stalls mid-run on the second `eu-north-1` cluster. Request the
 increase before the first run with
-`aws service-quotas request-service-quota-increase --service-code ec2 --quota-code <code> --desired-value <n> --region <region>`.
+`aws service-quotas request-service-quota-increase --service-code ec2 --quota-code <code> --desired-value <n> --region <region>`
+(for VPCs use `--service-code vpc`).
+
+### E2E account budget
+
+The e2e AWS account 120392301094 carries a monthly cost budget
+`krops-e2e-monthly` with a $200 ceiling. Notifications publish to the SNS
+topic `krops-e2e-budget-alerts` (us-east-1) at 80% forecasted and 100%
+actual spend, and the topic's email subscription delivers them to
+joseph.shriner@polarsquad.com, the escalation path for budget alerts. The
+email subscription only activates after the SNS confirmation email is
+accepted.
 
 ## Configuration
 
@@ -321,7 +334,7 @@ This initial imperative phase performs these steps:
    and deletes the kind cluster (see [Pivot recovery](#pivot-recovery)).
 
 Everything downstream (providers, EKS clusters, workload Flux instances, the
-ACK operator, IAM role, pod identity bindings, and S3 buckets) reconciles
+ACK controllers, IAM roles, and S3 buckets) reconciles
 from Git with no further manual steps.
 
 The local-host environment performs the cluster, Flux Operator, and FluxInstance
@@ -455,15 +468,16 @@ For the AWS chain:
 ```sh
 # Management cluster after a toolbox run
 export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
-kubectl get kustomizations -n flux-system            # all Ready
+kubectl get kustomizations -n flux-system            # all Ready (incl. ack-controllers, workload-resources)
 kubectl get clusters.cluster.x-k8s.io -A             # Provisioned
+kubectl get buckets.s3.services.k8s.aws -n ack-system
+kubectl get dbinstances.rds.services.k8s.aws -n ack-system
 kubectl get roles.iam.services.k8s.aws -n ack-system
-kubectl get podidentityassociations.eks.services.k8s.aws -n ack-system
 
 # Workload clusters: export kubeconfigs first
 #   mise -E aws run kubeconfigs && export KUBECONFIG=~/.kube/krops-workloads.yaml
 #   kubectl config use-context eu-north-1-workload   (or eu-west-1-workload)
-kubectl get kustomizations -n flux-system            # aws-operators, s3-buckets, rds-instances, iam-roles
+kubectl get kustomizations -n flux-system            # root only; workload/base is empty since #346
 
 # AWS
 aws s3api get-bucket-encryption    --bucket krops-<account>-eu-north-1-workload-data

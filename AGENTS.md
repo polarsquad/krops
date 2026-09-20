@@ -13,7 +13,8 @@ resources. There is no app source code here, only declarative infrastructure.
 
 - `mgmt/aws/`: synced by the MANAGEMENT cluster's Flux.
   - `infrastructure/`: cert-manager, CAPI operator, CAPA identity, ACK
-    controllers, pod-identity roles, account-global IAM, konflate.
+    controllers (S3, RDS, IAM), the per-cluster Bucket/DBInstance/reader
+    Role CRs (`workload-resources/`), account-global IAM, konflate.
   - `capi-providers/`: capi-system, capa-system, caaph-system.
   - `addons/flux-apps/`: installs Flux on each workload cluster
     (HelmChartProxy + ClusterResourceSets).
@@ -84,7 +85,10 @@ resources. There is no app source code here, only declarative infrastructure.
   `gcp-vars` (flux-system) and the workload `cluster-vars`. Teardown is
   manual until the live acceptance run.
 - `workload/`: synced by each WORKLOAD cluster's Flux.
-  - `base/`: ACK controllers and S3/RDS/IAM custom resources.
+  - `base/`: intentionally empty since issue #346 (the ACK controllers and
+    the S3/RDS/IAM custom resources moved to `mgmt/aws/infrastructure/`);
+    the workload Flux instance stays ready for a future application
+    workload.
   - `azure-base/`: cert-manager, ASO (workload identity), and the Azure
     resources (VNet + delegated subnet + private DNS, storage account +
     container, PostgreSQL Flexible Server). `swedencentral-01/` points at it.
@@ -286,7 +290,7 @@ Load these only when the task touches their domain:
 - `docs/extending.md`: adding a workload cluster, adding apps, adding other providers (Azure, Talos, k0smotron).
 - `docs/secrets.md`: SOPS + age setup, credential rotation.
 - `docs/konflate.md`: rendered PR review, CI gate, tokens, write-back.
-- `docs/aws-iam.md`: EKS Pod Identity, ACK controller roles, reader user.
+- `docs/aws-iam.md`: management-cluster ACK controllers (static SOPS credentials, union scope), reader roles, reader user.
 - `docs/operations.md`: quotas, configuration, bootstrap, verification.
 - `docs/workload-resources.md`: S3/RDS posture, known limitations.
 - `docs/airgap.md`: Zarf offline bundle for the local-host profile.

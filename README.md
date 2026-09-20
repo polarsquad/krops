@@ -165,11 +165,12 @@ link to the full guide.
 #### AWS
 
 The reference environment. CAPA provisions an EKS management cluster in
-`eu-north-1` plus workload EKS clusters in `eu-north-1` and `eu-west-1`; each
-workload cluster runs the ACK S3, RDS, and IAM operators, authenticated with
-EKS Pod Identity (no static keys on workload clusters). Credentials are a
-SOPS-encrypted CAPA profile in Git plus per-controller IAM roles created
-declaratively by the management cluster. It needs a GitHub PAT, an age key,
+`eu-north-1` plus workload EKS clusters in `eu-north-1` and `eu-west-1`; the
+management cluster runs the ACK S3, RDS, and IAM operators reconciling the
+per-cluster AWS resources, so workload clusters hold no credentials and run
+no controllers. Credentials are a
+SOPS-encrypted CAPA profile in Git (the same static pattern authenticates
+the ACK controllers). It needs a GitHub PAT, an age key,
 AWS credentials, and the `clusterawsadm` CloudFormation stack.
 
 ![krops aws architecture](docs/aws-infra.svg)
@@ -325,7 +326,7 @@ teardown controls, toolbox release, and current parity status.
 | [docs/architecture.md](docs/architecture.md) | Architecture diagram, reconciliation order, how workload apps are delivered |
 | [docs/aws.md](docs/aws.md) | AWS environment: clusters, credentials, identifiers, reconciliation order, upgrades, known limitations |
 | [docs/wiremock-e2e-spike-findings-aws.md](docs/wiremock-e2e-spike-findings-aws.md) | WireMock e2e Phase 0 spike findings (AWS): CAPA/ACK honor `AWS_ENDPOINT_URL`, no network-layer interception needed |
-| [docs/aws-iam.md](docs/aws-iam.md) | EKS Pod Identity, ACK controller IAM roles, per-cluster reader roles, the `krops-reader` console user |
+| [docs/aws-iam.md](docs/aws-iam.md) | Management-cluster ACK controllers (static SOPS credentials, union scope), per-cluster reader roles, the `krops-reader` console user |
 | [docs/workload-resources.md](docs/workload-resources.md) | S3 bucket security posture, RDS instances, known limitations |
 | [docs/konflate.md](docs/konflate.md) | Rendered Flux PR review: GitHub Actions gate, in-cluster instance, write-back to PRs, tokens |
 | [docs/secrets.md](docs/secrets.md) | SOPS + age secret management, key setup, credential rotation |
@@ -357,9 +358,10 @@ teardown controls, toolbox release, and current parity status.
 ├── renovate.json5                 Hosted Renovate discovery and grouping rules
 ├── mgmt/aws/                      Synced by the MANAGEMENT cluster's Flux
 │   ├── infrastructure/           cert-manager, CAPI operator, CAPA identity,
-│   │                              ACK controllers, pod-identity roles,
-│   │                              account-global IAM (reader console user),
-│   │                              konflate (rendered Flux PR review)
+│   │                              ACK controllers (S3, RDS, IAM) and the
+│   │                              per-cluster Bucket/DBInstance/reader Role
+│   │                              CRs, account-global IAM (reader console
+│   │                              user), konflate (rendered Flux PR review)
 │   ├── capi-providers/           capi-system, capa-system (SOPS creds),
 │   │                              caaph-system
 │   ├── addons/flux-apps/         Installs Flux on each workload cluster
@@ -384,8 +386,9 @@ teardown controls, toolbox release, and current parity status.
 ├── mgmt/gcp/                      GKE management cluster (CAPG + Config
 │   │                              Connector operator + WIF identities)
 └── workload/                     Synced by each WORKLOAD cluster's Flux
-    ├── base/                     ACK S3/RDS/IAM controllers, Bucket CRs,
-    │                              DBInstance CRs, reader Role CRs
+    ├── base/                     Intentionally empty since #346 (ACK moved
+    │                              to the management cluster); ready for a
+    │                              future application workload
     ├── azure-base/               cert-manager, ASO, and the Azure workload
     │                              resources (VNet, storage, PostgreSQL)
     ├── gcp-base/                 KCC operator + ConfigConnector, PSA range,

@@ -1,13 +1,16 @@
 # Workload resources
 
-What the ACK controllers on each workload cluster create in AWS. For how the
-controllers authenticate (and the per-cluster reader roles / console user),
-see [AWS authentication & IAM](./aws-iam.md).
+What the ACK controllers on the management cluster create in AWS, one
+instance per workload cluster (issue #346 moved both the controllers and
+their CRs off the workload clusters). For how the controllers authenticate
+(and the per-cluster reader roles / console user), see
+[AWS authentication & IAM](./aws-iam.md).
 
 ## Bucket security posture
 
-`workload/base/s3-buckets/bucket.yaml` creates one bucket per cluster
-(`krops-<account>-<cluster>-data`) with:
+`mgmt/aws/infrastructure/workload-resources/bucket.yaml` creates one bucket
+per cluster (`krops-<account>-<cluster>-data`, literal values: there is no
+`cluster-vars` ConfigMap on the management cluster) with:
 
 - all public access blocked
 - server-side encryption enforced (SSE-S3/AES256, bucket keys)
@@ -17,15 +20,15 @@ see [AWS authentication & IAM](./aws-iam.md).
 
 ## RDS instances
 
-`workload/base/rds-instances/dbinstance.yaml` creates one PostgreSQL 17 instance
-per cluster (`krops-<cluster>-db`) in that cluster's own region; the ACK
-RDS controller runs with `aws.region: ${AWS_REGION}`:
+`mgmt/aws/infrastructure/workload-resources/dbinstance.yaml` creates one
+PostgreSQL 17 instance per cluster (`krops-<cluster>-db`) in that cluster's
+own region; the controller's default region is eu-north-1 and the eu-west-1
+instance overrides it with the `services.k8s.aws/region` annotation:
 
 - `db.t4g.micro`, 20 GiB gp3, single-AZ (smallest footprint)
 - not publicly accessible, storage encrypted
 - master password managed by RDS (`manageMasterUserPassword: true`) and stored
-  in Secrets Manager; workload clusters have no SOPS key, so an in-Git
-  password secret is not an option
+  in Secrets Manager: no password is ever declared in Git
 
 > **Known limitation**: the `DBInstance` sets no `dbSubnetGroupName`, so the
 > instance lands in the region's **default VPC**, not the EKS VPC. CAPA

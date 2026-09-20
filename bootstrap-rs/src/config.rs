@@ -120,15 +120,15 @@ pub struct TeardownSection {
     /// CloudFormation stack created by `clusterawsadm bootstrap iam`.
     #[serde(default)]
     pub cfn_stack_name: Option<String>,
-    /// Region-independent IAM roles: the ACK controller pod-identity roles
-    /// and the per-cluster reader roles (workload/base/iam-roles/role.yaml).
+    /// Region-independent IAM roles: the per-cluster reader roles
+    /// (mgmt/aws/infrastructure/workload-resources/role.yaml).
     #[serde(default)]
     pub global_iam_roles: Vec<String>,
     /// Region-independent IAM users (the console reader user).
     #[serde(default)]
     pub global_iam_users: Vec<String>,
     /// S3 bucket name pattern with `{account_id}` and `{cluster_name}`
-    /// placeholders (workload/base/s3-buckets/bucket.yaml).
+    /// placeholders (mgmt/aws/infrastructure/workload-resources/bucket.yaml).
     #[serde(default)]
     pub s3_bucket_pattern: Option<String>,
 }

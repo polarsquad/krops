@@ -176,8 +176,9 @@ def main() -> int:
                     f"environments.{name} teardown cluster-name {cluster_name!r} "
                     f"does not start with its region {region!r}"
                 )
-            # The RDS instance id is krops-<cluster>-db (workload/base/
-            # rds-instances/dbinstance.yaml substitutes CLUSTER_NAME).
+            # The RDS instance id is krops-<cluster>-db (mgmt/aws/
+            # infrastructure/workload-resources/dbinstance.yaml pins the
+            # literal identifiers).
             rds = workload.get("rds-instance", "")
             if cluster_name and rds != f"krops-{cluster_name}-db":
                 failures.append(
@@ -198,15 +199,23 @@ def main() -> int:
     # Global teardown constants pin to the manifests that define them.
     teardown = config.get("teardown", {})
     if teardown:
+        # The per-cluster reader roles created by the management cluster's
+        # ACK IAM controller (mgmt/aws/infrastructure/workload-resources/).
         expected_roles = [
-            "krops-ack-s3-controller",
-            "krops-ack-rds-controller",
-            "krops-ack-iam-controller",
+            "krops-eu-north-1-workload-reader",
+            "krops-eu-west-1-workload-reader",
         ]
         roles = teardown.get("global-iam-roles", [])
         for role in expected_roles:
             if role not in roles:
                 failures.append(f"teardown.global-iam-roles missing {role}")
+        # The ACK controllers moved to the management cluster (issue #346);
+        # their deleted pod-identity roles must not linger in the sweep list.
+        for role in roles:
+            if role.startswith("krops-ack-"):
+                failures.append(
+                    f"teardown.global-iam-roles names deleted role {role}"
+                )
         reader_user = REPO_ROOT / "mgmt/aws/infrastructure/aws-global-iam/reader-user.yaml"
         users = teardown.get("global-iam-users", [])
         if reader_user.is_file() and "krops-reader" not in users:

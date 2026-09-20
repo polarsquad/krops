@@ -1,48 +1,71 @@
 # AWS authentication & IAM
 
-## EKS Pod Identity (no static keys on workload clusters)
+## ACK controllers on the management cluster (static SOPS credentials)
 
-The ACK S3, RDS, and IAM controllers on the workload clusters carry
-**no credentials**. Instead:
+All ACK controllers (S3, RDS, IAM) run on the **management** cluster only
+(issue #346). ACK controllers talk to the AWS API directly, so they do not
+need to run inside the cluster whose resources they manage; the workload
+clusters run no controllers and hold no credentials at all.
 
-- Each EKS control plane enables the `eks-pod-identity-agent` addon
-  (declared in the CAPI cluster spec).
-- The **management** cluster runs ACK IAM + EKS controllers
-  (`mgmt/aws/infrastructure/ack-controllers/`, authenticated with the same
-  SOPS-encrypted credential pattern as CAPA) which declaratively create:
-  - an IAM `Role` per controller, trusted by `pods.eks.amazonaws.com`:
-    - `krops-ack-s3-controller`: scoped to `krops-*` buckets only
-    - `krops-ack-rds-controller`: RDS management scoped to `krops-*`
-      RDS resources (plus read-only `rds:Describe*`), the
-      `secretsmanager:CreateSecret`/`TagResource`/`RotateSecret` actions on
-      `rds!*` secrets required by `manageMasterUserPassword`,
-      `kms:DescribeKey` and grant management (`CreateGrant`/`ListGrants`/
-      `RevokeGrant`, restricted with `kms:GrantIsForAWSResource`) so RDS can
-      use the default `aws/rds` and `aws/secretsmanager` KMS keys (without
-      these `CreateDBInstance` fails with `KMSKeyNotAccessibleFault`) and
-      `iam:CreateServiceLinkedRole` for `AWSServiceRoleForRDS` (needed the
-      first time an RDS instance is created in the account)
-    - `krops-ack-iam-controller`: IAM role management scoped to
-      `krops-*` roles only. Known trade-off: name-scoped `iam:CreateRole`
-      + `iam:PutRolePolicy` is still a privilege-escalation surface (any
-      permission can be granted to a role, as long as it is named
-      `krops-*`), consistent with the pragmatic name-based scoping used
-      for the other controllers
-  - a `PodIdentityAssociation` per cluster and controller binding the
-    `ack-s3-controller` / `ack-rds-controller` / `ack-iam-controller`
-    ServiceAccounts to their roles.
+The controllers authenticate with the same SOPS-encrypted static credential
+pattern as CAPA
+(`mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml`). The
+kind management cluster runs on kind (not EKS), so IRSA/Pod Identity is not
+available there; static credentials via SOPS is the established pattern.
 
-Pod Identity is used instead of IRSA because its trust policy is static: it
-does not embed a per-cluster OIDC provider ID, so the whole chain can live in
-Git before the clusters exist. ACK retries the associations until CAPA has
-finished provisioning the EKS clusters.
+### Least-privilege trade-off: the static principal's union scope
+
+Before #346 each workload-cluster controller assumed its own scoped IAM role
+via EKS Pod Identity (`krops-ack-s3-controller`, `krops-ack-rds-controller`,
+`krops-ack-iam-controller`, declared in the deleted
+`mgmt/aws/infrastructure/ack-pod-identity/`). Moving the controllers to the
+management cluster deleted those roles, so the single static principal behind
+`aws-credentials` now needs the **union** of their former policies (granted
+outside this repo, same as the CAPA permissions):
+
+- **S3**: `s3:ListAllMyBuckets` + `s3:GetBucketLocation` on `*`, and bucket
+  management on `arn:aws:s3:::krops-*` only: `s3:CreateBucket`,
+  `s3:DeleteBucket`, `s3:GetBucket*`/`s3:PutBucket*`,
+  `s3:DeleteBucketPolicy`, encryption/lifecycle/replication/accelerate/
+  analytics/inventory/metrics/intelligent-tiering configuration Get+Put,
+  `s3:ListBucket`, `s3:TagResource`/`s3:UntagResource`/
+  `s3:DeleteBucketTagging`/`s3:ListTagsForResource`
+- **RDS**: `rds:Describe*` + `rds:ListTagsForResource` on `*`; instance
+  management (`rds:CreateDBInstance`/`ModifyDBInstance`/`DeleteDBInstance`/
+  `RebootDBInstance`/`StartDBInstance`/`StopDBInstance`,
+  `rds:AddTagsToResource`/`RemoveTagsFromResource`) on
+  `arn:aws:rds:*:*:*:krops-*`; `secretsmanager:CreateSecret`/`TagResource`/
+  `RotateSecret` on `arn:aws:secretsmanager:*:*:secret:rds!*` (required by
+  `manageMasterUserPassword`); `kms:DescribeKey` on `*` plus
+  `kms:CreateGrant`/`ListGrants`/`RevokeGrant` restricted with
+  `kms:GrantIsForAWSResource` (so RDS can use the default `aws/rds` and
+  `aws/secretsmanager` KMS keys; without these `CreateDBInstance` fails with
+  `KMSKeyNotAccessibleFault`); `iam:CreateServiceLinkedRole` scoped to
+  `AWSServiceRoleForRDS` (needed the first time an RDS instance is created
+  in the account)
+- **IAM**: role management (`iam:CreateRole`/`DeleteRole`/`GetRole`/
+  `UpdateRole`/`UpdateRoleDescription`/`UpdateAssumeRolePolicy`/
+  `PutRolePolicy`/`DeleteRolePolicy`/`GetRolePolicy`/`ListRolePolicies`/
+  `ListAttachedRolePolicies`/`ListInstanceProfilesForRole`/`TagRole`/
+  `UntagRole`/`ListRoleTags`) scoped to `arn:aws:iam::*:role/krops-*`, plus
+  the user actions for the `krops-reader` console user
+  (`iam:CreateUser`/`PutUserPolicy`/`GetUser`/`GetUserPolicy`/`TagUser`)
+
+The trade-off is real: name-scoped `iam:CreateRole` + `iam:PutRolePolicy` is
+still a privilege-escalation surface (any permission can be granted to a
+role, as long as it is named `krops-*`), and the union now sits on one
+long-lived static principal instead of three short-lived pod-identity
+sessions. Accepted because the management cluster is already the only
+cluster with static AWS credentials in Git and already owns every `Cluster`
+object; the workload clusters shed their last credential and controller in
+exchange.
 
 ## Per-cluster read-only IAM roles
 
-`workload/base/iam-roles/role.yaml` has each cluster's ACK IAM controller create
-one read-only IAM role (`krops-<cluster>-reader`). IAM is global, so the
-cluster name is part of the role name to keep the two clusters from fighting
-over one role:
+`mgmt/aws/infrastructure/workload-resources/role.yaml` has the management
+cluster's ACK IAM controller create one read-only IAM role per workload
+cluster (`krops-<cluster>-reader`). IAM is global, so the cluster name is
+part of the role name to keep the two clusters from fighting over one role:
 
 - trust policy: the AWS account root (`arn:aws:iam::<account>:root`,
   `sts:AssumeRole`): any principal in the account that is itself allowed to

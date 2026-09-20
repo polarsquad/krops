@@ -2,9 +2,10 @@
 
 The `aws` environment is the reference: a disposable kind bootstrap cluster
 runs Flux, CAPA v2.13.0 provisions self-managed EKS clusters, the pivot moves
-the management objects into the `eu-north-1-management` cluster, and each EKS
-workload cluster runs its own ACK operators (S3, RDS, IAM) reconciling AWS
-resources from `workload/base/`.
+the management objects into the `eu-north-1-management` cluster, and the
+management cluster runs the ACK operators (S3, RDS, IAM) reconciling the
+per-workload-cluster AWS resources from
+`mgmt/aws/infrastructure/workload-resources/` (issue #346).
 
 ![krops aws architecture](aws-infra.svg)
 
@@ -15,21 +16,24 @@ resources from `workload/base/`.
 | `eu-north-1` | `eu-north-1-management` (the self-managed management cluster, provisioned by the pivot) and `eu-north-1-workload` |
 | `eu-west-1` | `eu-west-1-workload` |
 
-Every cluster is an EKS control plane with the `eks-pod-identity-agent` addon
-and an x86 plus an ARM (Graviton2) `AWSManagedMachinePool` at the cheapest
+Every cluster is an EKS control plane with an x86 plus an ARM (Graviton2)
+`AWSManagedMachinePool` at the cheapest
 offered 2 vCPU / 4 GiB shape for the region. The management cluster lives in
 `eu-north-1` and, after the pivot, reconciles its own Cluster objects.
 
 ## Prerequisites
 
 - An AWS account where you hold permission to create EKS clusters, VPCs, and
-  IAM roles. The ACK controllers need the `iam:CreateRole`/`PutRolePolicy`/
-  `GetRole`/`TagRole` and `iam:CreateUser`/`PutUserPolicy`/`GetUser`/
-  `GetUserPolicy`/`TagUser` actions (for the `krops-reader` console user), and
-  `eks:CreatePodIdentityAssociation`/`DescribePodIdentityAssociation`/
-  `DeletePodIdentityAssociation`. RDS management is granted through the
-  Git-declared `krops-ack-rds-controller` pod-identity role, not static
-  credentials.
+  IAM roles. The static credentials principal runs every ACK controller on
+  the management cluster, so it needs the union of the former per-controller
+  pod-identity role policies: S3 and RDS management scoped to `krops-*`
+  (plus `secretsmanager` on `rds!*` secrets and KMS grant management for the
+  managed master password), IAM role management scoped to `krops-*`
+  (`iam:CreateRole`/`PutRolePolicy`/`GetRole`/`TagRole`), and
+  `iam:CreateUser`/`PutUserPolicy`/`GetUser`/`GetUserPolicy`/`TagUser`
+  (for the `krops-reader` console user). See
+  [AWS authentication & IAM](./aws-iam.md) for the exact actions and the
+  least-privilege trade-off.
 - `mise -E aws install` (adds `aws-cli` and `clusterawsadm`), a GitHub PAT and
   an age key as for any GitHub-synced environment (`.env`, see
   [operations.md](./operations.md)).
@@ -49,7 +53,7 @@ offered 2 vCPU / 4 GiB shape for the region. The management cluster lives in
 
 ## Credentials
 
-There are two credential surfaces, and neither is a static key on a workload
+There are two credential surfaces, and neither is a credential on a workload
 cluster.
 
 - **CAPA (management cluster).** The EKS control planes and node pools are
@@ -66,19 +70,28 @@ cluster.
   mise run sops-encrypt mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml
   ```
 
-- **ACK controllers (workload clusters).** No credentials at rest. Each EKS
-  control plane enables the `eks-pod-identity-agent` addon, and the management
-  cluster's ACK IAM + EKS controllers create one IAM `Role` per controller
-  (trusted by `pods.eks.amazonaws.com`) plus a `PodIdentityAssociation` per
-  cluster and controller that binds the controller ServiceAccounts to their
-  roles. See [AWS authentication & IAM](./aws-iam.md) for the full chain.
+- **ACK controllers (management cluster).** Same static SOPS credential
+  pattern (`mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml`).
+  Since issue #346 the S3, RDS, and IAM controllers all run on the management
+  cluster and reconcile the per-workload-cluster `Bucket`, `DBInstance`, and
+  reader `Role` CRs declared in `mgmt/aws/infrastructure/workload-resources/`.
+  Workload clusters run no controllers and hold no credentials. The static
+  principal's policy must cover the union of the former per-controller
+  pod-identity roles; see [AWS authentication & IAM](./aws-iam.md) for the
+  full action list and the least-privilege trade-off.
 
 ## Commit the identifiers
 
 1. `mgmt/aws/addons/flux-apps/flux-instance.yaml` (the `cluster-vars`
-   ConfigMap per region): set `AWS_ACCOUNT_ID` to your account ID. It is used
-   by Flux `postBuild` substitution for the S3 bucket names.
-2. The EKS version is pinned in each `cluster.yaml`
+   ConfigMap per region): set `AWS_ACCOUNT_ID` to your account ID, kept as
+   the `postBuild` substitution channel for a future workload app.
+2. `mgmt/aws/infrastructure/workload-resources/`: the account ID is a
+   literal in the bucket names, the bucket policy ARNs, the reader-role
+   trust principal, and the RDS resource-level policy ARNs (there is no
+   `cluster-vars` ConfigMap on the management cluster). The reader role in
+   `mgmt/aws/infrastructure/aws-global-iam/reader-user.yaml` wildcards the
+   account ID instead.
+3. The EKS version is pinned in each `cluster.yaml`
    (`mgmt/aws/clusters/<region>/<env>/`); bump it deliberately, not with a
    generic dependency update.
 
@@ -96,8 +109,8 @@ and the kind cluster is deleted (see [Pivot recovery](./operations.md#pivot-reco
 
 Teardown is automated for `aws`. `mise run teardown` suspends Flux, deletes
 every workload CAPI Cluster, runs a best-effort AWS sweep for both workload
-regions and the self-managed management cluster (pod identity associations,
-nodegroups, EKS control planes, orphaned RDS, CAPA-tagged VPC resources,
+regions and the self-managed management cluster (nodegroups, EKS control
+planes, orphaned RDS, CAPA-tagged VPC resources,
 versioned S3 buckets, CAPA and ACK IAM roles, the `krops-reader` user, and the
 `clusterawsadm` CloudFormation stack), and removes the kind bootstrap cluster.
 See [Teardown](./operations.md#teardown) for the controls.
@@ -109,7 +122,7 @@ Management cluster (`mgmt/aws/`):
 ```
 cert-manager > capi-operator > capi-system > capa-system > clusters (eu-north-1, eu-west-1)
                                      + caaph-system > flux-apps
-ack-controllers > ack-pod-identity
+ack-controllers > workload-resources
 ack-controllers > aws-global-iam
 konflate (no dependencies)
 ```
@@ -117,9 +130,8 @@ konflate (no dependencies)
 Workload clusters (`workload/<region>-01/`):
 
 ```
-aws-operators (ACK S3 + RDS + IAM controllers) > s3-buckets (Bucket CRs)
-                                               + rds-instances (DBInstance CRs)
-                                               + iam-roles (Role CRs)
+(empty: workload/base reconciles nothing since issue #346; the per-cluster
+Flux instance stays installed, ready for a future application workload)
 ```
 
 ## Upgrading CAPA

@@ -5,23 +5,26 @@
 1. Create `mgmt/aws/clusters/<region>/<env>/` with a `cluster.yaml`,
    `kustomization.yaml` (set `namePrefix`), and `capi-nameref.yaml` (so CAPI
    cross-references get the prefix applied; see the existing regions).
-2. Label the `Cluster` with `fluxcd: enabled` **and** `region: <region>`, and
-   include the `eks-pod-identity-agent` addon in the `AWSManagedControlPlane`.
+2. Label the `Cluster` with `fluxcd: enabled` **and** `region: <region>`.
 3. Register it in `mgmt/aws/clusters/<region>/kustomization.yaml` and add a
    `Kustomization` entry in `mgmt/aws/clusters/flux-ks.yaml` with
    `dependsOn: [capa-system]`.
 4. In `mgmt/aws/addons/flux-apps/flux-instance.yaml`, add a per-region
    FluxInstance ConfigMap (sync path `workload/<region>-01`, plus `cluster-vars`)
    and a matching `ClusterResourceSet`.
-5. Add a `PodIdentityAssociation` for the new cluster in
-   `mgmt/aws/infrastructure/ack-pod-identity/pod-identity-associations.yaml`
-   (use the `services.k8s.aws/region` annotation for non-default regions).
+5. Add the cluster's `Bucket`, `DBInstance`, and reader `Role` CRs to
+   `mgmt/aws/infrastructure/workload-resources/` (literal account ID and
+   cluster name; use the `services.k8s.aws/region` annotation for
+   non-default regions) and add the reader role to `bootstrap.toml`'s
+   `teardown.global-iam-roles` and `tests/test-bootstrap-config.py`.
 6. Create `workload/<region>-01/kustomization.yaml` pointing at `../base`.
 7. Run `mise run validate`, commit, and push.
 
 ## Adding apps to the workload clusters
 
-Follow the `aws-operators` / `s3-buckets` pattern in `workload/base/`:
+`workload/base/` is an intentionally empty overlay since issue #346 (the ACK
+controllers and their CRs moved to the management cluster). Follow the
+Podinfo pattern in `workload/local-host/`:
 
 1. Create `workload/base/<app>/` with a `kustomization.yaml` listing the app's
    manifests, and a `flux-ks.yaml` defining the Flux `Kustomization`
@@ -73,9 +76,10 @@ CAPA is the provider this repo already runs; use it as the template:
 - `aws-credentials.sops.yaml` carries `AWS_B64ENCODED_CREDENTIALS`, produced
   by `mise run aws-credentials` (rotation: [docs/secrets.md](./secrets.md)).
 - Cluster definitions in `mgmt/aws/clusters/<region>/<env>/` use
-  `AWSManagedControlPlane` + `AWSManagedMachinePool` (EKS). Per-cluster IAM
-  for the ACK controllers is wired through
-  `mgmt/aws/infrastructure/ack-pod-identity/` (see
+  `AWSManagedControlPlane` + `AWSManagedMachinePool` (EKS). The ACK
+  controllers and the per-cluster AWS resource CRs run on the management
+  cluster (`mgmt/aws/infrastructure/ack-controllers/` and
+  `mgmt/aws/infrastructure/workload-resources/`; see
   [docs/aws-iam.md](./aws-iam.md)).
 
 ### Azure (CAPZ)

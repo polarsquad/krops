@@ -4,12 +4,16 @@
 # ClusterResourceSets below.
 #
 # Each workload cluster runs its own Flux instance syncing the workload/ overlay
-# for its region (workload/eu-north-01, workload/eu-west-01). Those overlays pull in
-# workload/base, which installs the ACK S3 operator and the Bucket CRs.
+# for its region (workload/eu-north-01, workload/eu-west-01). Those overlays pull
+# in workload/base, which is an intentionally empty overlay since issue #346:
+# the ACK controllers and the Bucket / DBInstance / reader Role CRs moved to
+# the management cluster (mgmt/aws/infrastructure/workload-resources/). The
+# workload Flux instance reconciles nothing today but is ready for a future
+# application workload (the local-host Podinfo pattern).
 #
 # Each ConfigMap also ships a `cluster-vars` ConfigMap into flux-system on the
-# workload cluster; the aws-operators / s3-buckets Flux Kustomizations use it
-# for postBuild variable substitution (region, cluster name, account ID).
+# workload cluster, kept as the per-cluster substitution channel (region,
+# cluster name, account ID) for that future workload's Flux Kustomizations.
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: v1
 kind: ConfigMap

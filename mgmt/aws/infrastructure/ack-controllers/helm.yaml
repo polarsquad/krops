@@ -1,17 +1,44 @@
 ---
 # ══════════════════════════════════════════════════════════════════════════════
-# ACK IAM + EKS controllers on the MANAGEMENT cluster.
+# ACK S3, RDS, and IAM controllers on the MANAGEMENT cluster.
 #
-# Purpose: declaratively create the IAM role and the EKS PodIdentityAssociations
-# that let the ACK S3 controllers on the WORKLOAD clusters authenticate via
-# EKS Pod Identity — no static AWS credentials ever land on workload clusters.
+# ACK controllers talk to the AWS API directly; they do not need to run inside
+# the account/cluster whose resources they manage. All ACK controllers
+# therefore run here, and the per-workload-cluster AWS resources (Bucket,
+# DBInstance, reader Role CRs) are declared under
+# mgmt/aws/infrastructure/workload-resources/.
 #
-# These management-side controllers authenticate with the same SOPS-encrypted
-# credential pattern used by capa-system (aws-credentials.sops.yaml).
+# These controllers authenticate with the same SOPS-encrypted credential
+# pattern used by capa-system (aws-credentials.sops.yaml). The principal
+# behind those static credentials needs the union of the former per-controller
+# pod-identity role policies (s3, rds, iam, secretsmanager, kms:CreateGrant) —
+# see docs/aws-iam.md for the exact actions and the least-privilege trade-off.
 #
 # The kind management cluster runs on kind (not EKS), so IRSA/Pod Identity is
 # not available here; static credentials via SOPS is the established pattern.
 # ══════════════════════════════════════════════════════════════════════════════
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: ack-s3-chart
+  namespace: ack-system
+spec:
+  interval: 1h
+  url: oci://public.ecr.aws/aws-controllers-k8s/s3-chart
+  ref:
+    tag: "1.11.0"
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: ack-rds-chart
+  namespace: ack-system
+spec:
+  interval: 1h
+  url: oci://public.ecr.aws/aws-controllers-k8s/rds-chart
+  ref:
+    tag: "1.12.0"
+---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
 metadata:
@@ -23,16 +50,55 @@ spec:
   ref:
     tag: "1.9.0"
 ---
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: OCIRepository
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
 metadata:
-  name: ack-eks-chart
+  name: ack-s3-controller
   namespace: ack-system
 spec:
-  interval: 1h
-  url: oci://public.ecr.aws/aws-controllers-k8s/eks-chart
-  ref:
-    tag: "1.23.0"
+  interval: 10m
+  timeout: 5m
+  chartRef:
+    kind: OCIRepository
+    name: ack-s3-chart
+  install:
+    crds: CreateReplace
+  upgrade:
+    crds: CreateReplace
+  values:
+    aws:
+      # Default region; eu-west-1 resources override it with the
+      # services.k8s.aws/region annotation on the CR.
+      region: eu-north-1
+      credentials:
+        secretName: aws-credentials
+        secretKey: credentials
+        profile: default
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: ack-rds-controller
+  namespace: ack-system
+spec:
+  interval: 10m
+  timeout: 5m
+  chartRef:
+    kind: OCIRepository
+    name: ack-rds-chart
+  install:
+    crds: CreateReplace
+  upgrade:
+    crds: CreateReplace
+  values:
+    aws:
+      # Default region; eu-west-1 resources override it with the
+      # services.k8s.aws/region annotation on the CR.
+      region: eu-north-1
+      credentials:
+        secretName: aws-credentials
+        secretKey: credentials
+        profile: default
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -52,31 +118,6 @@ spec:
   values:
     aws:
       # IAM is a global service; region only selects the API endpoint.
-      region: eu-north-1
-      credentials:
-        secretName: aws-credentials
-        secretKey: credentials
-        profile: default
----
-apiVersion: helm.toolkit.fluxcd.io/v2
-kind: HelmRelease
-metadata:
-  name: ack-eks-controller
-  namespace: ack-system
-spec:
-  interval: 10m
-  timeout: 5m
-  chartRef:
-    kind: OCIRepository
-    name: ack-eks-chart
-  install:
-    crds: CreateReplace
-  upgrade:
-    crds: CreateReplace
-  values:
-    aws:
-      # Default region; eu-west-1 resources override it with the
-      # services.k8s.aws/region annotation on the CR.
       region: eu-north-1
       credentials:
         secretName: aws-credentials

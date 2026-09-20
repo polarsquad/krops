@@ -8,8 +8,8 @@ Operator (ASO) that reconciles Azure resources from `workload/azure-base/`.
 | AWS (`aws`) | Azure (`azure`) |
 |---|---|
 | CAPA, `AWSManagedControlPlane` | CAPZ v1.27.0, `AzureASOManagedControlPlane` (AKS via inline ASO resources) |
-| ACK controllers on workload clusters | ASO 2.19.0 Helm release on workload clusters |
-| EKS Pod Identity (ACK IAM + EKS controllers on mgmt) | Workload identity: user-assigned identity + federated credential + role assignment, reconciled by the ASO bundled with CAPZ on mgmt |
+| ACK controllers on the management cluster only (issue #346) | ASO 2.19.0 Helm release on workload clusters |
+| Static SOPS credentials on the management cluster (no EKS Pod Identity since issue #346) | Workload identity: user-assigned identity + federated credential + role assignment, reconciled by the ASO bundled with CAPZ on mgmt |
 | S3 bucket | Storage account + blob container |
 | RDS PostgreSQL | PostgreSQL Flexible Server (private access, Entra-only auth) |
 | IAM reader role | none yet (follow-up) |

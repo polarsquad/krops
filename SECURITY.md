@@ -81,9 +81,10 @@ a gap.
   fields in `*.sops.yaml` are encrypted; the age public recipient is
   committed, the private key (`age.agekey`) and `.env` are gitignored.
   Rotation procedures are in `docs/secrets.md`.
-- Workload clusters use EKS Pod Identity; no static AWS keys are present
-  on them. The management cluster holds the CAPA and ACK credentials as
-  SOPS-encrypted secrets. See `docs/aws-iam.md`.
+- Workload clusters run no AWS controllers and hold no AWS credentials
+  (issue #346). The management cluster holds the CAPA and ACK credentials as
+  SOPS-encrypted secrets; the ACK static principal carries the union of the
+  former per-controller pod-identity role policies. See `docs/aws-iam.md`.
 - Read access to AWS is scoped: one IAM user whose only permission is
   `sts:AssumeRole` into per-cluster `krops-*-reader` roles.
 - S3 buckets block all public access, enforce SSE, enable versioning,

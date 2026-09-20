@@ -19,8 +19,9 @@ Flux or CAPI reconciliation architecture.
 
 The reference environment manages AWS infrastructure through the Kubernetes
 API: CAPA provisions EKS workload clusters, CAPI addons deliver per-cluster Flux
-instances, and ACK operators (S3, RDS, IAM) manage cloud resources with EKS Pod
-Identity.
+instances, and ACK operators (S3, RDS, IAM) on the management cluster manage
+the per-cluster cloud resources with static SOPS credentials. Workload
+clusters run no controllers and hold no credentials.
 
 ![krops aws architecture](aws-infra.svg)
 
@@ -50,8 +51,8 @@ flowchart TD
         CAPIS[capi-system]
         CAPAS["capa-system (SOPS creds)"]
         CAAPH[caaph-system]
-        ACKC["ack-controllers (SOPS creds)<br/>ACK IAM + EKS controllers"]
-        ACKPI["ack-pod-identity<br/>IAM Role + PodIdentityAssociations"]
+        ACKC["ack-controllers (SOPS creds)<br/>ACK S3 + RDS + IAM controllers"]
+        WR["workload-resources<br/>Bucket + DBInstance + reader Role CRs"]
         AWSIAM["aws-global-iam<br/>krops-reader console user"]
         KONF["konflate (SOPS token)<br/>rendered Flux PR review"]
         EUN[eu-north-1 cluster def]
@@ -64,7 +65,7 @@ flowchart TD
         CAPAS --> EUN
         CAPAS --> EUW
         CAPAS --> MGMT
-        FS --> ACKC --> ACKPI
+        FS --> ACKC --> WR
         ACKC --> AWSIAM
         FS --> KONF
     end
@@ -72,11 +73,8 @@ flowchart TD
     REPO --> FS
 
     subgraph aws["AWS"]
-        EKS1[EKS: eu-north-1-workload<br/>x86 + ARM node pools<br/>pod-identity agent addon]
-        EKS2[EKS: eu-west-1-workload<br/>x86 + ARM node pools<br/>pod-identity agent addon]
-        ROLE[IAM Role: krops-ack-s3-controller<br/>trust: pods.eks.amazonaws.com]
-        RDSROLE[IAM Role: krops-ack-rds-controller<br/>trust: pods.eks.amazonaws.com]
-        IAMROLE[IAM Role: krops-ack-iam-controller<br/>trust: pods.eks.amazonaws.com]
+        EKS1[EKS: eu-north-1-workload<br/>x86 + ARM node pools]
+        EKS2[EKS: eu-west-1-workload<br/>x86 + ARM node pools]
         B1[(S3: krops-...-eu-north-1-workload-data)]
         B2[(S3: krops-...-eu-west-1-workload-data)]
         DB1[(RDS: krops-eu-north-1-workload-db)]
@@ -88,54 +86,29 @@ flowchart TD
 
     EUN -->|CAPA provisions| EKS1
     EUW -->|CAPA provisions| EKS2
-    ACKPI -->|creates| ROLE
-    ACKPI -->|creates| RDSROLE
-    ACKPI -->|creates| IAMROLE
     AWSIAM -->|creates| RUSER
     RUSER -.->|sts:AssumeRole| RD1
     RUSER -.->|sts:AssumeRole| RD2
-    ACKPI -->|binds SAs to roles| EKS1
-    ACKPI -->|binds SAs to roles| EKS2
 
     FA -->|"HelmChartProxy: flux-operator<br/>CRS: FluxInstance + cluster-vars + pull secret"| WF1
     FA -->|same, per region label| WF2
 
     subgraph wl1["Workload cluster eu-north-1"]
-        WF1["Flux (sync: workload/eu-north-01)"]
-        AO1["aws-operators Ks<br/>ACK S3 + RDS + IAM controllers (Pod Identity)"]
-        SB1["s3-buckets Ks<br/>dependsOn: aws-operators"]
-        RI1["rds-instances Ks<br/>dependsOn: aws-operators"]
-        IR1["iam-roles Ks<br/>dependsOn: aws-operators"]
-        WF1 --> AO1 --> SB1
-        AO1 --> RI1
-        AO1 --> IR1
+        WF1["Flux (sync: workload/eu-north-01)<br/>workload/base is empty today"]
     end
 
     subgraph wl2["Workload cluster eu-west-1"]
-        WF2["Flux (sync: workload/eu-west-01)"]
-        AO2["aws-operators Ks<br/>ACK S3 + RDS + IAM controllers (Pod Identity)"]
-        SB2["s3-buckets Ks<br/>dependsOn: aws-operators"]
-        RI2["rds-instances Ks<br/>dependsOn: aws-operators"]
-        IR2["iam-roles Ks<br/>dependsOn: aws-operators"]
-        WF2 --> AO2 --> SB2
-        AO2 --> RI2
-        AO2 --> IR2
+        WF2["Flux (sync: workload/eu-west-01)<br/>workload/base is empty today"]
     end
 
     WF1 --> REPO
     WF2 --> REPO
-    ROLE -.->|credentials via pod identity| AO1
-    ROLE -.->|credentials via pod identity| AO2
-    RDSROLE -.->|credentials via pod identity| AO1
-    RDSROLE -.->|credentials via pod identity| AO2
-    IAMROLE -.->|credentials via pod identity| AO1
-    IAMROLE -.->|credentials via pod identity| AO2
-    SB1 -->|Bucket CR reconciled| B1
-    SB2 -->|Bucket CR reconciled| B2
-    RI1 -->|DBInstance CR reconciled| DB1
-    RI2 -->|DBInstance CR reconciled| DB2
-    IR1 -->|Role CR reconciled| RD1
-    IR2 -->|Role CR reconciled| RD2
+    WR -->|Bucket CR reconciled| B1
+    WR -->|Bucket CR reconciled| B2
+    WR -->|DBInstance CR reconciled| DB1
+    WR -->|DBInstance CR reconciled| DB2
+    WR -->|Role CR reconciled| RD1
+    WR -->|Role CR reconciled| RD2
 ```
 
 ### Reconciliation order (AWS management cluster)
@@ -146,7 +119,7 @@ Enforced with Flux `dependsOn`:
 cert-manager ▶ capi-operator ▶ capi-system ▶ capa-system ▶ clusters (eu-north-1, eu-west-1)
                             │                            └▶ caaph-system ▶ flux-apps
                             └▶ capa-identity ▶ aws-managed-clusters
-ack-controllers ▶ ack-pod-identity
+ack-controllers ▶ workload-resources
 ack-controllers ▶ aws-global-iam
 konflate (no dependencies)
 ```
@@ -177,9 +150,8 @@ write-back, UI access): [PR review: konflate](./konflate.md).
 ### Reconciliation order (AWS workload clusters)
 
 ```
-aws-operators (ACK S3 + RDS + IAM controllers) ▶ s3-buckets (Bucket CRs)
-                                               ├▶ rds-instances (DBInstance CRs)
-                                               └▶ iam-roles (Role CRs)
+(empty: workload/base reconciles nothing since issue #346; the per-cluster
+Flux instance stays installed, ready for a future application workload)
 ```
 
 ### How workload apps are delivered (AWS)
@@ -189,11 +161,16 @@ aws-operators (ACK S3 + RDS + IAM controllers) ▶ s3-buckets (Bucket CRs)
 2. `flux-apps` matches those labels: a **HelmChartProxy** installs the Flux
    Operator on every workload cluster, and per-region **ClusterResourceSets**
    apply a `FluxInstance` (syncing `workload/<region>-01/`), a `cluster-vars`
-   ConfigMap (`AWS_REGION`, `CLUSTER_NAME`, `AWS_ACCOUNT_ID`, used by Flux
-   `postBuild` substitution), and the Git pull secret.
-3. The workload cluster's Flux reconciles `workload/`: first `aws-operators`
-   (ACK S3 + RDS + IAM controllers, `wait: true`), then `s3-buckets`,
-   `rds-instances`, and `iam-roles` (all `dependsOn: aws-operators`).
+   ConfigMap (`AWS_REGION`, `CLUSTER_NAME`, `AWS_ACCOUNT_ID`, kept as the
+   `postBuild` substitution channel for a future workload), and the Git pull
+   secret.
+3. The workload cluster's Flux reconciles `workload/`, whose `base/` overlay
+   is intentionally empty since issue #346: the ACK controllers and the
+   Bucket / DBInstance / reader Role CRs moved to the management cluster
+   (`mgmt/aws/infrastructure/ack-controllers/` and
+   `mgmt/aws/infrastructure/workload-resources/`). The instance reconciles
+   nothing today but is ready for a future application workload (the
+   local-host Podinfo pattern).
 
 See [AWS authentication & IAM](./aws-iam.md) for how the ACK controllers
 authenticate, and [Workload resources](./workload-resources.md) for what they

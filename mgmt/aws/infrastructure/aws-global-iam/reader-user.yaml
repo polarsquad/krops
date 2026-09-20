@@ -2,14 +2,21 @@
 # ══════════════════════════════════════════════════════════════════════════════
 # IAM user for humans: log into the AWS console and assume the per-cluster
 # read-only reader roles (krops-<cluster>-reader, see
-# workload/base/iam-roles/role.yaml) to view the resources this repo creates.
+# mgmt/aws/infrastructure/workload-resources/role.yaml) to view the resources
+# this repo creates.
 # Reconciled by the ACK IAM controller on this (management) cluster.
 #
 # The only permission is sts:AssumeRole on krops-*-reader roles — the user
 # can see nothing directly; everything goes through a reader role. The account
 # ID is wildcarded because ${AWS_ACCOUNT_ID} substitution is not available on
-# the management cluster (no cluster-vars ConfigMap here), same as the role
-# ARNs in ../ack-pod-identity/.
+# the management cluster (no cluster-vars ConfigMap here), the same reason
+# ../workload-resources/ uses literal values.
+#
+# services.k8s.aws/adoption-policy: adopt-or-create — this CR is applied twice
+# per bootstrap (the kind bootstrap cluster creates the user before the pivot;
+# the management cluster's Flux re-applies the CR after it), so the post-pivot
+# controller must adopt the existing user instead of going Terminal with
+# "Resource already exists".
 #
 # NOTE: ACK's User resource cannot manage console passwords (there is no
 # LoginProfile resource in the ACK IAM controller). After the user is
@@ -25,6 +32,8 @@ kind: User
 metadata:
   name: reader-user
   namespace: ack-system
+  annotations:
+    services.k8s.aws/adoption-policy: adopt-or-create
 spec:
   name: krops-reader
   inlinePolicies:

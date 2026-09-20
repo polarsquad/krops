@@ -6,8 +6,10 @@
 # or mgmt/local-host/clusters/management) is created by the providers running
 # in the kind bootstrap cluster; this script then:
 #
-#   1. waits for the management cluster to be provisioned,
-#   2. exports its kubeconfig (rewriting the endpoint to localhost for CAPD),
+#   1. waits for the management cluster definition (Flux creates it after
+#      the bootstrap handoff, #348) and for the cluster to be provisioned,
+#   2. exports its kubeconfig (rewriting the endpoint to localhost for CAPD)
+#      and waits for the target nodes (nodeless-tolerant, #349),
 #   3. installs the CAPI operator + provider CRs in the target (imperatively,
 #      at the same versions as Git, because HelmReleases need Flux first),
 #   4. suspends Flux in kind and runs `clusterctl move`,
@@ -48,6 +50,9 @@ PIVOT_SKIP_DELETE="${PIVOT_SKIP_DELETE:-0}"
 CERT_MANAGER_VERSION="1.21.2"
 CAPI_OPERATOR_VERSION="0.28.0"
 
+# Phase 2 node readiness budget (the previous bare kubectl-wait --timeout=15m).
+MGMT_NODE_READY_TIMEOUT="15m"
+
 case "$PROFILE" in
   aws)
     MGMT_CLUSTER="eu-north-1-management"
@@ -79,14 +84,6 @@ pivot_preflight() {
     exit 1
   fi
 
-  if ! kubectl get cluster "$MGMT_CLUSTER" -n "$MGMT_NS" >/dev/null 2>&1; then
-    echo "ERROR: Cluster '$MGMT_CLUSTER' not found in the bootstrap cluster." >&2
-    echo "       The management cluster definition must be reconciled first:" >&2
-    echo "       aws:        merged to main, Flux-in-kind creates it (~15-25 min)" >&2
-    echo "       local-host: mise -E local-host run oci-push, then wait ~2 min" >&2
-    exit 1
-  fi
-
   if [ "$PROFILE" = aws ]; then
     require_flux_env
   else
@@ -100,6 +97,42 @@ pivot_preflight() {
   fi
 }
 
+# ── Phase 0: wait for the management cluster definition ─────────────────────
+# Duration string (40m, 2h, 90s, or bare seconds) to seconds.
+duration_to_seconds() {
+  case "$1" in
+    *h) echo $(( $(echo "$1" | tr -dc '0-9') * 3600 )) ;;
+    *m) echo $(( $(echo "$1" | tr -dc '0-9') * 60 )) ;;
+    *s) echo "$(echo "$1" | tr -dc '0-9')" ;;
+    *)  echo "$1" ;;
+  esac
+}
+
+# Creating the definition is Flux's job after the bootstrap handoff (the CAPA
+# HelmRelease, providers, identity, and clusters overlay), a multi-minute
+# chain on a clean first run (issue #348). Poll for the Cluster object with
+# the same budget as the Phase 1 kubeconfig wait; on timeout, surface the
+# Kustomization conditions so a stuck Flux is distinguishable from one still
+# reconciling.
+wait_for_mgmt_cluster_definition() {
+  echo ">>> Waiting for the management cluster definition (timeout: ${MGMT_READY_TIMEOUT})..."
+  local timeout_s attempts=0
+  timeout_s="$(duration_to_seconds "$MGMT_READY_TIMEOUT")"
+  local max_attempts=$(( timeout_s / MGMT_POLL_INTERVAL ))
+  until kubectl get cluster "$MGMT_CLUSTER" -n "$MGMT_NS" >/dev/null 2>&1; do
+    attempts=$((attempts + 1))
+    if [ "$attempts" -ge "$max_attempts" ]; then
+      echo "ERROR: Cluster '$MGMT_CLUSTER' was not created within ${MGMT_READY_TIMEOUT}." >&2
+      kubectl get kustomizations -n flux-system || true
+      echo "       Flux creates the management cluster definition after the bootstrap" >&2
+      echo "       handoff; a failed Kustomization above is why the Cluster is missing." >&2
+      echo "       Re-run the same command once Flux has reconciled: the chain is rerun-safe." >&2
+      exit 1
+    fi
+    sleep "$MGMT_POLL_INTERVAL"
+  done
+}
+
 # ── Phase 1: wait for the management cluster ──────────────────────────────────
 # CAPI Clusters do not expose a uniform Ready condition across providers, so
 # readiness = the kubeconfig secret exists (control plane has an endpoint).
@@ -110,12 +143,7 @@ wait_for_management_cluster() {
   # endpoint). Poll rather than kubectl-wait so a not-yet-created secret is
   # waited on instead of erroring immediately.
   local timeout_s attempts=0
-  case "$MGMT_READY_TIMEOUT" in
-    *h) timeout_s=$(( $(echo "$MGMT_READY_TIMEOUT" | tr -dc '0-9') * 3600 )) ;;
-    *m) timeout_s=$(( $(echo "$MGMT_READY_TIMEOUT" | tr -dc '0-9') * 60 )) ;;
-    *s) timeout_s="$(echo "$MGMT_READY_TIMEOUT" | tr -dc '0-9')" ;;
-    *)  timeout_s="$MGMT_READY_TIMEOUT" ;;
-  esac
+  timeout_s="$(duration_to_seconds "$MGMT_READY_TIMEOUT")"
   local max_attempts=$(( timeout_s / MGMT_POLL_INTERVAL ))
   until kubectl get "secret/${MGMT_CLUSTER}-kubeconfig" -n "$MGMT_NS" >/dev/null 2>&1; do
     attempts=$((attempts + 1))
@@ -127,6 +155,37 @@ wait_for_management_cluster() {
     sleep "$MGMT_POLL_INTERVAL"
   done
   clusterctl describe cluster "$MGMT_CLUSTER" -n "$MGMT_NS" || true
+}
+
+# ── Phase 2 helper: wait for target nodes (nodeless-tolerant) ───────────────
+# `kubectl wait node --all` errors "no matching resources found" while the
+# target has zero nodes, and on EKS the CAPA MachinePool registers nodes 1-2
+# min AFTER the control plane goes ACTIVE (issue #349). Poll until at least
+# one node exists AND every registered node is Ready, within the same 15m
+# budget the bare wait had.
+wait_for_mgmt_nodes() {
+  echo ">>> Waiting for management-cluster nodes to be ready (timeout: ${MGMT_NODE_READY_TIMEOUT})..."
+  local timeout_s deadline node_states total ready
+  timeout_s="$(duration_to_seconds "$MGMT_NODE_READY_TIMEOUT")"
+  deadline=$(( $(date +%s) + timeout_s ))
+  while :; do
+    node_states="$(kubectl --kubeconfig "$MGMT_KUBECONFIG" get nodes --no-headers 2>/dev/null || true)"
+    total="$(printf '%s\n' "$node_states" | grep -c . || true)"
+    ready="$(printf '%s\n' "$node_states" | awk '$2 ~ /^Ready/' | grep -c . || true)"
+    if [ "$total" -ge 1 ] && [ "$ready" -eq "$total" ]; then
+      kubectl --kubeconfig "$MGMT_KUBECONFIG" get nodes
+      return
+    fi
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      echo "ERROR: management cluster nodes were not all Ready within ${MGMT_NODE_READY_TIMEOUT}." >&2
+      kubectl --kubeconfig "$MGMT_KUBECONFIG" get nodes || true
+      clusterctl describe cluster "$MGMT_CLUSTER" -n "$MGMT_NS" || true
+      echo "       The node pool registers nodes after the control plane goes ACTIVE;" >&2
+      echo "       re-run the same command once nodes register: the pivot is rerun-safe." >&2
+      exit 1
+    fi
+    sleep "$MGMT_POLL_INTERVAL"
+  done
 }
 
 # ── Phase 2: export the target kubeconfig ─────────────────────────────────────
@@ -158,8 +217,7 @@ export_mgmt_kubeconfig() {
     "$(kubectl --kubeconfig "$MGMT_KUBECONFIG" config current-context)" \
     krops-mgmt >/dev/null
 
-  echo ">>> Waiting for management-cluster nodes to be ready..."
-  kubectl --kubeconfig "$MGMT_KUBECONFIG" wait --for=condition=Ready node --all --timeout=15m
+  wait_for_mgmt_nodes
 }
 
 # ── Phase 3: install CAPI in the target ───────────────────────────────────────
@@ -359,6 +417,7 @@ MGMT_POLL_INTERVAL="${MGMT_POLL_INTERVAL:-10}"
 trap seed_cleanup EXIT
 
 pivot_preflight
+wait_for_mgmt_cluster_definition
 wait_for_management_cluster
 export_mgmt_kubeconfig
 install_capi_in_target

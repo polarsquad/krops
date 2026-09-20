@@ -481,7 +481,12 @@ and resumes through the pivot; there is no separate pivot subcommand. See
 
 `clusterctl move` is re-runnable: an object is deleted from the source kind
 cluster only after it was created on the target, so kind stays authoritative
-until the final kind deletion. If a pivot phase fails:
+until the final kind deletion. On a clean first run the pivot also WAITS for
+two Flux-driven prerequisites instead of failing fast: the management
+`Cluster` definition (polled up to `MGMT_READY_TIMEOUT`, surfacing failed
+Kustomizations on timeout) and the first target nodes (up to 15m, tolerating
+a nodeless EKS start). A timeout in either prints the Kustomization or node
+state and is safe to re-run. If a pivot phase fails:
 
 1. Fix the reported cause.
 2. Re-run the pivot (`mise run pivot`, or rerun bootstrap) from a checkout of

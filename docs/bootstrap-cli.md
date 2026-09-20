@@ -126,12 +126,12 @@ pins together with their declarative counterparts. See
 | `GITHUB_TOKEN` | required for `aws` and `local-talos` | PAT with read access to the repository |
 | `GITHUB_USER` | `git` | Basic-auth username paired with the PAT |
 | `AGE_KEY_FILE` | `age.agekey` | SOPS age private key loaded into `sops-age` |
-| `AGE_PUBLIC_KEY` | derived from `AGE_KEY_FILE` | Public key override during secret creation |
+| `AGE_PUBLIC_KEY` | derived from `AGE_KEY_FILE` | Public key override during secret creation; must match the key file's public key when both are known (preflight fails fast on a mismatch) |
 | `OCI_REPOSITORY` / `OCI_TAG` | `krops` / `latest` | Local-host OCI artifact name |
 | `BOOTSTRAP_PIVOT` | `1` | Any value other than literal `1` skips pivot |
 | `MGMT_KUBECONFIG` | `~/.kube/krops-mgmt.yaml` | Exported management kubeconfig for native runs |
-| `MGMT_READY_TIMEOUT` | `40m` for aws, `15m` for local-host, `30m` for local-talos (PXE install + first Talos boot) | Management cluster provisioning wait |
-| `MGMT_POLL_INTERVAL` | `10` seconds | Management cluster provisioning poll |
+| `MGMT_READY_TIMEOUT` | `40m` for aws, `15m` for local-host, `30m` for local-talos (PXE install + first Talos boot) | Management cluster definition and provisioning waits |
+| `MGMT_POLL_INTERVAL` | `10` seconds | Management cluster definition and provisioning poll |
 | `BOOTSTRAP_KUBECONTEXT` | config value `kind-mgmt` | Source context required by pivot |
 | `PIVOT_SKIP_DELETE` | `0` | Literal `1` keeps kind after a successful pivot |
 
@@ -183,11 +183,14 @@ depend on engine- or version-specific error text.
    local-host, install the Flux Operator, create the Git and SOPS secrets
    (GitHub-synced environments) or publish the local OCI artifact, install
    the `FluxInstance`, and watch reconciliation.
-3. **Pivot by default:** wait for the CAPI-managed management cluster, export
-   its kubeconfig, install cert-manager, the CAPI operator, and provider CRs at
-   the versions declared in `bootstrap.toml`, suspend Flux in kind, run
-   `clusterctl move`, unpause the moved clusters, seed Flux on the target, and
-   delete kind after the safety checks pass.
+3. **Pivot by default:** wait for the Flux-created management `Cluster`
+   definition (a clean first run polls through the reconciliation chain and
+   surfaces failed Kustomizations on timeout), wait for the CAPI-managed
+   management cluster, export its kubeconfig, wait for the target nodes (the
+   poll tolerates a nodeless EKS start), install cert-manager, the CAPI
+   operator, and provider CRs at the versions declared in `bootstrap.toml`,
+   suspend Flux in kind, run `clusterctl move`, unpause the moved clusters,
+   seed Flux on the target, and delete kind after the safety checks pass.
 
 If a phase fails, fix the cause and rerun the same command. `clusterctl move`
 is re-runnable, and kind remains authoritative until the final deletion.

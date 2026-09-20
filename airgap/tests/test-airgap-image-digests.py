@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 INVENTORY_FILES = {
     "airgap/images.txt",
     "airgap/zarf.yaml",
+    "airgap/manifests/flux-instance.yaml",
 }
 LOCAL_EXCEPTIONS = {
     "localhost:5001/krops-airgap:latest": (
@@ -23,19 +24,13 @@ NON_IMAGE_REFERENCES = {"127.0.0.1:31999"}
 IGNORED_AIRGAP_PREFIXES = (
     # docker-save tarballs staged from already-pinned images; not a source.
     "airgap/archives/",
-    # Deliberate tag-only refs, not a pin gap: the FluxInstance embeds
-    # multi-arch manifest-list digests that don't resolve in Zarf's
-    # single-arch internal registry, so this file pins controller images
-    # back to tags and the Zarf agent rewrites them to content-addressed
-    # <tag>-zarf-<hash> tags at deploy time (see the file's own header
-    # comment and docs/airgap.md's "Empirical findings" #1/#3).
-    "airgap/manifests/flux-instance.yaml",
     # Build-time output of render-and-inventory.sh; not a committed source.
     "airgap/rendered/",
     # Generated SBOM evidence, not an image source.
     "airgap/sbom/",
     # The test suite itself.
     "airgap/tests/",
+    "airgap/values/",
 )
 POTENTIAL_SOURCE_SUFFIXES = {".json", ".sh", ".toml", ".txt", ".yaml", ".yml"}
 IMAGE_REF = re.compile(

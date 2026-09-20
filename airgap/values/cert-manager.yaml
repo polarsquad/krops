@@ -3,3 +3,15 @@
 # In the airgap the chart is deployed by Zarf instead of a Flux HelmRelease.
 crds:
   enabled: true
+# See docs/airgap.md finding 8.
+image:
+  digest: sha256:70f532fd9cfde0b09d55687200942399d89838bc2d5d5b45152eb799a15912b8
+cainjector:
+  image:
+    digest: sha256:c85268c64f2e0e76684bf5fe8906caff34b82523561c6affe0fae3546bd87562
+webhook:
+  image:
+    digest: sha256:a60e2dac46dbb8a7f3df95c54ce941012f54c2fe022f0ee55aaa1ab40ed957ae
+startupapicheck:
+  image:
+    digest: sha256:46e75b6866359ffb5d82624f41e3ed1c70b2994982702ced547ce5edb418a8f5

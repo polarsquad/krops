@@ -54,6 +54,11 @@ const NODE_READY_TIMEOUT: &str = "120s";
 // names, contexts, namespaces) come from bootstrap.toml instead.
 const DEFAULT_MGMT_KUBECONFIG_RELATIVE: &str = ".kube/krops-mgmt.yaml";
 const DEFAULT_MGMT_POLL_INTERVAL: u64 = 10;
+/// Phase 2 node readiness budget (the previous bare `kubectl wait node
+/// --all --timeout=15m`). The node pool registers its first nodes after the
+/// control plane goes ACTIVE, so the wait polls through a nodeless target
+/// (issue #349) within this same budget.
+const MGMT_NODE_READY_TIMEOUT: &str = "15m";
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
 
@@ -309,6 +314,27 @@ fn extract_age_pubkey(content: &str) -> Option<String> {
         .find_map(|l| l.strip_prefix("# public key: "))
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
+}
+
+/// Resolve the age public key planted in the sops-age secret. The
+/// `AGE_PUBLIC_KEY` override wins only when it agrees with the key file: a
+/// stale override makes Flux name the secret entry after a key that matches
+/// no SOPS recipient, so every `*.sops.yaml` Kustomization then fails with
+/// `no keys found in sops-age secret` (issue #350). A mismatch against a
+/// non-empty key-file pubkey fails fast, naming both public keys. Returns
+/// `None` when neither source yields a key.
+fn resolve_age_pubkey(
+    override_key: Option<&str>,
+    key_file_pubkey: Option<String>,
+) -> Result<Option<String>> {
+    let override_key = override_key.filter(|k| !k.is_empty());
+    match (override_key, key_file_pubkey) {
+        (Some(ovr), Some(file_key)) if ovr != file_key => bail!(
+            "AGE_PUBLIC_KEY ('{ovr}') does not match the public key in the age key file ('{file_key}').\n       The override would plant the wrong key in the sops-age secret and Flux could not decrypt any *.sops.yaml.\n       Remove AGE_PUBLIC_KEY from .env or set it to the key file's public key. See docs/secrets.md."
+        ),
+        (Some(ovr), _) => Ok(Some(ovr.to_string())),
+        (None, file_key) => Ok(file_key),
+    }
 }
 
 /// Extract the numeric host port from `<engine> port` output ("0.0.0.0:32771").
@@ -768,18 +794,20 @@ async fn preflight_github(cfg: &Config, http: &reqwest::Client) -> Result<Github
         );
     }
 
-    // Now safely extract the public key (validation already passed).
-    let age_pubkey = cfg
-        .age_public_key
-        .clone()
-        .filter(|k| !k.is_empty())
-        .or_else(|| extract_age_pubkey(&age_key_content))
-        .with_context(|| {
-            format!(
-                "Cannot determine age public key from '{}' or from AGE_PUBLIC_KEY env var.\n       Set AGE_PUBLIC_KEY in .env, or regenerate the key with: mise run sops-keygen",
-                age_key_file.display()
-            )
-        })?;
+    // Now safely extract the public key (validation already passed). A set
+    // AGE_PUBLIC_KEY still wins, but only after a cross-check against the
+    // key file: a stale override otherwise plants the wrong key in the
+    // sops-age secret and Flux cannot decrypt any *.sops.yaml (issue #350).
+    let age_pubkey = resolve_age_pubkey(
+        cfg.age_public_key.as_deref(),
+        extract_age_pubkey(&age_key_content),
+    )?
+    .with_context(|| {
+        format!(
+            "Cannot determine age public key from '{}' or from AGE_PUBLIC_KEY env var.\n       Set AGE_PUBLIC_KEY in .env, or regenerate the key with: mise run sops-keygen",
+            age_key_file.display()
+        )
+    })?;
 
     Ok(GithubContext {
         git_repo_url,
@@ -1349,6 +1377,25 @@ async fn wait_for_resource(args: &[&str], attempts: u32) -> bool {
     false
 }
 
+/// Poll `probe` immediately, then every `interval_s` after a failure, until
+/// it reports success or the `timeout_s` budget is spent. One final probe
+/// runs past the budget, mirroring the script's until-loop which tests the
+/// condition once more before declaring failure.
+async fn poll_until<F, Fut>(timeout_s: u64, interval_s: u64, mut probe: F) -> bool
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    let max_attempts = timeout_s.checked_div(interval_s).unwrap_or(1).max(1);
+    for _ in 0..max_attempts {
+        if probe().await {
+            return true;
+        }
+        tokio::time::sleep(Duration::from_secs(interval_s)).await;
+    }
+    probe().await
+}
+
 async fn watch_local_reconciliation(cfg: &Config, engine: &str) -> Result<()> {
     println!();
     println!(">>> Step 5: Flux reconciliation progress");
@@ -1539,9 +1586,11 @@ async fn watch_local_reconciliation(cfg: &Config, engine: &str) -> Result<()> {
 // The bootstrap's default exit moves the CAPI management inventory from the
 // kind bootstrap cluster into the self-managed management cluster, then
 // deletes kind. Phases mirror pivot.sh:
-//   0 preflight, 1 wait for the management cluster, 2 export its kubeconfig,
-//   3 install CAPI in the target, 4 suspend Flux in kind and move,
-//   5 seed Flux on the target, 6 delete the bootstrap cluster.
+//   0 preflight + wait for the Flux-created management Cluster definition
+//   (issue #348), 1 wait for the management cluster, 2 export its kubeconfig
+//   and wait for nodes (nodeless-tolerant, issue #349), 3 install CAPI in
+//   the target, 4 suspend Flux in kind and move, 5 seed Flux on the target,
+//   6 delete the bootstrap cluster.
 // The move stays re-runnable: objects are deleted from the source only after
 // they were created on the target, so kind stays authoritative until Phase 6.
 
@@ -1581,16 +1630,61 @@ async fn pivot_check_context(cfg: &Config) -> Result<()> {
     Ok(())
 }
 
-/// Phase 0: the management Cluster definition must exist in kind already.
-async fn pivot_check_management_cluster(mgmt_ns: &str, mgmt_cluster: &str) -> Result<()> {
-    if !run_quiet("kubectl", &["get", "cluster", mgmt_cluster, "-n", mgmt_ns]).await {
-        eprintln!("ERROR: Cluster '{mgmt_cluster}' not found in the bootstrap cluster.");
-        eprintln!("       The management cluster definition must be reconciled first:");
-        eprintln!("       aws:        merged to main, Flux-in-kind creates it (~15-25 min)");
-        eprintln!("       local-host: mise -E local-host run oci-push, then wait ~2 min");
-        bail!("Cluster '{mgmt_cluster}' not found in the bootstrap cluster");
+/// Phase 0 (issue #348): poll for the management Cluster object with the
+/// Phase 1 budget instead of failing fast. Creating the definition is Flux's
+/// job after the bootstrap handoff (the CAPA HelmRelease, providers,
+/// identity, and clusters overlay), a multi-minute chain on a clean first
+/// run. `diagnose` runs on timeout to surface the Kustomization conditions,
+/// so a stuck Flux is distinguishable from one still reconciling.
+async fn wait_for_cluster_definition<F, D, Fut, DFut>(
+    mgmt_cluster: &str,
+    timeout: &str,
+    poll_interval: u64,
+    probe: F,
+    diagnose: D,
+) -> Result<()>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = bool>,
+    D: FnOnce() -> DFut,
+    DFut: std::future::Future<Output = ()>,
+{
+    let timeout_s = parse_duration_seconds(timeout)?;
+    if poll_until(timeout_s, poll_interval, probe).await {
+        return Ok(());
     }
-    Ok(())
+    eprintln!("ERROR: Cluster '{mgmt_cluster}' was not created within {timeout}.");
+    diagnose().await;
+    eprintln!("       Flux creates the management cluster definition after the bootstrap");
+    eprintln!("       handoff; a failed Kustomization above is why the Cluster is missing.");
+    eprintln!("       Re-run the same command once Flux has reconciled: the chain is rerun-safe.");
+    bail!("Cluster '{mgmt_cluster}' was not created within {timeout}");
+}
+
+/// The Phase 0 wait against the kind bootstrap cluster (current kubectl
+/// context); on timeout lists the Flux Kustomizations as the diagnostic.
+async fn wait_for_mgmt_cluster_definition(cfg: &Config) -> Result<()> {
+    let mgmt_cluster = cfg.environment.mgmt_cluster.clone();
+    let mgmt_ns = cfg.repo.bootstrap.mgmt_namespace.clone();
+    let flux_ns = cfg.repo.bootstrap.flux_namespace.clone();
+    println!(
+        ">>> Waiting for the management cluster definition (timeout: {})...",
+        cfg.mgmt_ready_timeout
+    );
+    let probe_cluster = mgmt_cluster.clone();
+    wait_for_cluster_definition(
+        &mgmt_cluster,
+        &cfg.mgmt_ready_timeout,
+        cfg.mgmt_poll_interval,
+        move || {
+            let (cluster, ns) = (probe_cluster.clone(), mgmt_ns.clone());
+            async move { run_quiet("kubectl", &["get", "cluster", &cluster, "-n", &ns]).await }
+        },
+        move || async move {
+            let _ = run("kubectl", &["get", "kustomizations", "-n", &flux_ns]).await;
+        },
+    )
+    .await
 }
 
 /// Phase 1: wait for the management cluster kubeconfig secret.
@@ -1643,6 +1737,82 @@ async fn pivot_wait_for_management_cluster(cfg: &Config, mgmt_cluster: &str) -> 
     )
     .await;
     Ok(())
+}
+
+/// Node readiness of the pivot target, parsed from `kubectl get nodes -o
+/// json` (issue #349). Success = at least one node registered AND every
+/// registered node Ready.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NodesReadiness {
+    /// Zero nodes registered: `kubectl wait node --all` errors "no matching
+    /// resources found" here, which is why Phase 2 polls instead.
+    Nodeless,
+    /// Nodes registered but at least one not Ready, or unreadable output
+    /// (kubectl failed against a briefly unreachable API): keep waiting.
+    Pending,
+    Ready,
+}
+
+fn nodes_readiness(get_nodes_json: &str) -> NodesReadiness {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(get_nodes_json) else {
+        return NodesReadiness::Pending;
+    };
+    let Some(items) = value.get("items").and_then(serde_json::Value::as_array) else {
+        return NodesReadiness::Pending;
+    };
+    if items.is_empty() {
+        return NodesReadiness::Nodeless;
+    }
+    let all_ready = items.iter().all(|item| {
+        item.get("status")
+            .and_then(|status| status.get("conditions"))
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|conditions| {
+                conditions.iter().any(|condition| {
+                    condition.get("type").and_then(serde_json::Value::as_str) == Some("Ready")
+                        && condition.get("status").and_then(serde_json::Value::as_str)
+                            == Some("True")
+                })
+            })
+    });
+    if all_ready {
+        NodesReadiness::Ready
+    } else {
+        NodesReadiness::Pending
+    }
+}
+
+/// Phase 2 node wait (issue #349): poll node readiness with the same budget
+/// the bare `kubectl wait node --all --timeout=15m` had, tolerating a
+/// nodeless target (on EKS the CAPA MachinePool registers nodes 1-2 min
+/// after the control plane goes ACTIVE). `diagnose` runs on timeout.
+async fn wait_for_nodes_ready<F, D, Fut, DFut>(
+    timeout: &str,
+    poll_interval: u64,
+    probe: F,
+    diagnose: D,
+) -> Result<()>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = NodesReadiness>,
+    D: FnOnce() -> DFut,
+    DFut: std::future::Future<Output = ()>,
+{
+    let timeout_s = parse_duration_seconds(timeout)?;
+    let mut probe = probe;
+    let ready = poll_until(timeout_s, poll_interval, move || {
+        let future = probe();
+        async move { matches!(future.await, NodesReadiness::Ready) }
+    })
+    .await;
+    if ready {
+        return Ok(());
+    }
+    eprintln!("ERROR: management cluster nodes were not all Ready within {timeout}.");
+    diagnose().await;
+    eprintln!("       The node pool registers nodes after the control plane goes ACTIVE;");
+    eprintln!("       re-run the same command once nodes register: the pivot is rerun-safe.");
+    bail!("management cluster nodes were not all Ready within {timeout}");
 }
 
 /// Phase 2: export the target kubeconfig (chmod 600), rewrite the CAPD
@@ -1720,21 +1890,42 @@ async fn pivot_export_kubeconfig(cfg: &Config, engine: &str, mgmt_cluster: &str)
     )
     .await?;
 
-    println!(">>> Waiting for management-cluster nodes to be ready...");
-    run(
-        "kubectl",
-        &kubectl_cmd(
-            Some(&kc),
-            &[
-                "wait",
-                "--for=condition=Ready",
-                "node",
-                "--all",
-                "--timeout=15m",
-            ],
-        ),
+    // `kubectl wait node --all` errors "no matching resources found" while
+    // the target has zero nodes, and on EKS the CAPA MachinePool registers
+    // nodes 1-2 min after the control plane goes ACTIVE (issue #349): poll
+    // until at least one node exists AND every registered node is Ready.
+    println!(
+        ">>> Waiting for management-cluster nodes to be ready (timeout: {MGMT_NODE_READY_TIMEOUT})..."
+    );
+    let probe_kc = kc.clone();
+    let diag_kc = kc.clone();
+    let diag_cluster = mgmt_cluster.to_string();
+    let diag_ns = cfg.repo.bootstrap.mgmt_namespace.clone();
+    wait_for_nodes_ready(
+        MGMT_NODE_READY_TIMEOUT,
+        cfg.mgmt_poll_interval,
+        move || {
+            let kc = probe_kc.clone();
+            async move {
+                let output = capture_lossy(
+                    "kubectl",
+                    &kubectl_cmd(Some(&kc), &["get", "nodes", "-o", "json"]),
+                )
+                .await;
+                nodes_readiness(&output)
+            }
+        },
+        move || async move {
+            let _ = run("kubectl", &kubectl_cmd(Some(&diag_kc), &["get", "nodes"])).await;
+            let _ = run(
+                "clusterctl",
+                &["describe", "cluster", &diag_cluster, "-n", &diag_ns],
+            )
+            .await;
+        },
     )
     .await?;
+    let _ = run("kubectl", &kubectl_cmd(Some(&kc), &["get", "nodes"])).await;
     Ok(())
 }
 
@@ -2278,7 +2469,6 @@ async fn run_pivot(cfg: &Config, preflight: &Preflight, http: &reqwest::Client) 
     // the aws flux-env checks ran in preflight_github; the GitHub branch
     // check is not repeated here.
     pivot_check_context(cfg).await?;
-    pivot_check_management_cluster(&cfg.repo.bootstrap.mgmt_namespace, mgmt_cluster).await?;
     if cfg.is_local() && !registry_reachable(cfg, http).await {
         eprintln!(
             "ERROR: local registry is unavailable at localhost:{}",
@@ -2290,6 +2480,10 @@ async fn run_pivot(cfg: &Config, preflight: &Preflight, http: &reqwest::Client) 
             cfg.registry_port
         );
     }
+    // The management Cluster object is created by Flux after the bootstrap
+    // handoff (issue #348): poll for it, surfacing failed Kustomizations on
+    // timeout, instead of failing fast on a clean first run.
+    wait_for_mgmt_cluster_definition(cfg).await?;
 
     // ── Phase 1: wait for the management cluster ──────────────────────────
     pivot_wait_for_management_cluster(cfg, mgmt_cluster).await?;
@@ -3084,6 +3278,54 @@ mod tests {
     }
 
     #[test]
+    fn resolve_age_pubkey_accepts_matching_override() {
+        let file_key = extract_age_pubkey(VALID_AGE_KEY);
+        let resolved = resolve_age_pubkey(file_key.as_deref(), file_key.clone()).unwrap();
+        assert_eq!(resolved, file_key);
+    }
+
+    #[test]
+    fn resolve_age_pubkey_rejects_mismatched_override() {
+        let file_key = extract_age_pubkey(VALID_AGE_KEY).unwrap();
+        let stale = "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqstale0";
+        let err = resolve_age_pubkey(Some(stale), Some(file_key.clone()))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains(stale), "error must name the override: {err}");
+        assert!(
+            err.contains(&file_key),
+            "error must name the key-file pubkey: {err}"
+        );
+    }
+
+    #[test]
+    fn resolve_age_pubkey_derives_from_key_file_without_override() {
+        let file_key = extract_age_pubkey(VALID_AGE_KEY);
+        assert_eq!(
+            resolve_age_pubkey(None, file_key.clone()).unwrap(),
+            file_key
+        );
+        // An empty-string AGE_PUBLIC_KEY counts as unset.
+        assert_eq!(
+            resolve_age_pubkey(Some(""), file_key.clone()).unwrap(),
+            file_key
+        );
+    }
+
+    #[test]
+    fn resolve_age_pubkey_keeps_override_when_key_file_yields_no_pubkey() {
+        // Documented setups rely on the override when the key file's public
+        // key cannot be extracted; only a contradictory one is rejected.
+        assert_eq!(
+            resolve_age_pubkey(Some("age1override"), None)
+                .unwrap()
+                .as_deref(),
+            Some("age1override")
+        );
+        assert_eq!(resolve_age_pubkey(None, None).unwrap(), None);
+    }
+
+    #[test]
     fn extract_workload_port_parses_engine_output() {
         assert_eq!(
             extract_workload_port("0.0.0.0:32771\n[::]:32771\n").as_deref(),
@@ -3188,5 +3430,186 @@ mod tests {
             .as_object()
             .unwrap()
             .contains_key(&format!("keys.{pubkey}.agekey")));
+    }
+
+    // ── Clean-first-run waits (#348/#349) ────────────────────────────────────
+
+    #[test]
+    fn nodes_readiness_parses_kubectl_json() {
+        assert_eq!(nodes_readiness(r#"{"items":[]}"#), NodesReadiness::Nodeless);
+        let ready = r#"{"items":[{"status":{"conditions":[{"type":"Ready","status":"True"}]}}]}"#;
+        assert_eq!(nodes_readiness(ready), NodesReadiness::Ready);
+        let not_ready =
+            r#"{"items":[{"status":{"conditions":[{"type":"Ready","status":"False"}]}}]}"#;
+        assert_eq!(nodes_readiness(not_ready), NodesReadiness::Pending);
+        // One lagging node holds the whole wait.
+        let mixed = r#"{"items":[{"status":{"conditions":[{"type":"Ready","status":"True"}]}},{"status":{"conditions":[{"type":"Ready","status":"False"}]}}]}"#;
+        assert_eq!(nodes_readiness(mixed), NodesReadiness::Pending);
+        // A registered node without conditions yet is not Ready.
+        assert_eq!(
+            nodes_readiness(r#"{"items":[{"status":{}}]}"#),
+            NodesReadiness::Pending
+        );
+        // kubectl failed (API briefly unreachable) or returned garbage:
+        // keep waiting rather than erroring the poll.
+        assert_eq!(nodes_readiness(""), NodesReadiness::Pending);
+        assert_eq!(
+            nodes_readiness("The connection to the server was refused"),
+            NodesReadiness::Pending
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn poll_until_returns_on_immediate_success() {
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counter = calls.clone();
+        let found = poll_until(2400, 10, move || {
+            counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            async { true }
+        })
+        .await;
+        assert!(found);
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn poll_until_succeeds_when_object_appears_after_delay() {
+        let answers =
+            std::sync::Arc::new(std::sync::Mutex::new(std::collections::VecDeque::from([
+                false, false, false, true,
+            ])));
+        let scripted = answers.clone();
+        let found = poll_until(2400, 10, move || {
+            let next = scripted.lock().unwrap().pop_front().unwrap_or(true);
+            async move { next }
+        })
+        .await;
+        assert!(found);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn poll_until_probes_once_past_the_budget_before_failing() {
+        // A 30s budget at a 10s interval is 3 attempts, plus the final
+        // past-budget probe (the until-loop tests once more before failing).
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counter = calls.clone();
+        let found = poll_until(30, 10, move || {
+            counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            async { false }
+        })
+        .await;
+        assert!(!found);
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 4);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn cluster_definition_wait_succeeds_when_object_appears() {
+        let answers =
+            std::sync::Arc::new(std::sync::Mutex::new(std::collections::VecDeque::from([
+                false, false, true,
+            ])));
+        let scripted = answers.clone();
+        let diagnosed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = diagnosed.clone();
+        wait_for_cluster_definition(
+            "test-mgmt",
+            "40m",
+            10,
+            move || {
+                let next = scripted.lock().unwrap().pop_front().unwrap_or(true);
+                async move { next }
+            },
+            move || {
+                let flag = flag.clone();
+                async move { flag.store(true, std::sync::atomic::Ordering::SeqCst) }
+            },
+        )
+        .await
+        .unwrap();
+        // No diagnostics on the success path.
+        assert!(!diagnosed.load(std::sync::atomic::Ordering::SeqCst));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn cluster_definition_wait_surfaces_kustomizations_when_stuck() {
+        let diagnosed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = diagnosed.clone();
+        let err = wait_for_cluster_definition(
+            "test-mgmt",
+            "40m",
+            10,
+            || async { false },
+            move || {
+                let flag = flag.clone();
+                async move { flag.store(true, std::sync::atomic::Ordering::SeqCst) }
+            },
+        )
+        .await
+        .unwrap_err();
+        // Stuck Flux: the Kustomization conditions were surfaced, and the
+        // failure names the missing object and the spent budget.
+        assert!(diagnosed.load(std::sync::atomic::Ordering::SeqCst));
+        assert_eq!(
+            err.to_string(),
+            "Cluster 'test-mgmt' was not created within 40m"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn nodes_wait_succeeds_when_nodes_register_after_delay() {
+        use NodesReadiness::{Nodeless, Pending, Ready};
+        let answers =
+            std::sync::Arc::new(std::sync::Mutex::new(std::collections::VecDeque::from([
+                Nodeless, Nodeless, Pending, Ready,
+            ])));
+        let scripted = answers.clone();
+        wait_for_nodes_ready(
+            "15m",
+            10,
+            move || {
+                let next = scripted.lock().unwrap().pop_front().unwrap_or(Ready);
+                async move { next }
+            },
+            || async {},
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn nodes_wait_fails_actionably_on_timeout() {
+        let diagnosed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = diagnosed.clone();
+        let err = wait_for_nodes_ready(
+            "15m",
+            10,
+            || async { NodesReadiness::Nodeless },
+            move || {
+                let flag = flag.clone();
+                async move { flag.store(true, std::sync::atomic::Ordering::SeqCst) }
+            },
+        )
+        .await
+        .unwrap_err();
+        assert!(diagnosed.load(std::sync::atomic::Ordering::SeqCst));
+        assert_eq!(
+            err.to_string(),
+            "management cluster nodes were not all Ready within 15m"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn nodes_wait_never_succeeds_while_nodeless() {
+        // Regression pin for #349: a nodeless target must burn the whole
+        // budget, never succeed early (kubectl wait --all errored here).
+        let err = wait_for_nodes_ready(
+            "15m",
+            10,
+            || async { NodesReadiness::Nodeless },
+            || async {},
+        )
+        .await
+        .unwrap_err();
+        assert!(err.to_string().contains("not all Ready within 15m"));
     }
 }

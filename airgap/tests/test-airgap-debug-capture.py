@@ -16,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 OFFLINE_RUN_SH = REPO_ROOT / "airgap/scripts/offline-run.sh"
 AIR_GAPPED_YML = REPO_ROOT / ".github/workflows/air-gapped.yml"
 DEBUG_FILE = "/tmp/airgap-cert-manager-debug.txt"
+WORKLOAD_DEBUG_FILE = "/tmp/airgap-workload-debug.txt"
 
 
 def main() -> int:
@@ -28,6 +29,9 @@ def main() -> int:
         if probe not in script:
             failures.append(f"{OFFLINE_RUN_SH}: debug capture no longer runs '{probe}'")
 
+    if WORKLOAD_DEBUG_FILE not in script:
+        failures.append(f"{OFFLINE_RUN_SH}: no longer writes {WORKLOAD_DEBUG_FILE}")
+
     workflow = AIR_GAPPED_YML.read_text()
     upload_blocks = re.split(r"\n(?=      - name:)", workflow)
     upload_steps = [
@@ -39,7 +43,7 @@ def main() -> int:
         failures.append(f"{AIR_GAPPED_YML}: found no deployment-evidence upload steps")
     missing = [
         block.splitlines()[0].strip() for block in upload_steps
-        if DEBUG_FILE not in block
+        if DEBUG_FILE not in block or WORKLOAD_DEBUG_FILE not in block
     ]
     if missing:
         failures.append(

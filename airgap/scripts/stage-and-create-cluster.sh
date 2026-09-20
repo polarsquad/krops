@@ -41,7 +41,7 @@ if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
   echo ">>> kind cluster '${CLUSTER_NAME}' already exists; leaving it in place"
 else
   echo ">>> Creating kind cluster '${CLUSTER_NAME}' (image ${KIND_NODE_IMAGE})..."
-  kind create cluster --name "$CLUSTER_NAME" --image "$KIND_NODE_IMAGE" --config - <<EOF
+  kind create cluster --name "$CLUSTER_NAME" --image "${KIND_NODE_IMAGE%@*}" --config - <<EOF
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
@@ -53,10 +53,11 @@ EOF
 fi
 
 kubectl config use-context "kind-${CLUSTER_NAME}" >/dev/null
-kubectl wait --for=condition=Ready node --all --timeout=180s
+kubectl wait --for=condition=Ready node --all --timeout=60s
 
 # Recreate krops-registry (the workload cluster's Flux and CAAPH fetch from it;
 # the Zarf internal registry is only reachable inside the mgmt cluster).
+REGISTRY_IMAGE="${REGISTRY_IMAGE:-registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373}"
 REGISTRY_NAME="${REGISTRY_NAME:-krops-registry}"
 REGISTRY_PORT="${REGISTRY_PORT:-5001}"
 registry_failure() {
@@ -75,7 +76,7 @@ if ! docker ps --filter "name=^${REGISTRY_NAME}$" --format '{{.Names}}' | grep -
     --health-interval=1s \
     --health-timeout=2s \
     --health-retries=15 \
-    registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373 >/dev/null
+    "${REGISTRY_IMAGE%@*}" >/dev/null
 fi
 
 registry_health=$(docker inspect --format \
@@ -111,7 +112,7 @@ flux push artifact "oci://localhost:${REGISTRY_PORT}/krops:latest" \
   --insecure-registry \
   --reproducible
 helm push "$ARCHIVES/charts/flux-operator-0.58.0.tgz" "oci://localhost:${REGISTRY_PORT}/charts" --plain-http
-helm push "$ARCHIVES/charts/podinfo-6.14.0.tgz" "oci://localhost:${REGISTRY_PORT}/stefanprodan/charts" --plain-http
+helm push "$ARCHIVES"/charts/podinfo-*.tgz "oci://localhost:${REGISTRY_PORT}/stefanprodan/charts" --plain-http
 
 echo ">>> Staged. Next:"
 echo "      zarf init archives/zarf-init-arm64.tar.zst --registry-mode=nodeport --components=\"\" --confirm"

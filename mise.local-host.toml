@@ -27,7 +27,7 @@ done
 
 if ! curl --fail --silent --show-error "http://${REGISTRY_HOST}:${REGISTRY_PORT}/v2/" >/dev/null; then
   echo "ERROR: local registry is unavailable at ${REGISTRY_HOST}:${REGISTRY_PORT}" >&2
-  echo "       Start it with: mise -E local-host run bootstrap" >&2
+  echo "       Start it with: scripts/toolbox-run.sh bootstrap local-host" >&2
   exit 1
 fi
 

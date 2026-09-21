@@ -126,6 +126,11 @@ resources. There is no app source code here, only declarative infrastructure.
   any repository that carries it) builds the ARM64 bundle on an arm64 runner,
   then deploys it with external egress blocked (fails if any public traffic
   was attempted). The deploy evidence artifact is uploaded.
+  The `report-status` job (scheduled runs only) opens or comments on one
+  tracking issue titled "air-gapped: scheduled workflow is failing" when a
+  needed job failed, and closes it when all succeeded; cancelled runs are
+  ignored. `airgap/tests/test-airgap-failure-notification.py` parses the
+  workflow YAML to guard its wiring.
 - `virtualized-e2e/`: WireMock-virtualized e2e harness (issue #355), not
   Flux-reconciled and not wired into a mise task yet (Phase 4). `lib/`
   carries the shared components (WireMock manifest templates under

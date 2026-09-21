@@ -1,4 +1,4 @@
-min_version = "2026.9.7"
+min_version = "2026.9.12"
 
 [tools]
 go = "1.27.1"

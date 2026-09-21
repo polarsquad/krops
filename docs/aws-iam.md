@@ -28,8 +28,11 @@ outside this repo, same as the CAPA permissions):
   `s3:DeleteBucket`, `s3:GetBucket*`/`s3:PutBucket*`,
   `s3:DeleteBucketPolicy`, encryption/lifecycle/replication/accelerate/
   analytics/inventory/metrics/intelligent-tiering configuration Get+Put,
-  `s3:ListBucket`, `s3:TagResource`/`s3:UntagResource`/
-  `s3:DeleteBucketTagging`/`s3:ListTagsForResource`
+  `s3:ListBucket`, `s3:TagResource` (the `CreateBucket` tagSet is authorized
+  against it, see #352/#353) and `s3:DeleteBucketTagging` (tag-removal
+  drift). `s3:UntagResource`/`s3:ListTagsForResource` are not needed: the ACK
+  S3 controller only calls them for directory buckets, which krops does not
+  create
 - **RDS**: `rds:Describe*` + `rds:ListTagsForResource` on `*`; instance
   management (`rds:CreateDBInstance`/`ModifyDBInstance`/`DeleteDBInstance`/
   `RebootDBInstance`/`StartDBInstance`/`StopDBInstance`,

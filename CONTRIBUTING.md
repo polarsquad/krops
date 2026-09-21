@@ -102,10 +102,13 @@ Requirements:
   (`mise x node@24 -- ...`).
 - Python 3 for the test scripts under `tests/` and `airgap/tests/`.
 
-Environment layers: `mise -E local-host`, `mise -E aws`, and
-`mise -E local-talos` add per-environment tools and tasks. Contributors
-without an AWS account or bare metal should work in `local-host`; it walks
-the full bootstrap, pivot, workload, and teardown chain with no cloud cost.
+Environment layers: `mise.aws.toml`, `mise.azure.toml`, `mise.gcp.toml`,
+`mise.local-host.toml`, and `mise.local-talos.toml` add per-environment
+tools and helper tasks; they run in the toolbox image (`--entrypoint mise`,
+see `docs/operations.md`), and the host `mise install` is only needed for
+`mise run validate` and the docs tasks. Contributors without an AWS account
+or bare metal should work in `local-host`; it walks the full bootstrap,
+pivot, workload, and teardown chain with no cloud cost.
 
 ## Rules that apply to every change
 

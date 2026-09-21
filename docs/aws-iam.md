@@ -187,7 +187,7 @@ IPAM/IPv6 actions (IPv4 clusters), no launch-template writes (the
 ### Not covered (operator steps)
 
 - First-time creation of the clusterawsadm CloudFormation stack
-  (`mise -E aws run aws-bootstrap`) needs `cloudformation:CreateStack` plus
+  (the `aws-bootstrap` task, run in the toolbox per [docs/aws.md](./aws.md)) needs `cloudformation:CreateStack` plus
   IAM writes on the `*.cluster-api-provider-aws.sigs.k8s.io` roles. The
   stack is already `CREATE_COMPLETE` (2026-09-01, per #143), so recreating
   it stays an operator step.

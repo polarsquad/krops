@@ -304,7 +304,7 @@ needs:
 ## Configuration
 
 Copy the env template and fill it in. Both the lifecycle wrapper
-(`scripts/toolbox-run.sh`) and the helper mise tasks load `.env`
+(`scripts/toolbox-run.sh`) and the helper mise tasks (through mise's `env_file`, inside the toolbox) load `.env`
 automatically, and it is gitignored:
 
 ```sh

@@ -58,6 +58,11 @@ if ! python3 tests/test-sops-keygen-prints-public-key.py; then
   echo "    FAILED: sops-keygen public key" >&2
   fail=1
 fi
+echo "==> local-host kubeconfig endpoint is host-only (toolbox keeps the kind-network endpoint)"
+if ! python3 tests/test-local-host-kubeconfig-toolbox-endpoint.py; then
+  echo "    FAILED: local-host kubeconfig toolbox endpoint" >&2
+  fail=1
+fi
 echo "==> air-gap digest token boundary"
 if ! python3 airgap/tests/test-digest-regex.py; then
   echo "    FAILED: air-gap digest token boundary" >&2

@@ -161,6 +161,9 @@ jobs:
       - name: sops-keygen prints the public key (#423)
         run: python3 tests/test-sops-keygen-prints-public-key.py
 
+      - name: local-host kubeconfig endpoint is host-only (#423)
+        run: python3 tests/test-local-host-kubeconfig-toolbox-endpoint.py
+
       - name: cert-manager version consistency (#322)
         run: python3 tests/test-cert-manager-version-consistency.py
 

@@ -89,8 +89,11 @@ every `.env` assignment with outer quote
 stripping before detecting the engine or resolving a socket for it, so a
 `.env`-selected `CONTAINER_ENGINE` takes effect from the start (issue #257).
 An already-exported variable is left alone, so process environment wins over
-`.env` (the same precedence as mise's `env_file`, for the helper tasks). It
-then passes only this
+`.env` for the wrapper. Note the opposite rule for the helper tasks: mise's
+`env_file` loads `/workspace/.env` inside the container and its values
+override the process environment, so a `-e NAME=value` on a helper run
+loses to the same key in `.env` (see [Helper tasks in the
+toolbox](#helper-tasks-in-the-toolbox)). It then passes only this
 allowlist into the container:
 
 - Engine and lifecycle: `CONTAINER_ENGINE`, `ENGINE_SOCK`, `KROPS_PROFILE`,
@@ -134,6 +137,74 @@ Inside the toolbox:
   kubeconfig after creation.
 - `/root/.kube` maps to the checkout's `.kube/`, so the exported management
   kubeconfig persists on the host as `.kube/krops-mgmt.yaml`.
+
+### Helper tasks in the toolbox
+
+The one-off and helper steps (cloud preparation, SOPS key work, kubeconfig
+exports, `oci-push`) are mise tasks defined in `mise.toml` and the
+`mise.<env>.toml` layers. They run in the same toolbox image as the
+lifecycle, by pointing the container's entrypoint at `mise` and running the
+task from the mounted checkout. There is no wrapper verb for them; each
+environment page shows its commands and they all follow one of two shapes.
+
+Repo-only tasks (`sops-*`, `aws-credentials`) run as your own user so the
+files they write are owned by you:
+
+```sh
+export TOOLBOX_IMAGE=ghcr.io/polarsquad/krops-toolbox:latest   # or krops-toolbox:dev
+docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/tmp \
+  -v "$PWD:/workspace" -w /workspace \
+  -e MISE_AUTO_INSTALL=0 \
+  --entrypoint mise "$TOOLBOX_IMAGE" run <task> [args]
+```
+
+Cluster tasks (`mgmt-kubeconfig`, `kubeconfigs`, `oci-push`, the cloud
+`*-bootstrap` and `*-federate` tasks) run as root, with the persisted
+kubeconfig directory and the engine socket mounted like the lifecycle run:
+
+```sh
+docker run --rm -it \
+  -v "$PWD:/workspace" -w /workspace \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "$PWD/.kube:/root/.kube" \
+  -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml \
+  -e MISE_AUTO_INSTALL=0 \
+  --entrypoint mise "$TOOLBOX_IMAGE" -E <env> run <task>
+```
+
+Rules that apply to every helper run:
+
+- `--entrypoint mise` bypasses `toolbox-entrypoint.sh`, so `KROPS_TOOLBOX`
+  is not set. The local-host kubeconfig tasks need it (`-e KROPS_TOOLBOX=1`)
+  together with `--network kind`: they then keep the CAPD-recorded
+  kind-network endpoint instead of rewriting it to `127.0.0.1`, which inside
+  a container is the container itself. A kubeconfig exported that way works
+  from later toolbox runs on the kind network, not from host `kubectl`.
+- `MISE_AUTO_INSTALL=0` is required. The mounted `mise.toml` pins dev-only
+  tools (`zarf`, `go`) that the image does not carry; without the flag mise
+  tries to install them, and as a non-root user that fails with `Permission
+  denied` under `/usr/local/share/mise`.
+- mise loads `/workspace/.env` (`env_file` in `mise.toml`) and its values
+  override the process environment. Cloud credentials for `aws-bootstrap`,
+  `aws-credentials`, `azure-bootstrap`, and `gcp-bootstrap` come from `.env`
+  first; to run with other credentials, pass `-e MISE_ENV_FILE=/dev/null`
+  and the variables by name (`-e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY
+  -e AWS_SESSION_TOKEN -e AWS_REGION`). A bare `-e NAME` forwards the host
+  value without placing it in argv.
+- Interactive logins (`az login --use-device-code`, `gcloud auth login
+  --no-launch-browser`) need `-it`. The gcloud session persists in the
+  checkout's gitignored `.gcloud/` (`-e CLOUDSDK_CONFIG=/workspace/.gcloud`);
+  the Azure session persists through `-v "$PWD/.azure:/root/.azure"` (add
+  `.azure/` to your global gitignore or keep it outside the checkout with
+  another host path).
+- Podman: replace `docker` with `podman` and the socket source with the one
+  `scripts/toolbox-run.sh` resolves (`podman info --format
+  '{{.Host.RemoteSocket.Path}}'`).
+
+Host-side on purpose: `mise run validate` (repository development, see
+[Validation](#validation)) and `mise -E local-host run podinfo-port-forward`
+(the browser is on the host; a toolbox form is shown with the local-host
+chain below).
 
 ### Verifying a toolbox release
 
@@ -329,7 +400,7 @@ Talos cluster takes over as the management cluster. The management-ready
 wait defaults to 30 minutes (`mgmt-ready-timeout` in `bootstrap.toml`) to
 cover the PXE install and first Talos boot. Scope fence: management-only.
 There is no workload cluster and no CNI addon; Talos ships flannel. Verify
-after the pivot with `mise -E local-talos run kubeconfigs` and
+after the pivot with the persisted `.kube/krops-mgmt.yaml` and
 `kubectl get nodes`: one Ready node on the committed endpoint, schedulable
 for the full management plane (`allowSchedulingOnControlPlanes`).
 
@@ -343,15 +414,20 @@ for the full management plane (`allowSchedulingOnControlPlanes`).
 **Workflow:**
 ```bash
 # Republish the local management and workload folders after making changes
-mise -E local-host run oci-push
+docker run --rm -it \
+  -v "$PWD:/workspace" -w /workspace \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "$PWD/.kube:/root/.kube" \
+  -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml \
+  -e MISE_AUTO_INSTALL=0 --network kind -e REGISTRY_HOST=krops-registry -e REGISTRY_PORT=5000 \
+  --entrypoint mise "$TOOLBOX_IMAGE" -E local-host run oci-push
 
-# Optional overrides
-OCI_REPOSITORY=my-config OCI_TAG=v1 \
-  mise -E local-host run oci-push
+# Optional overrides: add -e OCI_REPOSITORY=my-config -e OCI_TAG=v1 to the same run.
 
 # FluxInstance pulls and reconciles the artifact's mgmt/local-host kustomization.
 # The bootstrap configures kind's containerd to mirror localhost:5001 to the
-# registry's in-cluster endpoint, krops-registry:5000.
+# registry's in-cluster endpoint, krops-registry:5000, which is the endpoint
+# the toolbox run above pushes to over the kind network.
 ```
 
 The artifact contains only `mgmt/local-host/` and `workload/local-host/`,
@@ -371,23 +447,42 @@ export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
 flux get kustomizations --watch
 ```
 
-For the local-host environment, export and verify the CAPD workload kubeconfig
-after `docker-workload-cluster` reports Ready:
+For the local-host environment, export the CAPD workload kubeconfig after
+`docker-workload-cluster` reports Ready. The toolbox run keeps the
+kind-network endpoint, so the file is read back through the toolbox too:
 
 ```sh
-export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"  # toolbox management cluster
-mise -E local-host run kubeconfigs
-KUBECONFIG=local-workload.kubeconfig kubectl get nodes
+docker run --rm -it \
+  -v "$PWD:/workspace" -w /workspace \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "$PWD/.kube:/root/.kube" \
+  -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml \
+  -e MISE_AUTO_INSTALL=0 --network kind -e KROPS_TOOLBOX=1 \
+  --entrypoint mise "$TOOLBOX_IMAGE" -E local-host run kubeconfigs
+docker run --rm --network kind -v "$PWD:/workspace" -w /workspace \
+  --entrypoint kubectl "$TOOLBOX_IMAGE" --kubeconfig local-workload.kubeconfig get nodes
 ```
 
-The local workload Flux instance installs Podinfo from its OCI Helm chart. Open
-it in a host browser by running the port-forward task in a separate terminal:
+The local workload Flux instance installs Podinfo from its OCI Helm chart.
+Open it in a host browser by running the port-forward in a separate
+terminal. This is the one helper that stays a host task on purpose (the
+browser is on the host); it needs a host `kubectl` and a kubeconfig with the
+`127.0.0.1` endpoint, which `mise -E local-host run kubeconfigs` on the host
+produces:
 
 ```sh
 mise -E local-host run podinfo-port-forward
 ```
 
-Then browse to <http://localhost:9898>. Press Ctrl-C to stop forwarding.
+On an engine-only host, publish the port from a toolbox run on the kind
+network instead:
+
+```sh
+docker run --rm -it --network kind -p 9898:9898 \
+  -v "$PWD:/workspace" -w /workspace -e MISE_AUTO_INSTALL=0 \
+  --entrypoint kubectl "$TOOLBOX_IMAGE" --kubeconfig local-workload.kubeconfig \
+  port-forward --namespace podinfo --address 0.0.0.0 service/podinfo 9898:9898
+```
 
 The workload uses Kubernetes v1.37.0. A CAPI ClusterResourceSet installs a
 pinned Kindnet daemon as its CNI before the Flux addons are delivered.
@@ -412,10 +507,16 @@ For the local-host end-to-end chain:
 
 ```sh
 TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh bootstrap local-host
-export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
-mise -E local-host run kubeconfigs
-KUBECONFIG=local-workload.kubeconfig flux get all --all-namespaces
-mise -E local-host run podinfo-port-forward  # browse to http://localhost:9898
+docker run --rm -it \
+  -v "$PWD:/workspace" -w /workspace \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "$PWD/.kube:/root/.kube" \
+  -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml \
+  -e MISE_AUTO_INSTALL=0 --network kind -e KROPS_TOOLBOX=1 \
+  --entrypoint mise "$TOOLBOX_IMAGE" -E local-host run kubeconfigs
+docker run --rm --network kind -v "$PWD:/workspace" -w /workspace \
+  --entrypoint flux "$TOOLBOX_IMAGE" --kubeconfig local-workload.kubeconfig get all --all-namespaces
+# then the port-forward from the section above, and browse to http://localhost:9898
 ```
 
 Bootstrap does not return until the management and workload root
@@ -433,8 +534,9 @@ kubectl get buckets.s3.services.k8s.aws -n ack-system
 kubectl get dbinstances.rds.services.k8s.aws -n ack-system
 kubectl get roles.iam.services.k8s.aws -n ack-system
 
-# Workload clusters: export kubeconfigs first
-#   mise -E aws run kubeconfigs && export KUBECONFIG=~/.kube/krops-workloads.yaml
+# Workload clusters: export kubeconfigs first (see the AWS page for the
+# toolbox run of `kubeconfigs`), then
+#   export KUBECONFIG=.kube/krops-workloads.yaml
 #   kubectl config use-context eu-north-1-workload   (or eu-west-1-workload)
 kubectl get kustomizations -n flux-system            # root only; workload/base is empty since #346
 
@@ -574,8 +676,18 @@ mise run validate
 ```
 
 The task checks shell syntax for the retained lifecycle scripts, runs the
-`bootstrap.toml` manifest cross-check, and builds every kustomize overlay under
-`mgmt/` and `workload/`.
+`bootstrap.toml` manifest cross-check and the toolbox/doc tests, and builds
+every kustomize overlay under `mgmt/`, `workload/`, and `virtualized-e2e/`.
+It is repository development, so it stays a host task on purpose (it needs
+the pinned Python, `uv`, and `kubectl`). Contributors without a host
+toolchain can run the same task in the toolbox, redirecting the uv
+environment off the mount:
+
+```sh
+docker run --rm -v "$PWD:/workspace" -w /workspace \
+  -e MISE_AUTO_INSTALL=0 -e UV_PROJECT_ENVIRONMENT=/tmp/krops-venv \
+  --entrypoint mise "$TOOLBOX_IMAGE" run validate
+```
 
 `.github/workflows/validate.yml` separately builds every overlay, runs the
 Renovate air-gap digest and managed-pin coverage tests, cross-checks

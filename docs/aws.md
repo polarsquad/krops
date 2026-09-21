@@ -34,14 +34,17 @@ offered 2 vCPU / 4 GiB shape for the region. The management cluster lives in
   (for the `krops-reader` console user). See
   [AWS authentication & IAM](./aws-iam.md) for the exact actions and the
   least-privilege trade-off.
-- `mise -E aws install` (adds `aws-cli` and `clusterawsadm`), a GitHub PAT and
-  an age key as for any GitHub-synced environment (`.env`, see
-  [operations.md](./operations.md)).
+- A GitHub PAT and an age key as for any GitHub-synced environment (`.env`,
+  see [operations.md](./operations.md)). No host toolchain: `aws-cli` and
+  `clusterawsadm` are in the toolbox image.
 - The `clusterawsadm` IAM CloudFormation stack, provisioned once before
-  bootstrap and removed by a full AWS teardown:
+  bootstrap and removed by a full AWS teardown. `clusterawsadm` reads the
+  AWS credentials from `.env` (mise `env_file`) or the process environment
+  ([helper run rules](./operations.md#helper-tasks-in-the-toolbox)):
 
   ```sh
-  mise -E aws run aws-bootstrap
+  docker run --rm -it -v "$PWD:/workspace" -w /workspace -e MISE_AUTO_INSTALL=0 \
+    --entrypoint mise "$TOOLBOX_IMAGE" -E aws run aws-bootstrap
   # == clusterawsadm bootstrap iam create-cloudformation-stack --region eu-north-1
   ```
 
@@ -62,13 +65,20 @@ cluster.
   `configSecret` on the `aws` infrastructure provider). To set or rotate it:
 
   ```sh
-  mise -E aws run aws-bootstrap                                  # 1. CloudFormation stack
-  mise run aws-credentials                                       # 2. clusterawsadm bootstrap credentials encode-as-profile
-  # 3. paste the printed profile into
-  #    mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml
-  #    as AWS_B64ENCODED_CREDENTIALS
-  mise run sops-encrypt mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml
+  krops_mise() {   # from docs/secrets.md
+    docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/tmp \
+      -v "$PWD:/workspace" -w /workspace \
+      -e MISE_AUTO_INSTALL=0 -e SOPS_AGE_KEY_FILE=/workspace/age.agekey \
+      --entrypoint mise "$TOOLBOX_IMAGE" "$@"
+  }
+  krops_mise -E aws run aws-credentials     # clusterawsadm bootstrap credentials encode-as-profile
+  # paste the printed profile into
+  #   mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml
+  #   as AWS_B64ENCODED_CREDENTIALS
+  krops_mise run sops-encrypt mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml
   ```
+
+  (The CloudFormation stack from Prerequisites must already exist.)
 
 - **ACK controllers (management cluster).** Same static SOPS credential
   pattern (`mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml`).
@@ -98,19 +108,31 @@ cluster.
 ## Bootstrap, pivot, teardown
 
 ```sh
-mise run bootstrap                 # aws: kind + Flux + CAPA; then pivot into eu-north-1-management
-mise run mgmt-kubeconfig           # ~/.kube/krops-mgmt.yaml
-mise -E aws run kubeconfigs        # workload kubeconfigs (aws eks update-kubeconfig per region)
+scripts/toolbox-run.sh bootstrap aws   # kind + Flux + CAPA; then pivot into eu-north-1-management
+export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"   # written by the pivot, context krops-mgmt
+docker run --rm -it \
+  -v "$PWD:/workspace" -w /workspace \
+  -v "$PWD/.kube:/root/.kube" \
+  -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml -e KUBECONFIG_FILE=/root/.kube/krops-workloads.yaml \
+  -e MISE_AUTO_INSTALL=0 \
+  --entrypoint mise "$TOOLBOX_IMAGE" -E aws run kubeconfigs   # aws eks update-kubeconfig per region
+export KUBECONFIG="$PWD/.kube/krops-workloads.yaml"
 ```
+
+The workload kubeconfig lands in the checkout's `.kube/` through the
+`/root/.kube` mount (`KUBECONFIG_FILE` overrides the task's `~/.kube`
+default so the file persists on the host). Re-export the management
+kubeconfig with `-E aws run mgmt-kubeconfig` in the same run shape only if
+`.kube/krops-mgmt.yaml` was deleted; the pivot already wrote it.
 
 Bootstrap ends with the pivot: the CAPI inventory moves from the disposable
 `mgmt` kind cluster into the self-managed `eu-north-1-management` EKS cluster
 and the kind cluster is deleted (see [Pivot recovery](./operations.md#pivot-recovery)).
 
-Teardown is automated for `aws`. `mise run teardown` suspends Flux, deletes
-every workload CAPI Cluster, runs a best-effort AWS sweep for both workload
-regions and the self-managed management cluster (nodegroups, EKS control
-planes, orphaned RDS, CAPA-tagged VPC resources,
+Teardown is automated for `aws`. `scripts/toolbox-run.sh teardown aws`
+suspends Flux, deletes every workload CAPI Cluster, runs a best-effort AWS
+sweep for both workload regions and the self-managed management cluster
+(nodegroups, EKS control planes, orphaned RDS, CAPA-tagged VPC resources,
 versioned S3 buckets, CAPA and ACK IAM roles, the `krops-reader` user, and the
 `clusterawsadm` CloudFormation stack), and removes the kind bootstrap cluster.
 See [Teardown](./operations.md#teardown) for the controls.

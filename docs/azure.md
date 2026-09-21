@@ -20,15 +20,24 @@ Operator (ASO) that reconciles Azure resources from `workload/azure-base/`.
 
 - An Azure subscription where you hold Owner (needed once, for
   `azure-bootstrap`).
-- `mise -E azure install` (adds `az`), a GitHub PAT and an age key as for
-  `aws` (`.env`, see [operations.md](./operations.md)).
+- A GitHub PAT and an age key as for `aws` (`.env`, see
+  [operations.md](./operations.md)). No host toolchain: `az` is in the
+  toolbox image.
 - Resource providers (including the Arc ones), the shared resource group and
   the `krops-capz` / `krops-aso` user-assigned identities with their role
-  grants are created by:
+  grants are created by `azure-bootstrap`. Log in first with the device-code
+  flow; the session persists in a host directory mounted as `/root/.azure`
+  (keep it outside the checkout or gitignore it):
 
   ```sh
   export AZURE_SUBSCRIPTION_ID=<id>
-  mise -E azure run azure-bootstrap
+  mkdir -p "$HOME/.krops-azure"
+  docker run --rm -it -v "$HOME/.krops-azure:/root/.azure" \
+    --entrypoint az "$TOOLBOX_IMAGE" login --use-device-code
+  docker run --rm -it -v "$PWD:/workspace" -w /workspace \
+    -v "$HOME/.krops-azure:/root/.azure" \
+    -e AZURE_SUBSCRIPTION_ID -e MISE_AUTO_INSTALL=0 \
+    --entrypoint mise "$TOOLBOX_IMAGE" -E azure run azure-bootstrap
   ```
 
   It prints the values to commit; nothing it prints is secret (there is no
@@ -64,10 +73,24 @@ federated credential in `mgmt/azure/infrastructure/aso-workload-identity/`
 ## Bootstrap, pivot, teardown
 
 ```sh
-mise -E azure run bootstrap        # kind + Flux + CAPZ; then pivot into swedencentral-management
-mise -E azure run mgmt-kubeconfig  # ~/.kube/krops-mgmt.yaml
-mise -E azure run kubeconfigs      # workload kubeconfigs via clusterctl
+scripts/toolbox-run.sh bootstrap azure   # kind + Flux + CAPZ; then pivot into swedencentral-management
+export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"   # written by the pivot, context krops-mgmt
+docker run --rm -it \
+  -v "$PWD:/workspace" -w /workspace \
+  -v "$PWD/.kube:/root/.kube" \
+  -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml -e KUBECONFIG_FILE=/root/.kube/krops-workloads.yaml \
+  -e MISE_AUTO_INSTALL=0 \
+  --entrypoint mise "$TOOLBOX_IMAGE" -E azure run kubeconfigs   # via clusterctl; writes .kube/krops-workloads.yaml.<cluster>
 ```
+
+`arc-federate` runs inside the toolbox as the `post-kind-create-task` and
+needs the `az` session: pass `AZURE_CONFIG_DIR=/root/.azure` in `.env` and
+mount the same host directory into the lifecycle run (`scripts/toolbox-run.sh`
+forwards `AZURE_CONFIG_DIR`; add `-v "$HOME/.krops-azure:/root/.azure"` to a
+raw lifecycle run). To debug it by hand, use the cluster run shape from
+[Helper tasks in the toolbox](./operations.md#helper-tasks-in-the-toolbox)
+with `--network kind -e KUBECONFIG=/workspace/.kube/kind.yaml
+-v "$HOME/.krops-azure:/root/.azure"` and `-E azure run arc-federate`.
 
 Right after the kind cluster is created, bootstrap-rs runs the `arc-federate`
 mise task (`post-kind-create-task` in `bootstrap.toml`): it Arc-connects the
@@ -80,7 +103,8 @@ During the pivot the CLI applies the plain, secret-free
 (`pivot-manifests` in `bootstrap.toml`): the moved ASO resources reference
 the Secret by name and clusterctl does not carry it.
 
-Teardown is manual for now: `mise -E azure run teardown` refuses and prints
+Teardown is manual for now: `scripts/toolbox-run.sh teardown azure` refuses
+and prints
 the steps (`teardown.manual` in `bootstrap.toml`), including deleting the Arc
 resource (`az connectedk8s delete`). Automating the Azure orphan sweep is
 tracked in the follow-up issue linked from #71.

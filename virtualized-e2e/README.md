@@ -33,7 +33,9 @@ virtualized-e2e/
         └── README.md           mechanism documentation
 ```
 
-`aws/` is the reference arm. Azure and GCP arms are follow-up tasks.
+`aws/` is the reference arm. `gcp/` is the second arm (CoreDNS rewrite +
+SAN-matched TLS, with the WIF credential repoint for the auth path). The
+Azure arm is a follow-up task.
 
 ## What is NOT here yet
 

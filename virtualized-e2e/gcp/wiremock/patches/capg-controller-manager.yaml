@@ -1,0 +1,41 @@
+# Strategic merge patch: CAPG CA trust for the WireMock rewrite (#355).
+#
+# Target: deployment/capg-controller-manager, namespace capg-system
+# (rendered by the CAPI operator from the InfrastructureProvider in
+# mgmt/gcp/capi-providers/capg-system/, outside this tree). Apply with:
+#   kubectl patch deployment capg-controller-manager -n capg-system \
+#     --type strategic --patch-file virtualized-e2e/gcp/wiremock/patches/capg-controller-manager.yaml
+#
+# Mechanism (Phase 0 spike, docs/wiremock-e2e-spike-findings-gcp.md):
+# unlike the AWS arm there is NO endpoint env here. CAPG v1.13.1 has no
+# usable endpoint-override surface (spec.serviceEndpoints covers the REST
+# compute client only, the gRPC GKE client cannot dial an https://
+# override, and no auth endpoint is covered), and NO proxy env is set
+# (grpc-go never completes a CONNECT tunnel through WireMock's browser
+# proxying). Interception is the CoreDNS rewrite (coredns-rewrites.yaml)
+# plus TLS trust: SSL_CERT_FILE points Go's crypto/x509 at the mounted
+# throwaway CA, so the manager accepts both the SAN-matched server
+# certificate on the rewritten hostnames and the Service certificate the
+# repointed credential dials. The wiremock-ca ConfigMap must exist in this
+# namespace (volumes cannot cross namespaces).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: capg-controller-manager
+  namespace: capg-system
+spec:
+  template:
+    spec:
+      volumes:
+        - name: wiremock-ca
+          configMap:
+            name: wiremock-ca
+      containers:
+        - name: manager
+          env:
+            - name: SSL_CERT_FILE
+              value: /certs/ca.crt
+          volumeMounts:
+            - name: wiremock-ca
+              mountPath: /certs
+              readOnly: true

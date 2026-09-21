@@ -30,7 +30,7 @@ concurrency:
 jobs:
   gate:
     name: Tag matches Cargo.toml version
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 5
     steps:
       - name: Checkout
@@ -76,13 +76,13 @@ jobs:
           password: ${{ github.token }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4.3.0
+        uses: docker/setup-buildx-action@v4.4.1
 
       # Single-arch build, pushed under an internal <version>-linux-<arch> tag
       # that the merge job consumes. OCI labels carry the version and source
       # provenance (metadata-action was dropped; see merge/sign jobs).
       - name: Build and push single-arch
-        uses: docker/build-push-action@v7.3.0
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: bootstrap-rs/Dockerfile
@@ -108,7 +108,7 @@ jobs:
   merge:
     name: Merge multi-arch manifest
     needs: build
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 15
     permissions:
       contents: read
@@ -122,7 +122,7 @@ jobs:
           password: ${{ github.token }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4.3.0
+        uses: docker/setup-buildx-action@v4.4.1
 
       # Stable tags are derived in plain bash rather than via
       # docker/metadata-action: on the v0.2.1 run its `tags` output collapsed
@@ -157,7 +157,7 @@ jobs:
   sign-attest:
     name: Sign, attest
     needs: merge
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 20
     permissions:
       contents: read
@@ -172,7 +172,7 @@ jobs:
           password: ${{ github.token }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4.3.0
+        uses: docker/setup-buildx-action@v4.4.1
 
       - name: Install cosign
         uses: sigstore/cosign-installer@v4.1.2

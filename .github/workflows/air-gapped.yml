@@ -19,7 +19,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 15
     services:
       registry:
@@ -38,7 +38,7 @@ jobs:
       - name: Install mise
         uses: jdx/mise-action@v4.3.0
         with:
-          version: 2026.9.7
+          version: 2026.9.12
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
@@ -65,7 +65,7 @@ jobs:
   isolated-deploy:
     name: Deploy without external egress
     needs: build
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -74,7 +74,7 @@ jobs:
       - name: Install mise
         uses: jdx/mise-action@v4.3.0
         with:
-          version: 2026.9.7
+          version: 2026.9.12
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
@@ -181,44 +181,61 @@ jobs:
           if-no-files-found: warn
           retention-days: 1
 
-  notify-on-failure:
-    name: File/update failure issue
+  report-status:
+    name: File or close failure issue
     needs: [build, isolated-deploy]
-    if: failure() && github.event_name == 'schedule'
+    if: always() && github.event_name == 'schedule'
     runs-on: ubuntu-latest
     permissions:
       issues: write
     steps:
-      - name: Open or update the air-gapped failure issue
+      - name: Open, update or close the air-gapped failure issue
         uses: actions/github-script@v9.0.0
+        env:
+          NEEDS: ${{ toJSON(needs) }}
         with:
           script: |
             const title = "air-gapped: scheduled workflow is failing";
             const labels = ["bug", "area:airgap", "area:ci", "priority:high"];
-            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const body = `Scheduled run failed: ${runUrl}\n\nTriggered ${context.eventName} at ${new Date().toISOString()}.`;
+            const { owner, repo } = context.repo;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
 
-            const { data: issues } = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+            const results = Object.values(JSON.parse(process.env.NEEDS)).map((n) => n.result);
+            const failed = results.includes("failure");
+            if (!failed && !results.every((r) => r === "success")) {
+              return; // cancelled or skipped: neither a failure nor a recovery
+            }
+
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
               state: "open",
-              labels: labels.join(","),
+              per_page: 100,
             });
-            const existing = issues.find((issue) => issue.title === title);
+            const matching = issues.filter((i) => !i.pull_request && i.title === title);
 
-            if (existing) {
+            if (failed) {
+              const body = `Scheduled run failed: ${runUrl}\n\nTriggered ${context.eventName} at ${new Date().toISOString()}.`;
+              if (matching.length > 0) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: matching[0].number, body });
+              } else {
+                await github.rest.issues.create({ owner, repo, title, body, labels });
+              }
+              return;
+            }
+
+            for (const issue of matching) {
               await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: existing.number,
-                body,
+                owner,
+                repo,
+                issue_number: issue.number,
+                body: `Scheduled run recovered: ${runUrl}\n\nClosing automatically.`,
               });
-            } else {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title,
-                body,
-                labels,
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: issue.number,
+                state: "closed",
+                state_reason: "completed",
               });
             }

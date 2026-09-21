@@ -1,0 +1,41 @@
+# Strategic merge patch: CAPZ controller CA trust (issue #355).
+#
+# Target: deployment/capz-controller-manager, namespace capz-system
+# (installed by clusterctl init, outside this tree), container `manager`.
+# Apply with:
+#   kubectl patch deployment capz-controller-manager -n capz-system \
+#     --type strategic --patch-file virtualized-e2e/azure/wiremock/patches/capz-controller-manager.yaml
+#
+# Mechanism (Phase 0 spike, docs/wiremock-e2e-spike-findings-azure.md):
+# CAPZ v1.27.0 has NO endpoint-override surface (named clouds only in the
+# CR, endpoint env vars ignored, no deploy-time knobs), so its traffic is
+# intercepted by the CoreDNS rewrite in coredns.yaml, not by configuration.
+# This patch only installs trust: SSL_CERT_FILE points Go's crypto/x509 at
+# the mounted throwaway CA. The wiremock-ca ConfigMap must exist in this
+# namespace (volumes cannot cross namespaces).
+#
+# Ordering matters: a manager that established TLS connections to the real
+# endpoints BEFORE the rewrite keeps reusing them (Go transport
+# keep-alive). Apply the CoreDNS rewrite first, then roll this Deployment
+# (this patch's rollout suffices if the manager was already running).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: capz-controller-manager
+  namespace: capz-system
+spec:
+  template:
+    spec:
+      volumes:
+        - name: wiremock-ca
+          configMap:
+            name: wiremock-ca
+      containers:
+        - name: manager
+          env:
+            - name: SSL_CERT_FILE
+              value: /certs/ca.crt
+          volumeMounts:
+            - name: wiremock-ca
+              mountPath: /certs
+              readOnly: true

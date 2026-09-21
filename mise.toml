@@ -1,4 +1,4 @@
-min_version = "2026.9.7"
+min_version = "2026.9.12"
 
 [tools]
 go = "1.27.1"
@@ -10,12 +10,12 @@ clusterctl = "1.14.2"
 flux2 = "2.9.4"
 sops = "3.13.3"
 age = "1.3.2"
-uv = "0.12.13"
+uv = "0.12.17"
 
 # Zarf CLI (airgap prototype). See docs/dependencies.md's "Intentional
 # differences" for why version/asset_pattern are written this way.
 [tools."github:zarf-dev/zarf"]
-version = "0.85.0"
+version = "0.86.0"
 asset_pattern = 'zarf_v{{ version }}_{{ os(linux="Linux", macos="Darwin") }}_{{ arch(x64="amd64") }}'
 bin = "zarf"
 
@@ -51,6 +51,21 @@ fi
 echo "==> toolbox-run.sh .env precedence"
 if ! python3 tests/test-toolbox-run-env-precedence.py; then
   echo "    FAILED: toolbox-run.sh .env precedence" >&2
+  fail=1
+fi
+echo "==> sops-keygen prints the public key"
+if ! python3 tests/test-sops-keygen-prints-public-key.py; then
+  echo "    FAILED: sops-keygen public key" >&2
+  fail=1
+fi
+echo "==> local-host kubeconfig endpoint is host-only (toolbox keeps the kind-network endpoint)"
+if ! python3 tests/test-local-host-kubeconfig-toolbox-endpoint.py; then
+  echo "    FAILED: local-host kubeconfig toolbox endpoint" >&2
+  fail=1
+fi
+echo "==> docs show toolbox helper runs, not host mise (#423)"
+if ! python3 tests/test-docs-toolbox-helpers.py; then
+  echo "    FAILED: docs toolbox helpers" >&2
   fail=1
 fi
 echo "==> air-gap digest token boundary"
@@ -128,6 +143,16 @@ if ! python3 tests/test-kcc-operator-pin.py; then
   echo "    FAILED: kcc operator pin" >&2
   fail=1
 fi
+echo "==> ACK CR placement guard (#411)"
+if ! python3 tests/test-ack-cr-placement.py; then
+  echo "    FAILED: ACK CR placement" >&2
+  fail=1
+fi
+echo "==> ACK CR scope vs docs/aws-iam.md (#411)"
+if ! python3 tests/test-aws-iam-doc-scope.py; then
+  echo "    FAILED: ACK CR scope vs docs/aws-iam.md" >&2
+  fail=1
+fi
 echo "==> Python lint (ruff: unused imports, subprocess.run check=)"
 if ! uv run ruff check .; then
   echo "    FAILED: Python lint" >&2
@@ -152,7 +177,7 @@ if [ -f age.agekey ]; then
 fi
 age-keygen -o age.agekey
 echo
-PUBLIC_KEY=$(age-keygen -p age.agekey 2>/dev/null | head -1)
+PUBLIC_KEY=$(age-keygen -y age.agekey)
 echo "Public key: $PUBLIC_KEY"
 echo "Add this public key to the 'age:' field in .sops.yaml, then run: mise run sops-updatekeys"
 """
@@ -183,13 +208,24 @@ description = "Pivot the management cluster from local kind to the CAPI-managed 
 run = "scripts/toolbox-run.sh pivot"
 
 [tasks.mgmt-kubeconfig]
-description = "Export the management-cluster kubeconfig to ~/.kube/krops-mgmt.yaml"
+description = "Export the management-cluster kubeconfig to ~/.kube/krops-mgmt.yaml (toolbox: /root/.kube, persisted as .kube/krops-mgmt.yaml)"
 run = '''
-MGMT_CLUSTER="${MGMT_CLUSTER:-$(case "${KROPS_PROFILE:-aws}" in local-host) echo local-management;; local-talos) echo local-talos-management;; azure) echo swedencentral-management;; gcp) echo europe-north1-management;; *) echo eu-north-1-management;; esac)}"
+if [ -z "${MGMT_CLUSTER:-}" ]; then
+  case "${KROPS_PROFILE:-aws}" in
+    local-host) MGMT_CLUSTER=local-management;;
+    local-talos) MGMT_CLUSTER=local-talos-management;;
+    azure) MGMT_CLUSTER=swedencentral-management;;
+    gcp) MGMT_CLUSTER=europe-north1-management;;
+    *) MGMT_CLUSTER=eu-north-1-management;;
+  esac
+fi
 MGMT_KUBECONFIG="${MGMT_KUBECONFIG:-$HOME/.kube/krops-mgmt.yaml}"
 clusterctl get kubeconfig "$MGMT_CLUSTER" -n default > "$MGMT_KUBECONFIG"
 chmod 600 "$MGMT_KUBECONFIG"
-if [ "${KROPS_PROFILE:-aws}" = local-host ]; then
+# Host-only rewrite: inside the toolbox (KROPS_TOOLBOX=1, on the kind
+# network) the recorded endpoint already resolves and 127.0.0.1 would be
+# the container itself. Same rule as the CLI's should_rewrite_capd_endpoint.
+if [ "${KROPS_PROFILE:-aws}" = local-host ] && [ "${KROPS_TOOLBOX:-0}" != 1 ]; then
   # CAPD records the load balancer's container-network IP, which is not
   # routable from macOS. Point at the port published on localhost instead.
   engine="${CONTAINER_ENGINE:-docker}"

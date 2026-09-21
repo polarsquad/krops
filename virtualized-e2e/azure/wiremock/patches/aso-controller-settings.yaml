@@ -1,0 +1,48 @@
+# JSON merge patch: ASO endpoint configuration (issue #355).
+#
+# Target: secret/aso-controller-settings, namespace capz-system (created by
+# clusterctl init, outside this tree). Apply with:
+#   kubectl patch secret aso-controller-settings -n capz-system \
+#     --type merge --patch-file virtualized-e2e/azure/wiremock/patches/aso-controller-settings.yaml
+#
+# Mechanism (Phase 0 spike, docs/wiremock-e2e-spike-findings-azure.md): the
+# ASO v2.19.0 bundled by CAPZ v1.27.0 reads AZURE_AUTHORITY_HOST,
+# AZURE_RESOURCE_MANAGER_ENDPOINT, and AZURE_RESOURCE_MANAGER_AUDIENCE from
+# this Secret (optional secretKeyRef env entries on the
+# azureserviceoperator-controller-manager Deployment); all three point at
+# WireMock here. The token scope, ARM URL, and token path all derive from
+# them (spike evidence: scope https://wiremock.wiremock-system.svc/.default).
+#
+# The harness substitutes dummy service-principal credentials for the
+# workload-identity FIC chain the real environment uses
+# (USE_WORKLOAD_IDENTITY_AUTH=false); the SP path exercises the same
+# azidentity/azcore client construction for endpoint purposes. All values
+# are placeholders; nothing here authenticates against real Azure.
+#
+# Merge semantics touch only the listed keys: AZURE_SYNC_PERIOD and
+# AZURE_USER_AGENT_SUFFIX from the clusterctl-born Secret survive.
+#
+# Per-cluster credentials need no work: CAPZ's ASOSecret controller creates
+# per-cluster Secrets without endpoint keys, so those reconciles inherit the
+# global settings (ALLOW_MULTI_ENV_MANAGEMENT defaults to false). The whole
+# AzureASOManaged* AKS path is covered by this one patch.
+#
+# Even with this configuration in place, MSAL instance discovery anchors at
+# the real login.microsoftonline.com, so the CoreDNS rewrite
+# (patches/coredns.yaml) and the auth stubs (stubs-configmap.yaml) are
+# required as well. Patch this Secret BEFORE rolling the ASO Deployment:
+# secretKeyRef env is read at pod start.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: aso-controller-settings
+  namespace: capz-system
+stringData:
+  AZURE_SUBSCRIPTION_ID: "00000000-0000-0000-0000-000000000000"
+  AZURE_TENANT_ID: "11111111-1111-1111-1111-111111111111"
+  AZURE_CLIENT_ID: "22222222-2222-2222-2222-222222222222"
+  AZURE_CLIENT_SECRET: "krops-virtualized-e2e-dummy"
+  USE_WORKLOAD_IDENTITY_AUTH: "false"
+  AZURE_AUTHORITY_HOST: "https://wiremock.wiremock-system.svc"
+  AZURE_RESOURCE_MANAGER_ENDPOINT: "https://wiremock.wiremock-system.svc"
+  AZURE_RESOURCE_MANAGER_AUDIENCE: "https://wiremock.wiremock-system.svc"

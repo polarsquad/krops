@@ -77,12 +77,23 @@ CONTAINER_ENGINE=podman TOOLBOX_IMAGE="$TOOLBOX_IMAGE" \
   scripts/toolbox-run.sh bootstrap local-host
 ```
 
-The same wrapper powers `mise run bootstrap`, `mise run pivot`, and
-`mise run teardown`. It loads every `.env` assignment with outer quote
+The wrapper is the lifecycle entry point for every environment:
+
+```sh
+TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh bootstrap aws
+```
+
+`KROPS_PROFILE` (or the positional profile argument after the lifecycle
+verb, which reaches `krops-bootstrap`) selects the environment. It loads
+every `.env` assignment with outer quote
 stripping before detecting the engine or resolving a socket for it, so a
 `.env`-selected `CONTAINER_ENGINE` takes effect from the start (issue #257).
 An already-exported variable is left alone, so process environment wins over
-`.env`, matching mise's own `env_file` precedence. It then passes only this
+`.env` for the wrapper. Note the opposite rule for the helper tasks: mise's
+`env_file` loads `/workspace/.env` inside the container and its values
+override the process environment, so a `-e NAME=value` on a helper run
+loses to the same key in `.env` (see [Helper tasks in the
+toolbox](#helper-tasks-in-the-toolbox)). It then passes only this
 allowlist into the container:
 
 - Engine and lifecycle: `CONTAINER_ENGINE`, `ENGINE_SOCK`, `KROPS_PROFILE`,
@@ -98,16 +109,16 @@ allowlist into the container:
 CLOUDSDK_CONFIG=/workspace/.gcloud` appended after it. The container engine
 takes the last value for a repeated `-e` key, so the explicit one wins by
 design: the toolbox always uses the repo-local `.gcloud/` directory (inside
-the `/workspace` mount), shared with the host `mise -E gcp` session, never an
-operator override. Keep the two in sync if the mount path ever changes.
+the `/workspace` mount), shared with the host gcp session
+([gcp.md](./gcp.md)), never an operator override. Keep the two in sync if
+the mount path ever changes.
 
 It does not pass `BOOTSTRAP_CONFIG`, `REGISTRY_READY_RETRIES`,
 `LOCAL_RECONCILE_TIMEOUT`, `MGMT_KUBECONFIG`, `MGMT_READY_TIMEOUT`,
 `MGMT_POLL_INTERVAL`, `BOOTSTRAP_KUBECONTEXT`, or the teardown controls
 `AWS_ONLY`, `FORCE_KIND_DELETE`, `CLUSTER_DELETE_TIMEOUT`, and
-`PROVIDER_DELETE_TIMEOUT`. Use a raw container run with explicit `-e` entries,
-or the native CLI, when overriding those values. Direct use of the wrapper does
-not require host mise.
+`PROVIDER_DELETE_TIMEOUT`. Use a raw container run with explicit `-e` entries
+when overriding those values.
 
 Inside the toolbox:
 
@@ -126,6 +137,74 @@ Inside the toolbox:
   kubeconfig after creation.
 - `/root/.kube` maps to the checkout's `.kube/`, so the exported management
   kubeconfig persists on the host as `.kube/krops-mgmt.yaml`.
+
+### Helper tasks in the toolbox
+
+The one-off and helper steps (cloud preparation, SOPS key work, kubeconfig
+exports, `oci-push`) are mise tasks defined in `mise.toml` and the
+`mise.<env>.toml` layers. They run in the same toolbox image as the
+lifecycle, by pointing the container's entrypoint at `mise` and running the
+task from the mounted checkout. There is no wrapper verb for them; each
+environment page shows its commands and they all follow one of two shapes.
+
+Repo-only tasks (`sops-*`, `aws-credentials`) run as your own user so the
+files they write are owned by you:
+
+```sh
+export TOOLBOX_IMAGE=ghcr.io/polarsquad/krops-toolbox:latest   # or krops-toolbox:dev
+docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/tmp \
+  -v "$PWD:/workspace" -w /workspace \
+  -e MISE_AUTO_INSTALL=0 \
+  --entrypoint mise "$TOOLBOX_IMAGE" run <task> [args]
+```
+
+Cluster tasks (`mgmt-kubeconfig`, `kubeconfigs`, `oci-push`, the cloud
+`*-bootstrap` and `*-federate` tasks) run as root, with the persisted
+kubeconfig directory and the engine socket mounted like the lifecycle run:
+
+```sh
+docker run --rm -it \
+  -v "$PWD:/workspace" -w /workspace \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "$PWD/.kube:/root/.kube" \
+  -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml \
+  -e MISE_AUTO_INSTALL=0 \
+  --entrypoint mise "$TOOLBOX_IMAGE" -E <env> run <task>
+```
+
+Rules that apply to every helper run:
+
+- `--entrypoint mise` bypasses `toolbox-entrypoint.sh`, so `KROPS_TOOLBOX`
+  is not set. The local-host kubeconfig tasks need it (`-e KROPS_TOOLBOX=1`)
+  together with `--network kind`: they then keep the CAPD-recorded
+  kind-network endpoint instead of rewriting it to `127.0.0.1`, which inside
+  a container is the container itself. A kubeconfig exported that way works
+  from later toolbox runs on the kind network, not from host `kubectl`.
+- `MISE_AUTO_INSTALL=0` is required. The mounted `mise.toml` pins dev-only
+  tools (`zarf`, `go`) that the image does not carry; without the flag mise
+  tries to install them, and as a non-root user that fails with `Permission
+  denied` under `/usr/local/share/mise`.
+- mise loads `/workspace/.env` (`env_file` in `mise.toml`) and its values
+  override the process environment. Cloud credentials for `aws-bootstrap`,
+  `aws-credentials`, `azure-bootstrap`, and `gcp-bootstrap` come from `.env`
+  first; to run with other credentials, pass `-e MISE_ENV_FILE=/dev/null`
+  and the variables by name (`-e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY
+  -e AWS_SESSION_TOKEN -e AWS_REGION`). A bare `-e NAME` forwards the host
+  value without placing it in argv.
+- Interactive logins (`az login --use-device-code`, `gcloud auth login
+  --no-launch-browser`) need `-it`. The gcloud session persists in the
+  checkout's gitignored `.gcloud/` (`-e CLOUDSDK_CONFIG=/workspace/.gcloud`);
+  the Azure session persists through `-v "$PWD/.azure:/root/.azure"` (add
+  `.azure/` to your global gitignore or keep it outside the checkout with
+  another host path).
+- Podman: replace `docker` with `podman` and the socket source with the one
+  `scripts/toolbox-run.sh` resolves (`podman info --format
+  '{{.Host.RemoteSocket.Path}}'`).
+
+Host-side on purpose: `mise run validate` (repository development, see
+[Validation](#validation)) and `mise -E local-host run podinfo-port-forward`
+(the browser is on the host; a toolbox form is shown with the local-host
+chain below).
 
 ### Verifying a toolbox release
 
@@ -148,63 +227,36 @@ cosign verify-attestation \
   "$IMAGE"
 ```
 
-### Native host path
+### AWS service quotas (common first-run blockers)
 
-Tool versions are pinned in `mise.toml`, which requires mise 2026.8.10 or
-newer. With [mise](https://mise.jdx.dev/) installed:
+| Quota | Code | Needed | Why |
+|---|---|---|---|
+| EC2-VPC Elastic IPs (per region) | `L-0263D0A3` | ≥ 6 free in `eu-north-1`, ≥ 3 free in `eu-west-1` | One EIP per NAT gateway (3 AZs): two clusters in `eu-north-1` (management + workload), one in `eu-west-1` |
+| VPCs per region | `L-F678F1CE` | 8 in `eu-north-1` (raised from the default 5) | One VPC per cluster plus pre-existing non-krops VPCs. e2e account 120392301094: `eu-north-1` quota raised to 8 (5 in use, headroom 3), `eu-west-1` at 3/5 (headroom 2) |
 
-```sh
-mise install
-```
+The check is per region, and the default regional limit is 5, so a clean
+account stalls mid-run on the second `eu-north-1` cluster. Request the
+increase before the first run with
+`aws service-quotas request-service-quota-increase --service-code ec2 --quota-code <code> --desired-value <n> --region <region>`
+(for VPCs use `--service-code vpc`).
 
-This provides `kubectl`, `kind`, `helm`, `flux`, `clusterctl`, `go`, `sops`,
-`age`, and the `zarf` CLI. The `aws` environment layers on `aws-cli` and
-`clusterawsadm` (`mise -E aws install`); the `local-host` environment needs
-no extra tools; the `local-talos` environment layers on `talosctl`
-(`mise -E local-talos install`). Building the bootstrap CLI additionally
-requires a Rust
-toolchain ([rustup](https://rustup.rs/); the pin lives in
-`bootstrap-rs/rust-toolchain.toml`). The lifecycle mise tasks still use the
-toolbox. For a fully native run from the repository root, invoke
-`./bootstrap-rs/target/debug/krops-bootstrap` or call `./bootstrap.sh`,
-`./pivot.sh`, and `./teardown.sh` directly.
+### E2E account budget
 
-You also need:
+The e2e AWS account 120392301094 carries a monthly cost budget
+`krops-e2e-monthly` with a $200 ceiling. Notifications publish to the SNS
+topic `krops-e2e-budget-alerts` (us-east-1) at 80% forecasted and 100%
+actual spend, and the topic's email subscription delivers them to
+joseph.shriner@polarsquad.com, the escalation path for budget alerts. The
+email subscription only activates after the SNS confirmation email is
+accepted.
 
-- A running container engine for kind: Docker, or Podman 5.5+ (auto-detected
-  at bootstrap; set `CONTAINER_ENGINE=docker|podman` to override).
-  For local-host environment: the same engine is used to host the local
-  container registry for OCI artifacts.
+### local-talos prerequisites
 
-**AWS environment only:**
-- A GitHub personal access token (PAT) with read access to this repository
-  (fine-grained with read-only Contents permission, or classic with `repo`
-  scope). The Flux Operator chart is pulled anonymously.
-- AWS credentials with permission to create EKS clusters, VPCs, and IAM roles.
-  The same principal runs every ACK controller on the management cluster
-  (issue #346), so it additionally needs the union of the three former
-  per-controller pod-identity role policies: S3 bucket management scoped to
-  `krops-*`, RDS instance management scoped to `krops-*` (plus
-  `secretsmanager:CreateSecret`/`TagResource`/`RotateSecret` on `rds!*` for
-  managed master passwords and `kms:CreateGrant`/`ListGrants`/`RevokeGrant`
-  with `kms:GrantIsForAWSResource`), and IAM role management scoped to
-  `krops-*` (`iam:CreateRole`/`PutRolePolicy`/`GetRole`/`TagRole`) plus
-  `iam:CreateUser`/`PutUserPolicy`/`GetUser`/`GetUserPolicy`/`TagUser`
-  (for the `krops-reader` console user). This is a deliberate
-  least-privilege trade-off: one static principal now holds the union —
-  see [aws-iam.md](./aws-iam.md) for the exact action lists.
-- The `clusterawsadm` IAM CloudFormation stack provisioned before bootstrap and
-  removed by a full AWS teardown:
+In addition to the PAT and age key shared with the AWS environment
+(local-talos syncs its configuration from GitHub, so bootstrap seeds the same
+`flux-github-pat` and `sops-age` secrets), the `local-talos` environment
+needs:
 
-  ```sh
-  clusterawsadm bootstrap iam create-cloudformation-stack --region eu-north-1
-  ```
-
-**local-talos environment only:**
-- The GitHub PAT and age key, as for the AWS environment: local-talos syncs
-  its configuration from GitHub (a physical machine cannot reach the
-  laptop-hosted OCI registry), so bootstrap seeds the same `flux-github-pat`
-  and `sops-age` secrets.
 - A reachable [Tinkerbell](https://tinkerbell.org/) stack on the machine's
   network, and a `Hardware` resource describing the target machine. The
   stack is operator-owned infrastructure this repository does not deploy.
@@ -249,33 +301,11 @@ You also need:
   `spec.controlPlaneEndpoint.host` (the machine's stable IP) and the
   `TinkerbellMachineTemplate` `hardwareName` (the Hardware CR name).
 
-### AWS service quotas (common first-run blockers)
-
-| Quota | Code | Needed | Why |
-|---|---|---|---|
-| EC2-VPC Elastic IPs (per region) | `L-0263D0A3` | ≥ 6 free in `eu-north-1`, ≥ 3 free in `eu-west-1` | One EIP per NAT gateway (3 AZs): two clusters in `eu-north-1` (management + workload), one in `eu-west-1` |
-| VPCs per region | `L-F678F1CE` | 8 in `eu-north-1` (raised from the default 5) | One VPC per cluster plus pre-existing non-krops VPCs. e2e account 120392301094: `eu-north-1` quota raised to 8 (5 in use, headroom 3), `eu-west-1` at 3/5 (headroom 2) |
-
-The check is per region, and the default regional limit is 5, so a clean
-account stalls mid-run on the second `eu-north-1` cluster. Request the
-increase before the first run with
-`aws service-quotas request-service-quota-increase --service-code ec2 --quota-code <code> --desired-value <n> --region <region>`
-(for VPCs use `--service-code vpc`).
-
-### E2E account budget
-
-The e2e AWS account 120392301094 carries a monthly cost budget
-`krops-e2e-monthly` with a $200 ceiling. Notifications publish to the SNS
-topic `krops-e2e-budget-alerts` (us-east-1) at 80% forecasted and 100%
-actual spend, and the topic's email subscription delivers them to
-joseph.shriner@polarsquad.com, the escalation path for budget alerts. The
-email subscription only activates after the SNS confirmation email is
-accepted.
-
 ## Configuration
 
-Copy the env template and fill it in. `mise` loads `.env` automatically and it
-is gitignored:
+Copy the env template and fill it in. Both the lifecycle wrapper
+(`scripts/toolbox-run.sh`) and the helper mise tasks (through mise's `env_file`, inside the toolbox) load `.env`
+automatically, and it is gitignored:
 
 ```sh
 cp .env.example .env
@@ -296,16 +326,19 @@ Runtime environment variables take precedence over configurable defaults, and
 
 ## Bootstrap
 
+Every environment boots through the same lifecycle wrapper; the profile
+selects the environment (the default is `aws` from `bootstrap.toml`):
+
 ```sh
-mise run bootstrap                 # AWS environment (toolbox container via scripts/toolbox-run.sh)
-mise -E local-host run bootstrap   # local-host environment
-mise -E local-talos run bootstrap  # local-talos environment
-mise -E azure run bootstrap        # azure environment (after azure-bootstrap)
-mise -E gcp run bootstrap          # gcp environment (after gcp-bootstrap)
+TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh bootstrap            # aws
+TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh bootstrap local-host
+TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh bootstrap local-talos
+TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh bootstrap azure      # after azure-bootstrap
+TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh bootstrap gcp        # after gcp-bootstrap
 ```
 
 Azure: see [azure.md](./azure.md) for the subscription prep step that
-precedes `mise -E azure run bootstrap` (`azure-bootstrap` registers the
+precedes the `azure` wrapper run (`azure-bootstrap` registers the
 providers — including the Arc ones — and creates the shared resource group
 and the `krops-capz` / `krops-aso` user-assigned identities with their role
 grants; nothing it prints is secret). After the kind cluster is created,
@@ -313,7 +346,7 @@ bootstrap-rs runs the `arc-federate` mise task, which Arc-connects kind with
 an OIDC issuer for CAPZ/ASO workload identity (issue #236).
 
 GCP: see [gcp.md](./gcp.md) for the project prep step that precedes
-`mise -E gcp run bootstrap` (`gcp-bootstrap` enables the APIs and creates the
+the `gcp` wrapper run (`gcp-bootstrap` enables the APIs and creates the
 `krops-capg` / `krops-kcc` / `krops-reader` service accounts and the `krops`
 workload identity pool; nothing it prints is secret). After the kind cluster
 is created, bootstrap-rs runs the `wif-federate` mise task, which registers
@@ -321,7 +354,7 @@ the kind cluster's OIDC provider and the impersonation bindings for CAPG and
 Config Connector.
 
 > Before the first AWS bootstrap, generate an age key for SOPS. See
-> [Secret management](./secrets.md) for native and toolbox-only setup.
+> [Secret management](./secrets.md) for the host and toolbox-only setups.
 
 This initial imperative phase performs these steps:
 
@@ -367,7 +400,7 @@ Talos cluster takes over as the management cluster. The management-ready
 wait defaults to 30 minutes (`mgmt-ready-timeout` in `bootstrap.toml`) to
 cover the PXE install and first Talos boot. Scope fence: management-only.
 There is no workload cluster and no CNI addon; Talos ships flannel. Verify
-after the pivot with `mise -E local-talos run kubeconfigs` and
+after the pivot with the persisted `.kube/krops-mgmt.yaml` and
 `kubectl get nodes`: one Ready node on the committed endpoint, schedulable
 for the full management plane (`allowSchedulingOnControlPlanes`).
 
@@ -381,15 +414,20 @@ for the full management plane (`allowSchedulingOnControlPlanes`).
 **Workflow:**
 ```bash
 # Republish the local management and workload folders after making changes
-mise -E local-host run oci-push
+docker run --rm -it \
+  -v "$PWD:/workspace" -w /workspace \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "$PWD/.kube:/root/.kube" \
+  -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml \
+  -e MISE_AUTO_INSTALL=0 --network kind -e REGISTRY_HOST=krops-registry -e REGISTRY_PORT=5000 \
+  --entrypoint mise "$TOOLBOX_IMAGE" -E local-host run oci-push
 
-# Optional overrides
-OCI_REPOSITORY=my-config OCI_TAG=v1 \
-  mise -E local-host run oci-push
+# Optional overrides: add -e OCI_REPOSITORY=my-config -e OCI_TAG=v1 to the same run.
 
 # FluxInstance pulls and reconciles the artifact's mgmt/local-host kustomization.
 # The bootstrap configures kind's containerd to mirror localhost:5001 to the
-# registry's in-cluster endpoint, krops-registry:5000.
+# registry's in-cluster endpoint, krops-registry:5000, which is the endpoint
+# the toolbox run above pushes to over the kind network.
 ```
 
 The artifact contains only `mgmt/local-host/` and `workload/local-host/`,
@@ -409,26 +447,42 @@ export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
 flux get kustomizations --watch
 ```
 
-A native CLI or shell run writes the same context to
-`~/.kube/krops-mgmt.yaml` unless `MGMT_KUBECONFIG` overrides it.
-
-For the local-host environment, export and verify the CAPD workload kubeconfig
-after `docker-workload-cluster` reports Ready:
+For the local-host environment, export the CAPD workload kubeconfig after
+`docker-workload-cluster` reports Ready. The toolbox run keeps the
+kind-network endpoint, so the file is read back through the toolbox too:
 
 ```sh
-export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"  # toolbox management cluster
-mise -E local-host run kubeconfigs
-KUBECONFIG=local-workload.kubeconfig kubectl get nodes
+docker run --rm -it \
+  -v "$PWD:/workspace" -w /workspace \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "$PWD/.kube:/root/.kube" \
+  -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml \
+  -e MISE_AUTO_INSTALL=0 --network kind -e KROPS_TOOLBOX=1 \
+  --entrypoint mise "$TOOLBOX_IMAGE" -E local-host run kubeconfigs
+docker run --rm --network kind -v "$PWD:/workspace" -w /workspace \
+  --entrypoint kubectl "$TOOLBOX_IMAGE" --kubeconfig local-workload.kubeconfig get nodes
 ```
 
-The local workload Flux instance installs Podinfo from its OCI Helm chart. Open
-it in a host browser by running the port-forward task in a separate terminal:
+The local workload Flux instance installs Podinfo from its OCI Helm chart.
+Open it in a host browser by running the port-forward in a separate
+terminal. This is the one helper that stays a host task on purpose (the
+browser is on the host); it needs a host `kubectl` and a kubeconfig with the
+`127.0.0.1` endpoint, which `mise -E local-host run kubeconfigs` on the host
+produces:
 
 ```sh
 mise -E local-host run podinfo-port-forward
 ```
 
-Then browse to <http://localhost:9898>. Press Ctrl-C to stop forwarding.
+On an engine-only host, publish the port from a toolbox run on the kind
+network instead:
+
+```sh
+docker run --rm -it --network kind -p 9898:9898 \
+  -v "$PWD:/workspace" -w /workspace -e MISE_AUTO_INSTALL=0 \
+  --entrypoint kubectl "$TOOLBOX_IMAGE" --kubeconfig local-workload.kubeconfig \
+  port-forward --namespace podinfo --address 0.0.0.0 service/podinfo 9898:9898
+```
 
 The workload uses Kubernetes v1.37.0. A CAPI ClusterResourceSet installs a
 pinned Kindnet daemon as its CNI before the Flux addons are delivered.
@@ -441,8 +495,8 @@ Ready, it connects to `local-workload`, streams the workload Flux controller
 error logs, and returns after the workload root Kustomization becomes Ready.
 Filtering the workload stream to errors avoids showing normal startup retries
 and advisory messages as apparent failures. Each readiness wait defaults to 15
-minutes and can be changed with `LOCAL_RECONCILE_TIMEOUT` in a raw container or
-native run. The current wrapper does not forward that override.
+minutes and can be changed with `LOCAL_RECONCILE_TIMEOUT` in a raw container
+or fallback native run. The current wrapper does not forward that override.
 
 EKS clusters typically take 15–25 minutes to come up; node groups and the
 downstream app chain follow a few minutes after.
@@ -452,11 +506,17 @@ downstream app chain follow a few minutes after.
 For the local-host end-to-end chain:
 
 ```sh
-mise -E local-host run bootstrap
-export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
-mise -E local-host run kubeconfigs
-KUBECONFIG=local-workload.kubeconfig flux get all --all-namespaces
-mise -E local-host run podinfo-port-forward  # browse to http://localhost:9898
+TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh bootstrap local-host
+docker run --rm -it \
+  -v "$PWD:/workspace" -w /workspace \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "$PWD/.kube:/root/.kube" \
+  -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml \
+  -e MISE_AUTO_INSTALL=0 --network kind -e KROPS_TOOLBOX=1 \
+  --entrypoint mise "$TOOLBOX_IMAGE" -E local-host run kubeconfigs
+docker run --rm --network kind -v "$PWD:/workspace" -w /workspace \
+  --entrypoint flux "$TOOLBOX_IMAGE" --kubeconfig local-workload.kubeconfig get all --all-namespaces
+# then the port-forward from the section above, and browse to http://localhost:9898
 ```
 
 Bootstrap does not return until the management and workload root
@@ -474,8 +534,9 @@ kubectl get buckets.s3.services.k8s.aws -n ack-system
 kubectl get dbinstances.rds.services.k8s.aws -n ack-system
 kubectl get roles.iam.services.k8s.aws -n ack-system
 
-# Workload clusters: export kubeconfigs first
-#   mise -E aws run kubeconfigs && export KUBECONFIG=~/.kube/krops-workloads.yaml
+# Workload clusters: export kubeconfigs first (see the AWS page for the
+# toolbox run of `kubeconfigs`), then
+#   export KUBECONFIG=.kube/krops-workloads.yaml
 #   kubectl config use-context eu-north-1-workload   (or eu-west-1-workload)
 kubectl get kustomizations -n flux-system            # root only; workload/base is empty since #346
 
@@ -488,8 +549,8 @@ aws s3api get-public-access-block  --bucket krops-<account>-eu-north-1-workload-
 
 Bootstrap ends with a pivot: the CAPI inventory moves from the local `mgmt`
 kind cluster into the self-managed management cluster, and the kind cluster
-is deleted. `mise run bootstrap` runs the pivot by default
-(`BOOTSTRAP_PIVOT=0` opts out). `mise run pivot` starts the same rerun-safe CLI
+is deleted. `scripts/toolbox-run.sh bootstrap` runs the pivot by default
+(`BOOTSTRAP_PIVOT=0` opts out). `scripts/toolbox-run.sh pivot` starts the same rerun-safe CLI
 and resumes through the pivot; there is no separate pivot subcommand. See
 [the bootstrap CLI](./bootstrap-cli.md) for its interface and controls.
 
@@ -503,11 +564,12 @@ a nodeless EKS start). A timeout in either prints the Kustomization or node
 state and is safe to re-run. If a pivot phase fails:
 
 1. Fix the reported cause.
-2. Re-run the pivot (`mise run pivot`, or rerun bootstrap) from a checkout of
-   the revision you want self-managed, normally `main`. A native run must use
-   the bootstrap context (`kind-mgmt`; `BOOTSTRAP_KUBECONTEXT` overrides).
-   Toolbox mode selects kind's internal kubeconfig automatically. The CLI
-   reuses an existing healthy `mgmt` kind cluster on rerun.
+2. Re-run the pivot (`scripts/toolbox-run.sh pivot`, or rerun bootstrap)
+   from a checkout of the revision you want self-managed, normally `main`. A
+   fallback native run must use the bootstrap context (`kind-mgmt`;
+   `BOOTSTRAP_KUBECONTEXT` overrides). Toolbox mode selects kind's internal
+   kubeconfig automatically. The CLI reuses an existing healthy `mgmt` kind
+   cluster on rerun.
 3. Set `PIVOT_SKIP_DELETE=1` to keep the kind bootstrap cluster around for
    inspection once the pivot completes.
 
@@ -520,26 +582,27 @@ state and is safe to re-run. If a pivot phase fails:
 > to delete.
 
 The management kubeconfig is written to `MGMT_KUBECONFIG`, with context
-`krops-mgmt`. Native runs default to `~/.kube/krops-mgmt.yaml`; the toolbox
-mount makes its `/root/.kube/krops-mgmt.yaml` appear on the host as
-`./.kube/krops-mgmt.yaml`.
+`krops-mgmt`. The toolbox mount makes its `/root/.kube/krops-mgmt.yaml`
+appear on the host as `./.kube/krops-mgmt.yaml`; a fallback native run
+defaults to `~/.kube/krops-mgmt.yaml`.
 
 ## Teardown
 
-The mise tasks run the Rust subcommand in the toolbox:
+The wrapper runs the Rust subcommand in the toolbox:
 
 ```sh
-mise run teardown                 # aws
-mise -E local-host run teardown   # local-host
-mise -E local-talos run teardown  # local-talos
+TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh teardown            # aws
+TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh teardown local-host
+TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh teardown local-talos
 ```
 
 Azure teardown is manual; the CLI prints the steps.
 
-Native equivalents are `krops-bootstrap teardown [PROFILE]` and the retained
-`./teardown.sh` reference path. The positional profile selects an environment
-from `bootstrap.toml`. Teardown reads resource names and targets from
-`bootstrap.toml` and discovers where the CAPI controllers are running:
+The retained `./teardown.sh` reference path and a native
+`krops-bootstrap teardown [PROFILE]` run are the fallbacks. The positional
+profile selects an environment from `bootstrap.toml`. Teardown reads
+resource names and targets from `bootstrap.toml` and discovers where the
+CAPI controllers are running:
 
 - the `mgmt` kind cluster before pivot
 - the exported self-managed management kubeconfig after pivot
@@ -554,7 +617,7 @@ The main controls keep the shell interface:
 | `FORCE_KIND_DELETE` | `0` | Literal `1` overrides the final controller-host deletion guard |
 | `CLUSTER_DELETE_TIMEOUT` | `1200` seconds | CAPI cluster deletion wait (aws workloads, local-talos management) |
 | `PROVIDER_DELETE_TIMEOUT` | `300` seconds | CAPI provider deletion wait |
-| `MGMT_KUBECONFIG` | native: `~/.kube/krops-mgmt.yaml` | Post-pivot controller-host kubeconfig |
+| `MGMT_KUBECONFIG` | `~/.kube/krops-mgmt.yaml` (in the toolbox that is the checkout's `.kube/` mount) | Post-pivot controller-host kubeconfig |
 
 The hard preflight depends on the mode:
 
@@ -567,7 +630,7 @@ The hard preflight depends on the mode:
 
 A required-tool failure happens before mutation. The wrapper does not forward
 the four teardown controls in the table above; use a raw container invocation
-with explicit `-e` entries or a native run for recovery overrides.
+with explicit `-e` entries or a fallback native run for recovery overrides.
 
 For `local-host`, teardown suspends the workload Kustomization, deletes the
 CAPD workload cluster, waits for its containers to disappear, removes either
@@ -613,8 +676,18 @@ mise run validate
 ```
 
 The task checks shell syntax for the retained lifecycle scripts, runs the
-`bootstrap.toml` manifest cross-check, and builds every kustomize overlay under
-`mgmt/` and `workload/`.
+`bootstrap.toml` manifest cross-check and the toolbox/doc tests, and builds
+every kustomize overlay under `mgmt/`, `workload/`, and `virtualized-e2e/`.
+It is repository development, so it stays a host task on purpose (it needs
+the pinned Python, `uv`, and `kubectl`). Contributors without a host
+toolchain can run the same task in the toolbox, redirecting the uv
+environment off the mount:
+
+```sh
+docker run --rm -v "$PWD:/workspace" -w /workspace \
+  -e MISE_AUTO_INSTALL=0 -e UV_PROJECT_ENVIRONMENT=/tmp/krops-venv \
+  --entrypoint mise "$TOOLBOX_IMAGE" run validate
+```
 
 `.github/workflows/validate.yml` separately builds every overlay, runs the
 Renovate air-gap digest and managed-pin coverage tests, cross-checks

@@ -67,20 +67,20 @@ jobs:
 
   docker:
     name: Docker image build
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4.3.0
+        uses: docker/setup-buildx-action@v4.4.1
 
       # Rot protection for the toolbox image (issue #104): the image
       # cannot silently break between releases. Loads only; the release
       # workflow (toolbox-release.yml) pushes.
       - name: Build the toolbox image (load only)
-        uses: docker/build-push-action@v7.3.0
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: bootstrap-rs/Dockerfile
@@ -91,13 +91,25 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Smoke the image (binary + tools on PATH)
+      - name: Smoke the image (binary, tools, and helper tasks on PATH)
         run: |
           # /workspace has no bootstrap.toml in CI (the repo is mounted
           # there at runtime); --help must be probed from the checkout.
+          # The helper tasks (#423) run as `--entrypoint mise` against the
+          # mounted checkout: every tool they call must be on PATH and mise
+          # must list the tasks from /workspace without installing anything
+          # (MISE_AUTO_INSTALL=0 is what the documented runs pass).
           docker run --rm --entrypoint sh -v "$PWD:/workspace:ro" \
-            -w /workspace krops-toolbox:ci -c '
-            for t in kind kubectl helm clusterctl flux sops age aws docker xargs git curl; do
+            -w /workspace -e MISE_AUTO_INSTALL=0 krops-toolbox:ci -c '
+            for t in kind kubectl helm clusterctl flux sops age age-keygen aws clusterawsadm \
+                     az gcloud gke-gcloud-auth-plugin docker xargs git curl mise uv python3 bash; do
               command -v "$t" >/dev/null || { echo "::error::$t missing on PATH"; exit 1; }
             done
-            krops-bootstrap --help >/dev/null'
+            krops-bootstrap --help >/dev/null
+            for task in sops-keygen sops-encrypt sops-decrypt sops-updatekeys mgmt-kubeconfig aws-credentials validate; do
+              mise tasks ls 2>/dev/null | grep -q "^$task " || { echo "::error::mise task $task not visible from /workspace"; exit 1; }
+            done
+            for env in aws azure gcp local-host local-talos; do
+              mise -E "$env" tasks ls 2>/dev/null | grep -q "^kubeconfigs " || { echo "::error::mise -E $env kubeconfigs task not visible"; exit 1; }
+            done
+            mise -E aws which clusterawsadm >/dev/null || { echo "::error::mise -E aws cannot resolve clusterawsadm without installing"; exit 1; }'

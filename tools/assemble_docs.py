@@ -84,7 +84,7 @@ OUT = ROOT / "build" / "docs"
 
 
 def assemble(krops: Path = KROPS, src: Path = SRC, out: Path = OUT) -> Path:
-    """Recreate `out`: README -> index.md, docs/*.md and docs/*.svg, then the src/ overlay."""
+    """Recreate `out`: README -> index.md, docs/*.md, docs/*.svg and docs/proposals/*.md, then the src/ overlay."""
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
@@ -94,6 +94,11 @@ def assemble(krops: Path = KROPS, src: Path = SRC, out: Path = OUT) -> Path:
             (out / path.name).write_text(rewrite_doc_links(path.read_text()))
         elif path.suffix == ".svg":
             shutil.copy2(path, out / path.name)
+    proposals = krops / "docs" / "proposals"
+    if proposals.is_dir():
+        (out / "proposals").mkdir()
+        for path in sorted(proposals.glob("*.md")):
+            (out / "proposals" / path.name).write_text(rewrite_doc_links(path.read_text()))
     shutil.copytree(src, out, dirs_exist_ok=True)
     return out
 

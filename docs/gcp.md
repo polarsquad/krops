@@ -20,15 +20,19 @@ that reconciles GCP resources from `workload/gcp-base/`.
 
 - A GCP project with a billing account where you hold Owner (needed once,
   for `gcp-bootstrap`).
-- `mise -E gcp install` (adds `gcloud` 585.0.0), then
-  `gcloud components install gke-gcloud-auth-plugin` once (it is not in the
-  SDK tarball; the toolbox image runs this in its build, so `wif-federate`
-  and the GKE kubeconfig already have it), plus a GitHub PAT and an age key
-  as for `aws` (`.env`, see [operations.md](./operations.md)), and
-  `GCP_PROJECT` set.
-- `gcloud auth login` (browser or
-  `gcloud auth login --no-launch-browser`); the session is shared with the
-  toolbox through the gitignored `.gcloud/` directory (`CLOUDSDK_CONFIG`).
+- A GitHub PAT and an age key as for `aws` (`.env`, see
+  [operations.md](./operations.md)), and `GCP_PROJECT` set. No host
+  toolchain: `gcloud` and `gke-gcloud-auth-plugin` are in the toolbox image.
+- A gcloud session, created browser-less and persisted in the checkout's
+  gitignored `.gcloud/` directory (`CLOUDSDK_CONFIG`), which the lifecycle
+  wrapper also mounts so `wif-federate` and the GKE kubeconfig reuse it:
+
+  ```sh
+  docker run --rm -it -v "$PWD:/workspace" -w /workspace \
+    -e CLOUDSDK_CONFIG=/workspace/.gcloud \
+    --entrypoint gcloud "$TOOLBOX_IMAGE" auth login --no-launch-browser
+  ```
+
 - The one-time project preparation (enable the GKE/SQL/Storage/IAM/STS APIs,
   create the `krops-capg` / `krops-kcc` / `krops-reader` service accounts
   with their project role grants, and create the `krops` workload identity
@@ -36,7 +40,9 @@ that reconciles GCP resources from `workload/gcp-base/`.
 
   ```sh
   export GCP_PROJECT=<project-id>
-  mise -E gcp run gcp-bootstrap
+  docker run --rm -it -v "$PWD:/workspace" -w /workspace \
+    -e CLOUDSDK_CONFIG=/workspace/.gcloud -e GCP_PROJECT -e MISE_AUTO_INSTALL=0 \
+    --entrypoint mise "$TOOLBOX_IMAGE" -E gcp run gcp-bootstrap
   ```
 
   It prints the values to commit; nothing it prints is secret (no service
@@ -87,10 +93,19 @@ restricted by `attributeCondition` to exactly those two service accounts.
 ## Bootstrap, pivot, teardown
 
 ```sh
-mise -E gcp run bootstrap        # kind + Flux + CAPG; then pivot into europe-north1-management
-mise run mgmt-kubeconfig         # ~/.kube/krops-mgmt.yaml (mgmt-kubeconfig in mise.toml)
-mise -E gcp run kubeconfigs      # workload kubeconfigs (user kubeconfig Secrets)
+scripts/toolbox-run.sh bootstrap gcp     # kind + Flux + CAPG; then pivot into europe-north1-management
+export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"   # written by the pivot, context krops-mgmt
+docker run --rm -it \
+  -v "$PWD:/workspace" -w /workspace \
+  -v "$PWD/.kube:/root/.kube" \
+  -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml -e KUBECONFIG_FILE=/root/.kube/krops-workloads.yaml \
+  -e CLOUDSDK_CONFIG=/workspace/.gcloud -e MISE_AUTO_INSTALL=0 \
+  --entrypoint mise "$TOOLBOX_IMAGE" -E gcp run kubeconfigs   # user kubeconfig Secrets; writes .kube/krops-workloads.yaml.<cluster>
 ```
+
+The exported GKE kubeconfigs use `gke-gcloud-auth-plugin`, which the toolbox
+carries; use them from a toolbox `kubectl` run with the same `.kube` and
+`.gcloud` mounts, or install the plugin on the host.
 
 Right after the kind cluster is created, bootstrap-rs runs the
 `wif-federate` mise task (`post-kind-create-task` in `bootstrap.toml`):
@@ -106,7 +121,8 @@ Secrets and the `cnrm-system` namespace to the target before
 `pivot-manifest-vars`): the moved provider and Config Connector reference
 the Secrets by name and clusterctl does not carry them.
 
-Teardown is manual for now: `mise -E gcp run teardown` refuses and prints
+Teardown is manual for now: `scripts/toolbox-run.sh teardown gcp` refuses
+and prints
 the steps (`teardown.manual` in `bootstrap.toml`). The `krops` pool, its
 providers and the service accounts are deliberately left in place; they are
 re-adopted on the next bootstrap.

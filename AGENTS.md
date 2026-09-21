@@ -111,7 +111,7 @@ resources. There is no app source code here, only declarative infrastructure.
   `images.txt` with the identical tag and digest, guarding against partial
   air-gap updates (issue #228); the CI-only
   `airgap/tests/test-airgap-kubeadm-images.py` checks the k8s component pins in
-  `images.txt` against real `kubeadm config images list`. `scripts/` builds,
+  `images.txt` against real `kubeadm config images list` (`--fix` regenerates them). `scripts/` builds,
   renders, and stages the bundle (`build-*`, `render-*`, `stage-*`,
   `offline-run.sh`); `archives/` and `rendered/` are gitignored outputs.
   Zarf fetches SHA-256-pinned CAAPH release assets and bundles arm64
@@ -126,15 +126,24 @@ resources. There is no app source code here, only declarative infrastructure.
   any repository that carries it) builds the ARM64 bundle on an arm64 runner,
   then deploys it with external egress blocked (fails if any public traffic
   was attempted). The deploy evidence artifact is uploaded.
+  The `report-status` job (scheduled runs only) opens or comments on one
+  tracking issue titled "air-gapped: scheduled workflow is failing" when a
+  needed job failed, and closes it when all succeeded; cancelled runs are
+  ignored. `airgap/tests/test-airgap-failure-notification.py` parses the
+  workflow YAML to guard its wiring.
 - `virtualized-e2e/`: WireMock-virtualized e2e harness (issue #355), not
   Flux-reconciled and not wired into a mise task yet (Phase 4). `lib/`
   carries the shared components (WireMock manifest templates under
   `lib/wiremock/`, the `scenario-schema.json` Phase 3 shape,
   `sanitize_recording.py`, `assertions.py`); `<cloud>/wiremock/` carries one
   arm per cloud with only what differs (interception patches, boot stubs,
-  arm README). `aws/` is the reference arm; Azure and GCP arms are
-  follow-ups. The kustomize overlays here are built by `mise run validate`
-  like the `mgmt`/`workload` ones.
+  arm README). `aws/` is the reference arm; `azure/` adds the second arm
+  (ASO endpoint configuration via `aso-controller-settings`, plus a
+  CoreDNS rewrite covering CAPZ and MSAL instance discovery); `gcp/`
+  mirrors the reference with the CoreDNS-rewrite + SAN-cert interception
+  and WIF credential repoint from its Phase 0 spike. The kustomize
+  overlays here are built by `mise run validate` like the `mgmt`/`workload`
+  ones.
 - `bootstrap-rs/`: `krops-bootstrap`, the Rust CLI that ports the imperative
   lifecycle (bootstrap + pivot; teardown under issue #100). Behavioral port:
   same step order, messages, and env interface as the scripts, plus
@@ -156,12 +165,18 @@ resources. There is no app source code here, only declarative infrastructure.
   `scripts/toolbox-run.sh` (issue #104); the scripts remain the native path
   for development.
 - `docs/`: detailed documentation (see the table in README.md).
+  `docs/proposals/` holds design proposals under review (not yet decided or
+  implemented); the docs site assembler includes that folder.
 - `mise.toml`: pinned tool versions and all task entrypoints.
   `mise.aws.toml` is the AWS tool layer (aws-cli, clusterawsadm),
   activated with `MISE_ENV=aws`. `mise.azure.toml` (azure-cli) and
   `mise.gcp.toml` (gcloud, plus the `gcp-bootstrap`, `wif-federate` and
   `kubeconfigs` tasks; gcloud state lives in the gitignored `.gcloud/`
   shared with the toolbox) are the other per-environment layers.
+  Helper tasks run inside the toolbox image via `--entrypoint mise`
+  (issue #423); `validate` and `podinfo-port-forward` stay host tasks by
+  design; `MISE_AUTO_INSTALL=0` is mandatory for in-toolbox runs and mise's
+  `env_file` makes `/workspace/.env` override `-e` values.
 - `renovate.json5`: Renovate config. Dependency versions live in the native
   files that consume them (mise configs, manifests, workflows, airgap
   inventory); Renovate discovers and updates them weekly and tracks pending
@@ -213,11 +228,13 @@ Each component pairs a plain kustomize root with a Flux `Kustomization`:
 ## Common tasks (mise)
 
 ```sh
-mise install            # install pinned tools (kubectl, kind, flux, sops, age, ...)
-mise run validate       # build every kustomize overlay; mirrors CI
-mise run bootstrap      # toolbox container: kind cluster + Flux handoff + pivot to self-managed mgmt
-mise -E aws run kubeconfigs  # export AWS workload-cluster kubeconfigs
-mise run teardown       # toolbox container: full teardown (EKS, AWS resources, kind)
+mise install            # host: pinned tools for validate and the docs tasks
+mise run validate       # host: build every kustomize overlay; mirrors CI
+scripts/toolbox-run.sh bootstrap [profile]   # toolbox: kind + Flux handoff + pivot
+scripts/toolbox-run.sh teardown  [profile]   # toolbox: full teardown
+# helper tasks (sops-*, *-bootstrap, kubeconfigs, oci-push) run the same image:
+docker run --rm -it -v "$PWD:/workspace" -w /workspace -e MISE_AUTO_INSTALL=0 \
+  --entrypoint mise "$TOOLBOX_IMAGE" -E aws run kubeconfigs      # see docs/operations.md
 ```
 
 ## Editing renovate.json5

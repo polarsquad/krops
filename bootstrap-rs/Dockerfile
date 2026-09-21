@@ -17,7 +17,7 @@
 # slim-bookworm matches the runtime stage's glibc (bookworm, 2.36): a
 # binary built on the default rust image (trixie, glibc 2.39) fails on
 # bookworm with "GLIBC_2.39 not found".
-FROM rust:1.98.1-slim-bookworm@sha256:ebd900bae66fd508b466cef82d64a83a5fb34682e4c8b2797a42908bddc95a57 AS build
+FROM rust:1.98.1-slim-bookworm@sha256:ff521445a372125ed4f76e1453a1f8098f2d05332d1601d30db1c1f62757e730 AS build
 
 WORKDIR /build
 COPY bootstrap-rs/ ./bootstrap-rs/
@@ -25,10 +25,10 @@ RUN cd bootstrap-rs && cargo build --locked --release \
     && cp target/release/krops-bootstrap /usr/local/bin/krops-bootstrap
 
 # ── Stage 2: runtime with the pinned tool layer ───────────────────────────
-FROM debian:bookworm-slim@sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171
+FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
 
 # renovate: datasource=github-releases depName=jdx/mise extractVersion=^v(?<version>.+) versioning=semver
-ARG MISE_VERSION=2026.9.7
+ARG MISE_VERSION=2026.9.12
 # Set by BuildKit: "amd64" or "arm64".
 ARG TARGETARCH
 
@@ -40,7 +40,7 @@ ARG TARGETARCH
 # exec (CONTAINER_ENGINE=podman); it talks to the host socket the run
 # invocation mounts.
 # renovate: datasource=github-releases depName=containers/podman extractVersion=^v(?<version>.+) versioning=semver
-ARG PODMAN_VERSION=6.1.1
+ARG PODMAN_VERSION=6.1.2
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates curl git jq findutils gnupg python-is-python3 \

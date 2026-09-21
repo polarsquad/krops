@@ -30,7 +30,7 @@ concurrency:
 jobs:
   gate:
     name: Tag matches Cargo.toml version
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 5
     steps:
       - name: Checkout
@@ -108,7 +108,7 @@ jobs:
   merge:
     name: Merge multi-arch manifest
     needs: build
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 15
     permissions:
       contents: read
@@ -157,7 +157,7 @@ jobs:
   sign-attest:
     name: Sign, attest
     needs: merge
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 20
     permissions:
       contents: read

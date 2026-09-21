@@ -124,7 +124,7 @@ jobs:
           node-version: 24.21.0
 
       - name: Install Renovate
-        run: npm install --global renovate@44.104.2
+        run: npm install --global renovate@44.105.1
 
       - name: Verify only actions join the GitHub Actions group
         run: python3 tests/test-renovate-actions-grouping.py

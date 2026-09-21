@@ -1,0 +1,63 @@
+# JSON merge patch: CoreDNS rewrite for Azure endpoint interception (#355).
+#
+# Target: configmap/coredns, namespace kube-system (kind/kubeadm-installed,
+# outside this tree). Apply with:
+#   kubectl patch configmap coredns -n kube-system \
+#     --type merge --patch-file virtualized-e2e/azure/wiremock/patches/coredns.yaml
+#
+# Mechanism (Phase 0 spike, docs/wiremock-e2e-spike-findings-azure.md):
+# exact-name rewrites send the two Azure hostnames CAPZ dials (and the one
+# MSAL instance discovery anchors at, for both controllers) to the WireMock
+# Service. TLS then terminates at WireMock while the client keeps the real
+# hostname in SNI/Host, which is why the server certificate must carry
+# login.microsoftonline.com and management.azure.com as SANs (an Azure-arm
+# addition to the lib TLS contract). Proven end to end in the spike: CAPZ's
+# full reconcile arrived at WireMock with absoluteUrl showing the real ARM
+# hostname.
+#
+# A merge patch replaces the whole Corefile key, so this file carries the
+# full Corefile: kind v0.33.0's default (kubeadm v1.37, node v1.37.0),
+# verified against a live kind cluster, with the two rewrite lines added
+# after `ready`. If the kind/kubeadm pin moves, re-verify against the live
+# ConfigMap before applying:
+#   kubectl get configmap coredns -n kube-system -o jsonpath='{.data.Corefile}'
+#
+# CoreDNS's `reload` plugin picks the change up within its watch interval;
+# the deterministic path is:
+#   kubectl rollout restart deployment/coredns -n kube-system
+#
+# After the rewrite lands, restart any controller that was already running
+# against the real endpoints (Go transport keep-alive reuses established
+# TLS connections; spike caveat).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health {
+           lameduck 5s
+        }
+        ready
+        rewrite name exact login.microsoftonline.com wiremock.wiremock-system.svc.cluster.local.
+        rewrite name exact management.azure.com wiremock.wiremock-system.svc.cluster.local.
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+           pods insecure
+           fallthrough in-addr.arpa ip6.arpa
+           ttl 30
+        }
+        prometheus :9153
+        forward . /etc/resolv.conf {
+           max_concurrent 1000
+        }
+        cache 30 {
+           disable success cluster.local
+           disable denial cluster.local
+        }
+        loop
+        reload
+        loadbalance
+    }

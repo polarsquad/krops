@@ -1,0 +1,42 @@
+# Strategic merge patch: ASO controller CA trust (issue #355).
+#
+# Target: deployment/azureserviceoperator-controller-manager, namespace
+# capz-system (installed by clusterctl init as CAPZ's bundled ASO, outside
+# this tree), container `manager`. Apply with:
+#   kubectl patch deployment azureserviceoperator-controller-manager -n capz-system \
+#     --type strategic --patch-file virtualized-e2e/azure/wiremock/patches/azureserviceoperator-controller-manager.yaml
+#
+# Mechanism (Phase 0 spike, docs/wiremock-e2e-spike-findings-azure.md):
+# SSL_CERT_FILE points Go's crypto/x509 at the mounted throwaway CA, which
+# covers every azidentity/azcore TLS dial the controller makes. The
+# wiremock-ca ConfigMap must exist in this namespace (volumes cannot cross
+# namespaces); capz-system hosts both Azure controllers, so one ConfigMap
+# covers both.
+#
+# The endpoint redirection itself is NOT here: it lives in the
+# aso-controller-settings Secret patch (aso-controller-settings.yaml) plus
+# the CoreDNS rewrite for MSAL's instance-discovery anchor (coredns.yaml).
+# Patch the Secret before this rollout so the new pods read the final
+# values; if a pod established TLS connections to real endpoints before the
+# rewrite landed, restart it (Go transport keep-alive).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azureserviceoperator-controller-manager
+  namespace: capz-system
+spec:
+  template:
+    spec:
+      volumes:
+        - name: wiremock-ca
+          configMap:
+            name: wiremock-ca
+      containers:
+        - name: manager
+          env:
+            - name: SSL_CERT_FILE
+              value: /certs/ca.crt
+          volumeMounts:
+            - name: wiremock-ca
+              mountPath: /certs
+              readOnly: true

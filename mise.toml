@@ -53,6 +53,11 @@ if ! python3 tests/test-toolbox-run-env-precedence.py; then
   echo "    FAILED: toolbox-run.sh .env precedence" >&2
   fail=1
 fi
+echo "==> sops-keygen prints the public key"
+if ! python3 tests/test-sops-keygen-prints-public-key.py; then
+  echo "    FAILED: sops-keygen public key" >&2
+  fail=1
+fi
 echo "==> air-gap digest token boundary"
 if ! python3 airgap/tests/test-digest-regex.py; then
   echo "    FAILED: air-gap digest token boundary" >&2
@@ -152,7 +157,7 @@ if [ -f age.agekey ]; then
 fi
 age-keygen -o age.agekey
 echo
-PUBLIC_KEY=$(age-keygen -p age.agekey 2>/dev/null | head -1)
+PUBLIC_KEY=$(age-keygen -y age.agekey)
 echo "Public key: $PUBLIC_KEY"
 echo "Add this public key to the 'age:' field in .sops.yaml, then run: mise run sops-updatekeys"
 """

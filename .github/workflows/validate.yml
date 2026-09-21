@@ -158,6 +158,9 @@ jobs:
       - name: bootstrap.toml cross-check
         run: python3 tests/test-bootstrap-config.py
 
+      - name: sops-keygen prints the public key (#423)
+        run: python3 tests/test-sops-keygen-prints-public-key.py
+
       - name: cert-manager version consistency (#322)
         run: python3 tests/test-cert-manager-version-consistency.py
 

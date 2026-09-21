@@ -188,13 +188,24 @@ description = "Pivot the management cluster from local kind to the CAPI-managed 
 run = "scripts/toolbox-run.sh pivot"
 
 [tasks.mgmt-kubeconfig]
-description = "Export the management-cluster kubeconfig to ~/.kube/krops-mgmt.yaml"
+description = "Export the management-cluster kubeconfig to ~/.kube/krops-mgmt.yaml (toolbox: /root/.kube, persisted as .kube/krops-mgmt.yaml)"
 run = '''
-MGMT_CLUSTER="${MGMT_CLUSTER:-$(case "${KROPS_PROFILE:-aws}" in local-host) echo local-management;; local-talos) echo local-talos-management;; azure) echo swedencentral-management;; gcp) echo europe-north1-management;; *) echo eu-north-1-management;; esac)}"
+if [ -z "${MGMT_CLUSTER:-}" ]; then
+  case "${KROPS_PROFILE:-aws}" in
+    local-host) MGMT_CLUSTER=local-management;;
+    local-talos) MGMT_CLUSTER=local-talos-management;;
+    azure) MGMT_CLUSTER=swedencentral-management;;
+    gcp) MGMT_CLUSTER=europe-north1-management;;
+    *) MGMT_CLUSTER=eu-north-1-management;;
+  esac
+fi
 MGMT_KUBECONFIG="${MGMT_KUBECONFIG:-$HOME/.kube/krops-mgmt.yaml}"
 clusterctl get kubeconfig "$MGMT_CLUSTER" -n default > "$MGMT_KUBECONFIG"
 chmod 600 "$MGMT_KUBECONFIG"
-if [ "${KROPS_PROFILE:-aws}" = local-host ]; then
+# Host-only rewrite: inside the toolbox (KROPS_TOOLBOX=1, on the kind
+# network) the recorded endpoint already resolves and 127.0.0.1 would be
+# the container itself. Same rule as the CLI's should_rewrite_capd_endpoint.
+if [ "${KROPS_PROFILE:-aws}" = local-host ] && [ "${KROPS_TOOLBOX:-0}" != 1 ]; then
   # CAPD records the load balancer's container-network IP, which is not
   # routable from macOS. Point at the port published on localhost instead.
   engine="${CONTAINER_ENGINE:-docker}"

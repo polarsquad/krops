@@ -17,7 +17,7 @@
 # slim-bookworm matches the runtime stage's glibc (bookworm, 2.36): a
 # binary built on the default rust image (trixie, glibc 2.39) fails on
 # bookworm with "GLIBC_2.39 not found".
-FROM rust:1.98.1-slim-bookworm@sha256:ebd900bae66fd508b466cef82d64a83a5fb34682e4c8b2797a42908bddc95a57 AS build
+FROM rust:1.98.1-slim-bookworm@sha256:ff521445a372125ed4f76e1453a1f8098f2d05332d1601d30db1c1f62757e730 AS build
 
 WORKDIR /build
 COPY bootstrap-rs/ ./bootstrap-rs/

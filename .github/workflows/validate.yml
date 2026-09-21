@@ -113,6 +113,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7.0.1
 
+      # The sops-keygen and local-host kubeconfig tests (#423) run mise tasks,
+      # so mise and the pinned tools (age, kubectl) must be available here.
+      - name: Install mise
+        uses: jdx/mise-action@v4.3.0
+        with:
+          version: 2026.9.12
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
       - name: Install uv
         uses: astral-sh/setup-uv@v10.1.0
         with:

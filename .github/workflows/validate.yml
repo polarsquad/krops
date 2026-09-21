@@ -164,6 +164,9 @@ jobs:
       - name: local-host kubeconfig endpoint is host-only (#423)
         run: python3 tests/test-local-host-kubeconfig-toolbox-endpoint.py
 
+      - name: Docs show toolbox helper runs, not host mise (#423)
+        run: python3 tests/test-docs-toolbox-helpers.py
+
       - name: cert-manager version consistency (#322)
         run: python3 tests/test-cert-manager-version-consistency.py
 

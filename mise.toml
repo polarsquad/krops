@@ -63,6 +63,11 @@ if ! python3 tests/test-local-host-kubeconfig-toolbox-endpoint.py; then
   echo "    FAILED: local-host kubeconfig toolbox endpoint" >&2
   fail=1
 fi
+echo "==> docs show toolbox helper runs, not host mise (#423)"
+if ! python3 tests/test-docs-toolbox-helpers.py; then
+  echo "    FAILED: docs toolbox helpers" >&2
+  fail=1
+fi
 echo "==> air-gap digest token boundary"
 if ! python3 airgap/tests/test-digest-regex.py; then
   echo "    FAILED: air-gap digest token boundary" >&2

@@ -106,6 +106,9 @@ jobs:
           done
           exit $fail
 
+      - name: "Guard: no ACK CRs under workload/ (#411)"
+        run: python3 tests/test-ack-cr-placement.py
+
   renovate-digest-pinning:
     name: Renovate airgap digest pinning
     runs-on: ubuntu-latest

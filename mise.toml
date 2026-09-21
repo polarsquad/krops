@@ -128,6 +128,11 @@ if ! python3 tests/test-kcc-operator-pin.py; then
   echo "    FAILED: kcc operator pin" >&2
   fail=1
 fi
+echo "==> ACK CR placement guard (#411)"
+if ! python3 tests/test-ack-cr-placement.py; then
+  echo "    FAILED: ACK CR placement" >&2
+  fail=1
+fi
 echo "==> Python lint (ruff: unused imports, subprocess.run check=)"
 if ! uv run ruff check .; then
   echo "    FAILED: Python lint" >&2

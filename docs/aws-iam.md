@@ -28,8 +28,11 @@ outside this repo, same as the CAPA permissions):
   `s3:DeleteBucket`, `s3:GetBucket*`/`s3:PutBucket*`,
   `s3:DeleteBucketPolicy`, encryption/lifecycle/replication/accelerate/
   analytics/inventory/metrics/intelligent-tiering configuration Get+Put,
-  `s3:ListBucket`, `s3:TagResource`/`s3:UntagResource`/
-  `s3:DeleteBucketTagging`/`s3:ListTagsForResource`
+  `s3:ListBucket`, `s3:TagResource` (the `CreateBucket` tagSet is authorized
+  against it, see #352/#353) and `s3:DeleteBucketTagging` (tag-removal
+  drift). `s3:UntagResource`/`s3:ListTagsForResource` are not needed: the ACK
+  S3 controller only calls them for directory buckets, which krops does not
+  create
 - **RDS**: `rds:Describe*` + `rds:ListTagsForResource` on `*`; instance
   management (`rds:CreateDBInstance`/`ModifyDBInstance`/`DeleteDBInstance`/
   `RebootDBInstance`/`StartDBInstance`/`StopDBInstance`,
@@ -187,7 +190,7 @@ IPAM/IPv6 actions (IPv4 clusters), no launch-template writes (the
 ### Not covered (operator steps)
 
 - First-time creation of the clusterawsadm CloudFormation stack
-  (`mise -E aws run aws-bootstrap`) needs `cloudformation:CreateStack` plus
+  (the `aws-bootstrap` task, run in the toolbox per [docs/aws.md](./aws.md)) needs `cloudformation:CreateStack` plus
   IAM writes on the `*.cluster-api-provider-aws.sigs.k8s.io` roles. The
   stack is already `CREATE_COMPLETE` (2026-09-01, per #143), so recreating
   it stays an operator step.

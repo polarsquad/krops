@@ -22,63 +22,59 @@ with `spec.decryption.provider: sops`):
 
 ## First-time setup
 
+Every SOPS step is a mise task run in the toolbox as your own user, so the
+key file it writes is owned by you (the run shape is defined in
+[Helper tasks in the toolbox](./operations.md#helper-tasks-in-the-toolbox)).
+The commands below use this shell function for brevity:
+
 ```sh
-mise run sops-keygen        # creates ./age.agekey and prints the public key
-export SOPS_AGE_KEY_FILE="$PWD/age.agekey"
+export TOOLBOX_IMAGE=ghcr.io/polarsquad/krops-toolbox:latest   # or krops-toolbox:dev
+krops_mise() {
+  docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/tmp \
+    -v "$PWD:/workspace" -w /workspace \
+    -e MISE_AUTO_INSTALL=0 -e SOPS_AGE_KEY_FILE=/workspace/age.agekey \
+    --entrypoint mise "$TOOLBOX_IMAGE" "$@"
+}
 ```
 
-`AGE_KEY_FILE` is the bootstrap input; `SOPS_AGE_KEY_FILE` tells the SOPS CLI
-which private key to use while editing encrypted files.
-
-Toolbox-only key generation (a host with just the container engine):
+Generate the key (refuses to overwrite an existing `age.agekey`) and read
+the public key it prints:
 
 ```sh
-docker run --rm --user "$(id -u):$(id -g)" \
-  -e HOME=/tmp \
-  -v "$PWD:/workspace" -w /workspace \
-  --entrypoint age-keygen "$TOOLBOX_IMAGE" -o age.agekey
+krops_mise run sops-keygen        # creates ./age.agekey and prints the public key
 ```
 
-Set `TOOLBOX_IMAGE` to a published toolbox tag or a local build. Put the
-printed public key into the `age:` field of `.sops.yaml`, then re-encrypt
-existing secrets so they target your key:
+`AGE_KEY_FILE` (in `.env`, default `age.agekey`) is the bootstrap input;
+`SOPS_AGE_KEY_FILE` (set by `krops_mise` above) tells the SOPS CLI which
+private key to use while editing encrypted files.
+
+Put the printed public key into the `age:` field of `.sops.yaml`, then
+re-encrypt every `*.sops.yaml` under `mgmt/` so they target your key:
 
 ```sh
-mise run sops-updatekeys
-```
-
-The toolbox-only equivalent uses the new private key explicitly:
-
-```sh
-docker run --rm --user "$(id -u):$(id -g)" \
-  -e HOME=/tmp \
-  -v "$PWD:/workspace" -w /workspace \
-  -e SOPS_AGE_KEY_FILE=/workspace/age.agekey \
-  --entrypoint sh "$TOOLBOX_IMAGE" -c '
-    for f in $(find mgmt/aws -name "*.sops.yaml"); do
-      sops updatekeys --yes "$f"
-    done
-  '
+krops_mise run sops-updatekeys
 ```
 
 ## Setting / rotating AWS credentials
 
 ```sh
-# CAPA: generate the base64 profile (requires AWS creds in your shell env):
-clusterawsadm bootstrap credentials encode-as-profile
+# CAPA: generate the base64 profile. clusterawsadm reads AWS_ACCESS_KEY_ID /
+# AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN / AWS_REGION from .env first
+# (mise env_file), then from the process environment:
+krops_mise -E aws run aws-credentials
 # Put the value into stringData.AWS_B64ENCODED_CREDENTIALS, then encrypt:
 $EDITOR mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml
-mise run sops-encrypt mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml
+krops_mise run sops-encrypt mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml
 
 # ACK: standard AWS shared-credentials-file format under stringData.credentials:
 $EDITOR mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml
-mise run sops-encrypt mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml
+krops_mise run sops-encrypt mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml
 ```
 
 View a decrypted secret without changing it:
 
 ```sh
-mise run sops-decrypt <file>.sops.yaml
+krops_mise run sops-decrypt <file>.sops.yaml
 ```
 
 ## Azure credentials
@@ -103,10 +99,10 @@ To set or rotate the PAT in the workload clusters' pull secret:
 ```sh
 # Decrypt in place, put the PAT into the nested stringData.password field,
 # then re-encrypt:
-mise x -- sops --decrypt --in-place --input-type yaml --output-type yaml \
+krops_mise x -- sops --decrypt --in-place --input-type yaml --output-type yaml \
   mgmt/aws/addons/flux-apps/flux-pull-secret.sops.yaml
 $EDITOR mgmt/aws/addons/flux-apps/flux-pull-secret.sops.yaml
-mise run sops-encrypt mgmt/aws/addons/flux-apps/flux-pull-secret.sops.yaml
+krops_mise run sops-encrypt mgmt/aws/addons/flux-apps/flux-pull-secret.sops.yaml
 ```
 
 Remember to also update `GITHUB_TOKEN` in `.env` so the next bootstrap uses
@@ -121,10 +117,10 @@ What each token does is covered in [PR review: konflate](./konflate.md).
 # stringData.KONFLATE_WRITE_TOKEN (a fine-grained PAT with Pull requests +
 # Commit statuses R/W on this repo, or a classic PAT with `repo` scope),
 # then re-encrypt:
-mise x -- sops --decrypt --in-place --input-type yaml --output-type yaml \
+krops_mise x -- sops --decrypt --in-place --input-type yaml --output-type yaml \
   mgmt/aws/infrastructure/konflate/konflate-token.sops.yaml
 $EDITOR mgmt/aws/infrastructure/konflate/konflate-token.sops.yaml
-mise run sops-encrypt mgmt/aws/infrastructure/konflate/konflate-token.sops.yaml
+krops_mise run sops-encrypt mgmt/aws/infrastructure/konflate/konflate-token.sops.yaml
 ```
 
 Keep the two tokens separate: the read token (`KONFLATE_TOKEN`) should carry

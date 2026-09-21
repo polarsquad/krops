@@ -46,6 +46,18 @@ class KubernetesVersionGroupingTest(unittest.TestCase):
             with self.subTest(dependency=case[:2]):
                 self.assertEqual(result["groupName"] == "kubernetes-version", case[2])
 
+    def test_group_does_not_split_major_minor(self):
+        # One PR at the newest version: no rule may force separate major/minor
+        # PRs for group members (the old kindest/node isolation rule did).
+        results = apply_package_rules([
+            {
+                "depName": "kindest/node", "packageName": "kindest/node",
+                "datasource": "docker", "manager": "custom.regex",
+                "packageFile": "mise.toml",
+            }
+        ])
+        self.assertFalse(results[0]["separateMajorMinor"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -50,8 +50,9 @@ def main() -> int:
         print(f"image argument dropped from the exec: {argv}", file=sys.stderr); return 1
     if "local-host" not in argv:
         print(f"CLI args dropped from the exec: {argv}", file=sys.stderr); return 1
-    if argv.count("CLOUDSDK_CONFIG=/workspace/.gcloud") != 1:
-        print(f"repo-local CLOUDSDK_CONFIG override missing: {argv}", file=sys.stderr); return 1
+    cloudsdk = [a for a in argv if a.startswith("CLOUDSDK_CONFIG")]
+    if cloudsdk != ["CLOUDSDK_CONFIG", "CLOUDSDK_CONFIG=/workspace/.gcloud"]:
+        print(f"CLOUDSDK_CONFIG must be forwarded twice, repo-local value last: {argv}", file=sys.stderr); return 1
     # The image must come after the last -e (so it's not swallowed as a flag
     # value) and the CLI args must come after the image.
     image_idx = argv.index("krops-toolbox:test")

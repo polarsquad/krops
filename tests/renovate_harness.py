@@ -212,7 +212,10 @@ const dependencies = JSON.parse(fs.readFileSync(0, 'utf8'));
 const results = [];
 for (const dependency of dependencies) {
     const result = await applyPackageRules({ ...dependency, packageRules });
-    results.push({ groupName: result.groupName ?? null });
+    results.push({
+        groupName: result.groupName ?? null,
+        separateMajorMinor: result.separateMajorMinor ?? null,
+    });
 }
 process.stdout.write(JSON.stringify(results));
 """

@@ -27,7 +27,7 @@ done
 
 if ! curl --fail --silent --show-error "http://${REGISTRY_HOST}:${REGISTRY_PORT}/v2/" >/dev/null; then
   echo "ERROR: local registry is unavailable at ${REGISTRY_HOST}:${REGISTRY_PORT}" >&2
-  echo "       Start it with: mise -E local-host run bootstrap" >&2
+  echo "       Start it with: scripts/toolbox-run.sh bootstrap local-host" >&2
   exit 1
 fi
 
@@ -64,27 +64,31 @@ clusterctl get kubeconfig local-workload > "$KUBECONFIG_FILE"
 
 # CAPD records the load balancer's container-network IP, which is not routable
 # from macOS. Point the kubeconfig at the port published on localhost instead.
-if [ -n "${CONTAINER_ENGINE:-}" ]; then
-  engine="$CONTAINER_ENGINE"
-elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-  engine=docker
-elif command -v podman >/dev/null 2>&1 && podman info >/dev/null 2>&1; then
-  engine=podman
-else
-  echo "ERROR: no running container engine found" >&2
-  exit 1
-fi
-endpoint=$($engine port local-workload-lb 6443/tcp | head -1)
-port="${endpoint##*:}"
-case "$port" in
-  ''|*[!0-9]*)
-    echo "ERROR: cannot determine the local-workload API server port" >&2
+# Host-only: inside the toolbox (KROPS_TOOLBOX=1, on the kind network) the
+# recorded endpoint already resolves and 127.0.0.1 would be the container.
+if [ "${KROPS_TOOLBOX:-0}" != 1 ]; then
+  if [ -n "${CONTAINER_ENGINE:-}" ]; then
+    engine="$CONTAINER_ENGINE"
+  elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    engine=docker
+  elif command -v podman >/dev/null 2>&1 && podman info >/dev/null 2>&1; then
+    engine=podman
+  else
+    echo "ERROR: no running container engine found" >&2
     exit 1
-    ;;
-esac
-kubectl config set-cluster local-workload \
-  --server="https://127.0.0.1:${port}" \
-  --kubeconfig="$KUBECONFIG_FILE" >/dev/null
+  fi
+  endpoint=$($engine port local-workload-lb 6443/tcp | head -1)
+  port="${endpoint##*:}"
+  case "$port" in
+    ''|*[!0-9]*)
+      echo "ERROR: cannot determine the local-workload API server port" >&2
+      exit 1
+      ;;
+  esac
+  kubectl config set-cluster local-workload \
+    --server="https://127.0.0.1:${port}" \
+    --kubeconfig="$KUBECONFIG_FILE" >/dev/null
+fi
 chmod 600 "$KUBECONFIG_FILE"
 echo "Wrote ${KUBECONFIG_FILE}"
 echo "Use with: KUBECONFIG=${KUBECONFIG_FILE} kubectl get nodes"

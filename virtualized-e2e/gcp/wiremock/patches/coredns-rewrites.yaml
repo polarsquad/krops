@@ -1,0 +1,65 @@
+# Merge patch: CoreDNS rewrite of the Google API hostnames (issue #355).
+#
+# Target: configmap/coredns, namespace kube-system (the kind cluster's
+# CoreDNS, outside this tree). Apply with:
+#   kubectl patch configmap coredns -n kube-system \
+#     --type merge --patch-file virtualized-e2e/gcp/wiremock/patches/coredns-rewrites.yaml
+#
+# Mechanism (Phase 0 spike, docs/wiremock-e2e-spike-findings-gcp.md):
+# `rewrite name exact` maps each Google API hostname to the WireMock
+# Service, which TLS-terminates with a server certificate whose SANs match
+# the real hostnames. This is the only mechanism that intercepts BOTH the
+# REST compute clients and the gRPC GKE client: grpc-go never completes a
+# CONNECT tunnel through WireMock's browser proxying (HTTPS_PROXY is out),
+# and CAPG's spec.serviceEndpoints override cannot dial an https://
+# endpoint for gRPC and covers no auth endpoint.
+#
+# The Corefile below is kind's stock kubeadm-rendered one (kind v0.33.0,
+# the repo mise pin) with the five rewrite stanzas inserted. The stanza set
+# is the spike's enumeration: compute and container are the resource APIs;
+# oauth2, sts, and iamcredentials cover the auth path when the credential
+# repoint (patches/capg-wif-credentials-repoint.yaml and
+# patches/kcc-wif-credentials-repoint.yaml) is NOT applied. With the
+# repoint applied, the clients dial wiremock.wiremock-system.svc directly,
+# the three auth rewrites are inert, and only the resource APIs need DNS
+# interception. If kind's stock Corefile drifts, regenerate this file by
+# inserting the same stanzas into the live Corefile:
+#   kubectl get configmap coredns -n kube-system -o jsonpath='{.data.Corefile}'
+#
+# Spike caveats: applying prints the missing last-applied-configuration
+# warning (harmless), the CoreDNS rollout can take minutes on a loaded
+# host, and the rewrite must be in place BEFORE the controllers come up (a
+# manager that already dialed a real endpoint keeps the keep-alive
+# connection until its pod restarts).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health {
+           lameduck 5s
+        }
+        ready
+        rewrite name exact compute.googleapis.com wiremock.wiremock-system.svc.cluster.local
+        rewrite name exact container.googleapis.com wiremock.wiremock-system.svc.cluster.local
+        rewrite name exact oauth2.googleapis.com wiremock.wiremock-system.svc.cluster.local
+        rewrite name exact sts.googleapis.com wiremock.wiremock-system.svc.cluster.local
+        rewrite name exact iamcredentials.googleapis.com wiremock.wiremock-system.svc.cluster.local
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+           pods insecure
+           fallthrough in-addr.arpa ip6.arpa
+           ttl 30
+        }
+        prometheus :9153
+        forward . /etc/resolv.conf {
+           max_concurrent 1000
+        }
+        cache 30
+        loop
+        reload
+        loadbalance
+    }

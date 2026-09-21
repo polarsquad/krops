@@ -1,0 +1,58 @@
+# WireMock stub mappings for the GCP arm (issue #355), mounted at
+# /home/wiremock/mappings by the WireMock Deployment.
+#
+# Under the repo's WIF posture every reconcile exchanges credentials before
+# its first resource API call: the external_account STS exchange (token_url)
+# and the service account impersonation (service_account_impersonation_url),
+# both repointed at WireMock by patches/. These static mappings answer the
+# token chain from the start, before any Phase 2 recordings exist; this is
+# the GCP equivalent of the AWS arm's STS GetCallerIdentity boot stub. The
+# tokens are placeholders; nothing here authenticates against real GCP.
+#
+# Matching is by path, not host, so the same mappings also serve the
+# DNS-rewritten sts/iamcredentials.googleapis.com hosts when the credential
+# repoint is not applied (the spike doc's alternative). A
+# service-account-key credential instead fetches oauth2.googleapis.com/token
+# and would need a third stub (POST /token); not shipped, because the
+# harness runs the WIF posture (see README.md).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wiremock-stubs
+  namespace: wiremock-system
+  labels:
+    app.kubernetes.io/name: wiremock
+    app.kubernetes.io/part-of: krops-virtualized-e2e
+data:
+  sts-v1-token.json: |
+    {
+      "request": {
+        "method": "POST",
+        "url": "/v1/token"
+      },
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {
+          "access_token": "dummy-wiremock-wif-token",
+          "issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
+          "token_type": "Bearer",
+          "expires_in": 3600
+        }
+      }
+    }
+  iamcredentials-generate-access-token.json: |
+    {
+      "request": {
+        "method": "POST",
+        "urlPathPattern": "/v1/projects/-/serviceAccounts/[^/]+:generateAccessToken"
+      },
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "jsonBody": {
+          "accessToken": "dummy-wiremock-access-token",
+          "expireTime": "2099-01-01T00:00:00Z"
+        }
+      }
+    }

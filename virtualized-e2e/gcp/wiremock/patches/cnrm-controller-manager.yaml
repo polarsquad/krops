@@ -1,0 +1,36 @@
+# Strategic merge patch: KCC CA trust for the WireMock rewrite (#355).
+#
+# Target: statefulset/cnrm-controller-manager, namespace cnrm-system
+# (created by the Config Connector operator from the cluster-mode
+# ConfigConnector in mgmt/gcp/infrastructure/kcc/, outside this tree;
+# cluster mode renders a StatefulSet, namespaced mode would render a
+# Deployment). Apply with:
+#   kubectl patch statefulset cnrm-controller-manager -n cnrm-system \
+#     --type strategic --patch-file virtualized-e2e/gcp/wiremock/patches/cnrm-controller-manager.yaml
+#
+# Mechanism: identical to capg-controller-manager.yaml; see that file's
+# header. KCC's Google calls run through the Terraform provider processes
+# the manager spawns, which inherit its environment, so SSL_CERT_FILE on
+# the manager container covers them. The wiremock-ca ConfigMap must exist
+# in this namespace (volumes cannot cross namespaces).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cnrm-controller-manager
+  namespace: cnrm-system
+spec:
+  template:
+    spec:
+      volumes:
+        - name: wiremock-ca
+          configMap:
+            name: wiremock-ca
+      containers:
+        - name: manager
+          env:
+            - name: SSL_CERT_FILE
+              value: /certs/ca.crt
+          volumeMounts:
+            - name: wiremock-ca
+              mountPath: /certs
+              readOnly: true

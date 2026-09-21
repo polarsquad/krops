@@ -1,0 +1,15 @@
+# GCP arm of the virtualized e2e harness (issue #355).
+#
+# Composes the shared WireMock base from ../../lib/wiremock with the
+# GCP-specific stub ConfigMap. The templates carry envsubst placeholders
+# (see ../../lib/wiremock/example.env), so this build proves structure only:
+# Phase 4 renders the templates, then applies, then patches the cluster and
+# the controllers (patches/ is kubectl patch input, not part of this
+# Kustomization because its targets are operator/kubeadm-managed objects
+# outside this tree).
+# Test-harness manifests: not Flux-reconciled, no flux-ks.yaml.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../lib/wiremock
+  - stubs-configmap.yaml

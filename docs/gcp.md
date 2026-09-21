@@ -87,9 +87,9 @@ restricted by `attributeCondition` to exactly those two service accounts.
 ## Bootstrap, pivot, teardown
 
 ```sh
-mise -E gcp run bootstrap        # kind + Flux + CAPG; then pivot into europe-north1-management
-mise run mgmt-kubeconfig         # ~/.kube/krops-mgmt.yaml (mgmt-kubeconfig in mise.toml)
-mise -E gcp run kubeconfigs      # workload kubeconfigs (user kubeconfig Secrets)
+scripts/toolbox-run.sh bootstrap gcp     # kind + Flux + CAPG; then pivot into europe-north1-management
+mise run mgmt-kubeconfig                 # ~/.kube/krops-mgmt.yaml (mgmt-kubeconfig in mise.toml)
+mise -E gcp run kubeconfigs              # workload kubeconfigs (user kubeconfig Secrets)
 ```
 
 Right after the kind cluster is created, bootstrap-rs runs the
@@ -106,7 +106,8 @@ Secrets and the `cnrm-system` namespace to the target before
 `pivot-manifest-vars`): the moved provider and Config Connector reference
 the Secrets by name and clusterctl does not carry them.
 
-Teardown is manual for now: `mise -E gcp run teardown` refuses and prints
+Teardown is manual for now: `scripts/toolbox-run.sh teardown gcp` refuses
+and prints
 the steps (`teardown.manual` in `bootstrap.toml`). The `krops` pool, its
 providers and the service accounts are deliberately left in place; they are
 re-adopted on the next bootstrap.

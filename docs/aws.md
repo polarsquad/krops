@@ -98,19 +98,19 @@ cluster.
 ## Bootstrap, pivot, teardown
 
 ```sh
-mise run bootstrap                 # aws: kind + Flux + CAPA; then pivot into eu-north-1-management
-mise run mgmt-kubeconfig           # ~/.kube/krops-mgmt.yaml
-mise -E aws run kubeconfigs        # workload kubeconfigs (aws eks update-kubeconfig per region)
+scripts/toolbox-run.sh bootstrap aws   # kind + Flux + CAPA; then pivot into eu-north-1-management
+mise run mgmt-kubeconfig               # ~/.kube/krops-mgmt.yaml
+mise -E aws run kubeconfigs            # workload kubeconfigs (aws eks update-kubeconfig per region)
 ```
 
 Bootstrap ends with the pivot: the CAPI inventory moves from the disposable
 `mgmt` kind cluster into the self-managed `eu-north-1-management` EKS cluster
 and the kind cluster is deleted (see [Pivot recovery](./operations.md#pivot-recovery)).
 
-Teardown is automated for `aws`. `mise run teardown` suspends Flux, deletes
-every workload CAPI Cluster, runs a best-effort AWS sweep for both workload
-regions and the self-managed management cluster (nodegroups, EKS control
-planes, orphaned RDS, CAPA-tagged VPC resources,
+Teardown is automated for `aws`. `scripts/toolbox-run.sh teardown aws`
+suspends Flux, deletes every workload CAPI Cluster, runs a best-effort AWS
+sweep for both workload regions and the self-managed management cluster
+(nodegroups, EKS control planes, orphaned RDS, CAPA-tagged VPC resources,
 versioned S3 buckets, CAPA and ACK IAM roles, the `krops-reader` user, and the
 `clusterawsadm` CloudFormation stack), and removes the kind bootstrap cluster.
 See [Teardown](./operations.md#teardown) for the controls.

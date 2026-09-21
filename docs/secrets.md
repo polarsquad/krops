@@ -30,7 +30,7 @@ export SOPS_AGE_KEY_FILE="$PWD/age.agekey"
 `AGE_KEY_FILE` is the bootstrap input; `SOPS_AGE_KEY_FILE` tells the SOPS CLI
 which private key to use while editing encrypted files.
 
-With the toolbox and no host mise installation:
+Toolbox-only key generation (a host with just the container engine):
 
 ```sh
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -47,7 +47,7 @@ existing secrets so they target your key:
 mise run sops-updatekeys
 ```
 
-The container-only equivalent uses the new private key explicitly:
+The toolbox-only equivalent uses the new private key explicitly:
 
 ```sh
 docker run --rm --user "$(id -u):$(id -g)" \

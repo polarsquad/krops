@@ -129,7 +129,7 @@ pins together with their declarative counterparts. See
 | `AGE_PUBLIC_KEY` | derived from `AGE_KEY_FILE` | Public key override during secret creation; must match the key file's public key when both are known (preflight fails fast on a mismatch) |
 | `OCI_REPOSITORY` / `OCI_TAG` | `krops` / `latest` | Local-host OCI artifact name |
 | `BOOTSTRAP_PIVOT` | `1` | Any value other than literal `1` skips pivot |
-| `MGMT_KUBECONFIG` | `~/.kube/krops-mgmt.yaml` | Exported management kubeconfig for native runs |
+| `MGMT_KUBECONFIG` | `~/.kube/krops-mgmt.yaml` | Exported management kubeconfig for native fallback runs |
 | `MGMT_READY_TIMEOUT` | `40m` for aws, `15m` for local-host, `30m` for local-talos (PXE install + first Talos boot) | Management cluster definition and provisioning waits |
 | `MGMT_POLL_INTERVAL` | `10` seconds | Management cluster definition and provisioning poll |
 | `BOOTSTRAP_KUBECONTEXT` | config value `kind-mgmt` | Source context required by pivot |
@@ -176,7 +176,8 @@ depend on engine- or version-specific error text.
 
 1. **Preflight:** validate the environment and required tools, select a running
    container engine, and perform the GitHub token/age-key checks for
-   GitHub-synced environments (`aws`, `local-talos`). Native runs require
+   GitHub-synced environments (`aws`, `local-talos`). A fallback native run
+   requires
    `kind`, `helm`, `kubectl`, `clusterctl`, and `mise`; OCI-synced
    environments (`local-host`) also require `flux` and `curl`.
 2. **Bootstrap kind:** create or reuse `mgmt`, start the local registry for
@@ -260,10 +261,10 @@ empty account.
 
 ## Entry-point and parity status
 
-`mise run bootstrap`, `mise run pivot`, and `mise run teardown` now invoke
-`scripts/toolbox-run.sh`, which runs this CLI in the toolbox container. The
-`pivot` task is a named resume path for the rerun-safe default lifecycle; it
-does not select a separate CLI subcommand.
+`scripts/toolbox-run.sh bootstrap`, `scripts/toolbox-run.sh pivot`, and
+`scripts/toolbox-run.sh teardown` invoke this CLI in the toolbox container.
+The `pivot` wrapper verb is a named resume path for the rerun-safe default
+lifecycle; it does not select a separate CLI subcommand.
 
 The three shell scripts remain as native reference and fallback paths until
 full parity runs pass for all environments. Local-host bootstrap, pivot, and

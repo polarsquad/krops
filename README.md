@@ -65,7 +65,8 @@ The other environments' diagrams are linked from their [Environments](#environme
 
 ## Prerequisites
 
-The toolbox container is the primary lifecycle interface. A container user
+All krops interactions happen through the prereq
+`krops-toolbox` container, driven by Docker or Podman. A container user
 needs only the repository checkout and a running engine:
 
 - Docker, or Podman 5.5+; kind creates clusters through the mounted engine
@@ -76,6 +77,9 @@ needs only the repository checkout and a running engine:
   or build the current checkout with
   `docker build -f bootstrap-rs/Dockerfile -t krops-toolbox:dev .`
 
+The toolbox carries `krops-bootstrap` plus every tool the lifecycle uses, so
+no host toolchain is required for the bootstrap, pivot, or teardown.
+
 The `aws` environment additionally requires a GitHub PAT with read access,
 AWS credentials and service quotas, and an age private key. The
 `local-talos` environment needs the PAT and age key too (it syncs from
@@ -83,11 +87,13 @@ GitHub), plus a reachable Tinkerbell stack and the site values in
 `mgmt/local-talos/clusters/management/cluster.yaml`; see
 [Operations](docs/operations.md).
 
-Native development and air-gap work additionally need:
-
-- Mise 2026.8.10 or newer
-- Rust via [rustup](https://rustup.rs/) when building the CLI outside the
-  image; the pin lives in `bootstrap-rs/rust-toolchain.toml`
+The one-off and helper steps that are not part of the lifecycle (cloud
+preparation, kubeconfig exports, SOPS key work, `oci-push`, `validate`)
+still run as host [mise](https://mise.jdx.dev/) tasks and are documented
+in place where used; moving them into the toolbox as well is a follow-up.
+The tool versions they pin live in `mise.toml` (the toolbox image is built
+from the same pins); the environment layers (`mise.<env>.toml`) carry the
+per-environment tools.
 
 ## Quickstart
 
@@ -120,21 +126,22 @@ key path, and any AWS credential variables. Podman socket paths vary by host.
 quote characters, and persists kubeconfigs under `.kube/`; see
 [Operations](docs/operations.md) for both forms.
 
-For hosts with mise, the lifecycle tasks call that wrapper. Installing the
-pinned native tools also enables key generation, validation, and inspection:
+The lifecycle runs through `scripts/toolbox-run.sh`, the Docker/Podman
+wrapper that handles the mounts, `.env` loading, and socket resolution.
+Key generation and validation are host helper tasks, run with
+[mise](https://mise.jdx.dev/) (see the follow-up note in
+[Prerequisites](#prerequisites)):
 
 ```sh
 docker build -f bootstrap-rs/Dockerfile -t krops-toolbox:dev .
 export TOOLBOX_IMAGE=krops-toolbox:dev
-mise trust
-mise install
 cp .env.example .env        # aws and local-talos: fill in the Git source and PAT
 mise run sops-keygen         # first time only: age key for SOPS
-mise run bootstrap           # toolbox: bootstrap, Flux handoff, then pivot
+scripts/toolbox-run.sh bootstrap      # toolbox: bootstrap, Flux handoff, then pivot
 export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
 flux get kustomizations --watch
 mise run validate            # shell syntax, bootstrap.toml cross-check, overlays
-mise run teardown            # toolbox: reverse-order lifecycle cleanup
+scripts/toolbox-run.sh teardown      # toolbox: reverse-order lifecycle cleanup
 ```
 
 Dependency versions are managed by Renovate
@@ -179,10 +186,10 @@ AWS credentials, and the `clusterawsadm` CloudFormation stack.
 mise -E aws install            # adds aws-cli, clusterawsadm
 mise -E aws run aws-bootstrap  # once: clusterawsadm IAM CloudFormation stack
 mise run sops-keygen           # first time only: age key for SOPS
-mise run bootstrap             # kind + Flux + CAPA; then pivot
+scripts/toolbox-run.sh bootstrap aws   # kind + Flux + CAPA; then pivot
 mise run mgmt-kubeconfig       # ~/.kube/krops-mgmt.yaml
 mise -E aws run kubeconfigs    # workload kubeconfigs per region
-mise run teardown              # full AWS + EKS + kind cleanup
+scripts/toolbox-run.sh teardown aws    # full AWS + EKS + kind cleanup
 ```
 
 Full guide: [AWS environment](docs/aws.md) (clusters, credentials, commit the
@@ -205,7 +212,7 @@ PAT, an age key, and a subscription where you hold Owner.
 ```sh
 mise -E azure install            # adds az
 mise -E azure run azure-bootstrap  # once: providers, resource group, identities
-mise -E azure run bootstrap        # kind + Flux + CAPZ; then pivot
+scripts/toolbox-run.sh bootstrap azure   # kind + Flux + CAPZ; then pivot
 mise run mgmt-kubeconfig
 mise -E azure run kubeconfigs
 ```
@@ -229,7 +236,7 @@ Owner.
 ```sh
 mise -E gcp install              # adds gcloud
 mise -E gcp run gcp-bootstrap    # once: APIs, service accounts, WIF pool
-mise -E gcp run bootstrap        # kind + Flux + CAPG; then pivot
+scripts/toolbox-run.sh bootstrap gcp     # kind + Flux + CAPG; then pivot
 mise run mgmt-kubeconfig
 mise -E gcp run kubeconfigs
 ```
@@ -252,16 +259,15 @@ application access, with no GitHub or AWS credentials.
 ![krops local-host architecture](docs/local-host-infra.svg)
 
 ```sh
-mise -E local-host install
-mise -E local-host run bootstrap
+scripts/toolbox-run.sh bootstrap local-host
 export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
 mise -E local-host run oci-push  # republish local management and workload paths
 mise -E local-host run kubeconfigs
 mise -E local-host run podinfo-port-forward  # http://localhost:9898
-mise -E local-host run teardown
+scripts/toolbox-run.sh teardown local-host
 ```
 
-`mise -E local-host run bootstrap` waits for both the management and workload
+`scripts/toolbox-run.sh bootstrap local-host` waits for both the management and workload
 Flux reconciliation chains and surfaces workload errors; a successful
 bootstrap plus the Podinfo port-forward verifies the end-to-end flow.
 Teardown deletes the CAPD workload cluster first, then the pre-pivot kind
@@ -284,10 +290,10 @@ run (issue #225).
 
 ```sh
 mise -E local-talos install  # adds talosctl
-mise -E local-talos run bootstrap
+scripts/toolbox-run.sh bootstrap local-talos
 export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
 mise -E local-talos run kubeconfigs
-mise -E local-talos run teardown  # releases the Hardware; never wipes the machine
+scripts/toolbox-run.sh teardown local-talos  # releases the Hardware; never wipes the machine
 ```
 
 #### Air-gapped local host
@@ -310,10 +316,10 @@ versions, provider manifests, and teardown targets come from
 against the Git manifests. Sequence-level behavior and generic fallback
 defaults remain in the binary.
 
-`mise run bootstrap`, `pivot`, and `teardown` now run the CLI through the
-toolbox wrapper. The shell scripts remain native reference and fallback paths
-until all environments complete parity runs; local-host has passed the full
-lifecycle, while AWS parity still gates retirement. See
+`scripts/toolbox-run.sh bootstrap`, `pivot`, and `teardown` run the CLI in
+the toolbox container. The shell scripts remain native reference and
+fallback paths until all environments complete parity runs; local-host has
+passed the full lifecycle, while AWS parity still gates retirement. See
 [The bootstrap CLI](docs/bootstrap-cli.md) for the interface, configuration,
 teardown controls, toolbox release, and current parity status.
 
@@ -352,15 +358,18 @@ teardown controls, toolbox release, and current parity status.
 ├── bootstrap.toml                 Repository-owned lifecycle configuration
 ├── bootstrap.sh / pivot.sh /      Native shell references and fallback paths;
 │   teardown.sh                    retained until both parity gates pass
-├── scripts/toolbox-run.sh         Docker/Podman wrapper used by lifecycle tasks
+├── scripts/toolbox-run.sh         Docker/Podman wrapper: the lifecycle entry
+│                                  point (bootstrap, pivot, teardown)
 ├── tests/                         Config and Renovate coverage cross-checks
 ├── mkdocs.yml                     MkDocs Material config for the docs site
 ├── pyproject.toml / uv.lock       Python project for the docs site build
 ├── tools/assemble_docs.py         Assembles build/docs/ from README.md + docs/
 ├── website/                       Docs site assets: colour scheme CSS, CNAME
 ├── docs/                          Detailed documentation (see table above)
-├── mise.toml / mise.*.toml        Pinned toolchain and per-environment
-│                                  task layers (aws, azure, local-host, local-talos)
+├── mise.toml / mise.*.toml        Pinned toolchain (the toolbox image is
+│                                  built from these pins) and per-environment
+│                                  helper task layers (aws, azure, gcp,
+│                                  local-host, local-talos)
 ├── renovate.json5                 Hosted Renovate discovery and grouping rules
 ├── mgmt/aws/                      Synced by the MANAGEMENT cluster's Flux
 │   ├── infrastructure/           cert-manager, CAPI operator, CAPA identity,

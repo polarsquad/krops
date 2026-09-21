@@ -64,9 +64,9 @@ federated credential in `mgmt/azure/infrastructure/aso-workload-identity/`
 ## Bootstrap, pivot, teardown
 
 ```sh
-mise -E azure run bootstrap        # kind + Flux + CAPZ; then pivot into swedencentral-management
-mise -E azure run mgmt-kubeconfig  # ~/.kube/krops-mgmt.yaml
-mise -E azure run kubeconfigs      # workload kubeconfigs via clusterctl
+scripts/toolbox-run.sh bootstrap azure   # kind + Flux + CAPZ; then pivot into swedencentral-management
+mise run mgmt-kubeconfig                 # ~/.kube/krops-mgmt.yaml
+mise -E azure run kubeconfigs            # workload kubeconfigs via clusterctl
 ```
 
 Right after the kind cluster is created, bootstrap-rs runs the `arc-federate`
@@ -80,7 +80,8 @@ During the pivot the CLI applies the plain, secret-free
 (`pivot-manifests` in `bootstrap.toml`): the moved ASO resources reference
 the Secret by name and clusterctl does not carry it.
 
-Teardown is manual for now: `mise -E azure run teardown` refuses and prints
+Teardown is manual for now: `scripts/toolbox-run.sh teardown azure` refuses
+and prints
 the steps (`teardown.manual` in `bootstrap.toml`), including deleting the Arc
 resource (`az connectedk8s delete`). Automating the Azure orphan sweep is
 tracked in the follow-up issue linked from #71.

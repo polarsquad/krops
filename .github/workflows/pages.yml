@@ -27,7 +27,7 @@ concurrency:
 jobs:
   build:
     name: Build site
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - name: Checkout
@@ -35,7 +35,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v10.1.0
         with:
-          version: "0.12.13"
+          version: "0.12.17"
       - name: Sync
         run: uv sync --locked
       - name: Build
@@ -51,7 +51,7 @@ jobs:
     name: Deploy to GitHub Pages
     needs: build
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     environment:
       name: github-pages

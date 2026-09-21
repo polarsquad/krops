@@ -10,7 +10,7 @@
 KROPS_PROFILE = "local-talos"
 
 [tools]
-talosctl = "1.14.0"
+talosctl = "1.14.1"
 
 [tasks.kubeconfigs]
 description = "Export the Talos management-cluster kubeconfig (no rewrite: the machine is remote)"

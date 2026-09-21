@@ -55,7 +55,7 @@ jobs:
       - name: Install mise
         uses: jdx/mise-action@v4.3.0
         with:
-          version: 2026.9.7
+          version: 2026.9.12
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
@@ -116,7 +116,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v10.1.0
         with:
-          version: "0.12.13"
+          version: "0.12.17"
 
       - name: Set up Node.js
         uses: actions/setup-node@v7.0.0
@@ -124,7 +124,7 @@ jobs:
           node-version: 24.21.0
 
       - name: Install Renovate
-        run: npm install --global renovate@44.90.3
+        run: npm install --global renovate@44.104.2
 
       - name: Verify only actions join the GitHub Actions group
         run: python3 tests/test-renovate-actions-grouping.py
@@ -191,7 +191,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v10.1.0
         with:
-          version: "0.12.13"
+          version: "0.12.17"
 
       - name: ruff check (unused imports, subprocess.run check=)
         run: |

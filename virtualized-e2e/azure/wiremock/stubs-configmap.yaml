@@ -1,0 +1,80 @@
+# WireMock stub mappings for the Azure arm (issue #355), mounted at
+# /home/wiremock/mappings by the WireMock Deployment.
+#
+# These four static mappings make the AAD auth chain hermetic BEFORE any
+# Phase 2 recordings exist: like ACK's STS GetCallerIdentity dependency in
+# the AWS spike, no ARM traffic happens until token acquisition succeeds
+# (Phase 0 spike, docs/wiremock-e2e-spike-findings-azure.md). The tenant,
+# subscription, and client IDs are the dummy GUIDs the aso-controller-settings
+# patch pins; nothing here authenticates against real Azure.
+#
+# - aad-instance-discovery.json: MSAL validates a non-public authority via
+#   instance discovery anchored at the hardcoded public endpoint (reached
+#   through the CoreDNS rewrite of login.microsoftonline.com). The response
+#   must list every authority host in play in metadata[].aliases, both
+#   login.microsoftonline.com and wiremock.wiremock-system.svc.
+# - aad-openid-configuration-common.json: ASO's MSAL path
+#   (/common/.well-known/openid-configuration).
+# - aad-openid-configuration-tenant.json: CAPZ's MSAL path
+#   (/<tenant>/v2.0/.well-known/openid-configuration). Different URL shape;
+#   both must exist.
+# - aad-token.json: issues a dummy unsigned-JWT access token; both vendored
+#   azidentity versions (ASO v1.13.x, CAPZ v1.14.x) accept a JWT-shaped
+#   string without complaint.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wiremock-stubs
+  namespace: wiremock-system
+  labels:
+    app.kubernetes.io/name: wiremock
+    app.kubernetes.io/part-of: krops-virtualized-e2e
+data:
+  aad-instance-discovery.json: |
+    {
+      "request": {
+        "method": "GET",
+        "urlPath": "/common/discovery/instance"
+      },
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "body": "{\"tenant_discovery_endpoint\":\"https://wiremock.wiremock-system.svc/common/.well-known/openid-configuration\",\"api-version\":\"1.1\",\"metadata\":[{\"preferred_network\":\"wiremock.wiremock-system.svc\",\"preferred_cache\":\"wiremock.wiremock-system.svc\",\"aliases\":[\"login.microsoftonline.com\",\"wiremock.wiremock-system.svc\"]}]}"
+      }
+    }
+  aad-openid-configuration-common.json: |
+    {
+      "request": {
+        "method": "GET",
+        "urlPath": "/common/.well-known/openid-configuration"
+      },
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "body": "{\"issuer\":\"https://wiremock.wiremock-system.svc/{tenantid}/v2.0\",\"authorization_endpoint\":\"https://wiremock.wiremock-system.svc/common/oauth2/v2.0/authorize\",\"token_endpoint\":\"https://wiremock.wiremock-system.svc/common/oauth2/v2.0/token\",\"jwks_uri\":\"https://wiremock.wiremock-system.svc/common/discovery/v2.0/keys\",\"response_modes_supported\":[\"query\",\"fragment\",\"form_post\"],\"response_types_supported\":[\"code\",\"id_token\",\"code id_token\"],\"scopes_supported\":[\"openid\",\"profile\",\"email\",\"offline_access\"],\"subject_types_supported\":[\"pairwise\"],\"id_token_signing_alg_values_supported\":[\"RS256\"],\"token_endpoint_auth_methods_supported\":[\"client_secret_post\",\"client_secret_basic\"],\"claims_supported\":[\"sub\",\"iss\",\"aud\",\"exp\",\"iat\",\"tid\"]}"
+      }
+    }
+  aad-openid-configuration-tenant.json: |
+    {
+      "request": {
+        "method": "GET",
+        "urlPathTemplate": "/{tenant}/v2.0/.well-known/openid-configuration"
+      },
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "body": "{\"issuer\":\"https://wiremock.wiremock-system.svc/11111111-1111-1111-1111-111111111111/v2.0\",\"authorization_endpoint\":\"https://wiremock.wiremock-system.svc/11111111-1111-1111-1111-111111111111/oauth2/v2.0/authorize\",\"token_endpoint\":\"https://wiremock.wiremock-system.svc/11111111-1111-1111-1111-111111111111/oauth2/v2.0/token\",\"jwks_uri\":\"https://wiremock.wiremock-system.svc/11111111-1111-1111-1111-111111111111/discovery/v2.0/keys\",\"response_modes_supported\":[\"query\",\"fragment\",\"form_post\"],\"response_types_supported\":[\"code\",\"id_token\",\"code id_token\"],\"scopes_supported\":[\"openid\",\"profile\",\"email\",\"offline_access\"],\"subject_types_supported\":[\"pairwise\"],\"id_token_signing_alg_values_supported\":[\"RS256\"],\"token_endpoint_auth_methods_supported\":[\"client_secret_post\",\"client_secret_basic\"],\"claims_supported\":[\"sub\",\"iss\",\"aud\",\"exp\",\"iat\",\"tid\"]}"
+      }
+    }
+  aad-token.json: |
+    {
+      "request": {
+        "method": "POST",
+        "urlPathTemplate": "/{tenant}/oauth2/v2.0/token"
+      },
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "body": "{\"token_type\":\"Bearer\",\"expires_in\":3599,\"ext_expires_in\":3599,\"access_token\":\"eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJhdWQiOiJodHRwczovL3dpcmVtb2NrLndpcmVtb2NrLXN5c3RlbS5zdmMiLCJpc3MiOiJodHRwczovL3dpcmVtb2NrLndpcmVtb2NrLXN5c3RlbS5zdmMvMTExMTExMTEtMTExMS0xMTExLTExMTEtMTExMTExMTExMTExL3YyLjAiLCJzdWIiOiIyMjIyMjIyMi0yMjIyLTIyMjItMjIyMi0yMjIyMjIyMjIyMjIiLCJleHAiOjQxMDI0NDQ4MDB9.\"}"
+      }
+    }

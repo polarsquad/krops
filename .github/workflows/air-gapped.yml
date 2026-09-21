@@ -19,7 +19,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 15
     services:
       registry:
@@ -38,7 +38,7 @@ jobs:
       - name: Install mise
         uses: jdx/mise-action@v4.3.0
         with:
-          version: 2026.9.7
+          version: 2026.9.12
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
@@ -65,7 +65,7 @@ jobs:
   isolated-deploy:
     name: Deploy without external egress
     needs: build
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -74,7 +74,7 @@ jobs:
       - name: Install mise
         uses: jdx/mise-action@v4.3.0
         with:
-          version: 2026.9.7
+          version: 2026.9.12
         env:
           GITHUB_TOKEN: ${{ github.token }}
 

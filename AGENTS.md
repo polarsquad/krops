@@ -166,6 +166,10 @@ resources. There is no app source code here, only declarative infrastructure.
   `mise.gcp.toml` (gcloud, plus the `gcp-bootstrap`, `wif-federate` and
   `kubeconfigs` tasks; gcloud state lives in the gitignored `.gcloud/`
   shared with the toolbox) are the other per-environment layers.
+  Helper tasks run inside the toolbox image via `--entrypoint mise`
+  (issue #423); `validate` and `podinfo-port-forward` stay host tasks by
+  design; `MISE_AUTO_INSTALL=0` is mandatory for in-toolbox runs and mise's
+  `env_file` makes `/workspace/.env` override `-e` values.
 - `renovate.json5`: Renovate config. Dependency versions live in the native
   files that consume them (mise configs, manifests, workflows, airgap
   inventory); Renovate discovers and updates them weekly and tracks pending
@@ -217,11 +221,13 @@ Each component pairs a plain kustomize root with a Flux `Kustomization`:
 ## Common tasks (mise)
 
 ```sh
-mise install            # install pinned tools (kubectl, kind, flux, sops, age, ...)
-mise run validate       # build every kustomize overlay; mirrors CI
-mise run bootstrap      # toolbox container: kind cluster + Flux handoff + pivot to self-managed mgmt
-mise -E aws run kubeconfigs  # export AWS workload-cluster kubeconfigs
-mise run teardown       # toolbox container: full teardown (EKS, AWS resources, kind)
+mise install            # host: pinned tools for validate and the docs tasks
+mise run validate       # host: build every kustomize overlay; mirrors CI
+scripts/toolbox-run.sh bootstrap [profile]   # toolbox: kind + Flux handoff + pivot
+scripts/toolbox-run.sh teardown  [profile]   # toolbox: full teardown
+# helper tasks (sops-*, *-bootstrap, kubeconfigs, oci-push) run the same image:
+docker run --rm -it -v "$PWD:/workspace" -w /workspace -e MISE_AUTO_INSTALL=0 \
+  --entrypoint mise "$TOOLBOX_IMAGE" -E aws run kubeconfigs      # see docs/operations.md
 ```
 
 ## Editing renovate.json5

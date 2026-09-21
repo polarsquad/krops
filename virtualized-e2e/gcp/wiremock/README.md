@@ -124,3 +124,14 @@ WireMock image's own keytool, both `--keystore-password` and
   `oauth2.googleapis.com/token` and need a `POST /token` stub before any
   compute call. That stub is not shipped: the harness runs the repo's WIF
   posture, where no oauth2 token call is made.
+- The rewrite set covers CAPG's resource APIs (compute, container) plus
+  the auth hosts, but not the Google hosts the repo's KCC resources dial:
+  `iam.googleapis.com` (IAMServiceAccount, IAMPolicyMember, the
+  WorkloadIdentityPool family in `mgmt/gcp/infrastructure/kcc-identity/`),
+  `serviceusage.googleapis.com` (the Service activations), and from
+  `workload/gcp-base/` `storage.googleapis.com`, `sqladmin.googleapis.com`,
+  and `servicenetworking.googleapis.com`. Under the WIF repoint those calls
+  authenticate against WireMock and then dial the real hosts with a dummy
+  token, so they are neither intercepted nor assertable. Phase 2 must
+  extend the rewrite list and the SAN set per KCC service in scope, or
+  scope the arm title down to CAPG plus KCC auth.

@@ -135,7 +135,13 @@ arguments. Renovate manages those base references and build arguments.
    `coredns`, `etcd`, and `pause` pins match what the pinned `kindest/node`
    version's real `kubeadm` binary actually deploys
    (`airgap/tests/test-airgap-kubeadm-images.py`), rather than drifting to
-   whatever the latest upstream tag happens to be. The workload cluster, the
+   whatever the latest upstream tag happens to be. The test verifies the
+   kubeadm binary's SHA-256 and each pinned digest against the registry.
+   Renovate bumps these pins like any other; when a bump disagrees with
+   kubeadm the check fails, and `python3
+   airgap/tests/test-airgap-kubeadm-images.py --fix` regenerates every tracked
+   pin from kubeadm and the registry so the fix can be committed by hand. The
+   workload cluster, the
    CAPD management cluster, and the kind bootstrap mgmt node all run the
    same `kindest/node` version. The check compares against `kubeadm config
    images list` for that version, not a live `crictl` harvest against a
@@ -182,8 +188,8 @@ hard platform limit -- tracked in
 [renovatebot/renovate#46270](https://github.com/renovatebot/renovate/discussions/46270),
 with the tech debt tracked in #326. The `validate.yml`
 `test-airgap-kubeadm-images.py` check is the fallback in the meantime: it
-can't stop Renovate from proposing a stale tag, but it fails the PR before
-merge instead of letting the drift ship silently. If Mend allowlists
+fails the PR before merge instead of letting the drift ship silently, and
+`--fix` is the manual stand-in for the script. If Mend allowlists
 `postUpgradeTasks` for this repo, or self-hosting is revisited, replacing
 this check with that script would close the gap properly and make the CI
 test redundant.

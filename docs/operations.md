@@ -103,15 +103,24 @@ allowlist into the container:
   `AGE_PUBLIC_KEY`
 - AWS: `AWS_REGION`, `AWS_PROFILE`, `AWS_ACCESS_KEY_ID`,
   `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`
+- Azure: `AZURE_SUBSCRIPTION_ID`, `AZURE_LOCATION`, `AZURE_CONFIG_DIR`
+- GCP: `GCP_PROJECT`, `GCP_REGION`, `CLOUDSDK_CONFIG`
 
-`CLOUDSDK_CONFIG` is forwarded twice: once through the GCP allowlist entry
-(an operator-set value, if any), then again as an explicit `-e
-CLOUDSDK_CONFIG=/workspace/.gcloud` appended after it. The container engine
-takes the last value for a repeated `-e` key, so the explicit one wins by
-design: the toolbox always uses the repo-local `.gcloud/` directory (inside
-the `/workspace` mount), shared with the host gcp session
-([gcp.md](./gcp.md)), never an operator override. Keep the two in sync if
-the mount path ever changes.
+Most of that list reflects whatever the operator set in `.env` or the shell.
+Two entries don't: `ENGINE_SOCK` is recomputed by the engine-detection step
+above and unconditionally re-exported right before this list is built
+([Socket resolution](../scripts/toolbox-run.sh)), and `CLOUDSDK_CONFIG` is
+forwarded through this allowlist and then forwarded again as an explicit `-e
+CLOUDSDK_CONFIG=/workspace/.gcloud` appended after it; the container engine
+takes the last value for a repeated `-e` key, so the explicit one always
+wins. Both are canonical-by-design: the toolbox always resolves its own
+engine socket and always uses the repo-local `.gcloud/` directory (inside the
+`/workspace` mount, shared with the host gcp session, [gcp.md](./gcp.md)),
+never an operator override. `KUBECONFIG` is the same kind of value but isn't
+part of this allowlist at all: it's hardcoded to
+`/workspace/.kube/kind.yaml` directly on the `exec` line. Setting any of
+`ENGINE_SOCK`, `CLOUDSDK_CONFIG`, or `KUBECONFIG` in `.env` has no effect;
+see `.env.example`.
 
 It does not pass `BOOTSTRAP_CONFIG`, `REGISTRY_READY_RETRIES`,
 `LOCAL_RECONCILE_TIMEOUT`, `MGMT_KUBECONFIG`, `MGMT_READY_TIMEOUT`,

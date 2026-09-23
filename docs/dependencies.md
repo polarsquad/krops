@@ -153,18 +153,6 @@ arguments. Renovate manages those base references and build arguments.
    (`tests/test-cert-manager-version-consistency.py`) -- catches the same
    drift the `platform-charts` Renovate group prevents, regardless of how it
    happens.
-   And (#322) that the pinned cert-manager
-   version (`bootstrap.toml`) supports the pinned Kubernetes version
-   (`tests/test-cert-manager-kubernetes-support.py`) whenever a Renovate PR
-   changes either pin -- a daily scheduled deployment failed silently for two
-   weeks when cert-manager v1.21.x (supports v1.33-v1.36) was left paired
-   with a Renovate-bumped Kubernetes v1.37.0 before this existed. There is no
-   structured/versioned feed for cert-manager's supported-version window, so
-   the check fetches and parses the same Markdown source that renders
-   [cert-manager's "Currently supported releases" page](https://cert-manager.io/docs/releases/),
-   rather than a compatibility table hardcoded here that would go stale the
-   same way. That's a known fragile workaround, not a real fix; see the note
-   below.
 3. For toolbox inputs, also require the `bootstrap-rs` workflow's Rust checks
    and container build/smoke job.
 4. For a `kubernetes-version` PR, re-harvest the images kubeadm deploys for
@@ -193,17 +181,6 @@ fails the PR before merge instead of letting the drift ship silently, and
 `postUpgradeTasks` for this repo, or self-hosting is revisited, replacing
 this check with that script would close the gap properly and make the CI
 test redundant.
-
-cert-manager's Helm chart's `kubeVersion` field only encodes a floor
-(`>= 1.22.0-0`), not the real supported ceiling, so Helm's own install-time
-validation doesn't catch this either. Keeping that field in sync would let
-both Helm and this check rely on the chart's own metadata instead of scraped
-docs; upstream already has that filed
-([cert-manager/cert-manager#4132](https://github.com/cert-manager/cert-manager/issues/4132),
-reopened as [#9123](https://github.com/cert-manager/cert-manager/issues/9123)
-after the original went stale unresolved). If that ships, replace this
-check's Markdown scrape with a read of the chart's own `kubeVersion` for the
-pinned release.
 
 If an image appears in both a manifest and the air-gap inventory
 (`airgap/images.txt` or `airgap/zarf.yaml`), update both in the same PR. There

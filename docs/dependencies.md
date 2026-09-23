@@ -28,6 +28,15 @@ Renovate discovers and updates versions in:
   pin, its `pivot.sh`/HelmRelease counterparts, its `airgap/zarf.yaml` chart
   pin, and its four `airgap/images.txt`/`airgap/zarf.yaml` image tags all
   share the `platform-charts` group so they can't drift apart (issue #322).
+  The Helm index publishes cert-manager versions as `v1.21.x`. The pins in
+  `bootstrap.toml`, `pivot.sh`, and the HelmReleases are spelled without the
+  leading `v`; `airgap/zarf.yaml` keeps the `v` as a literal in its
+  annotation-driven line (the custom manager regex consumes it and the
+  `autoReplaceStringTemplate` adds it back). The packageRule that resolves
+  `charts.jetstack.io` carries `extractVersion` to strip the `v` from the
+  datasource before Renovate matches and writes back versions; without it,
+  bare pins would receive a spurious leading `v`, and the zarf chart pin
+  would become `vv1.21.x`.
 - `bootstrap-rs/Dockerfile`: digest-pinned build and runtime base images, and
   the mise CLI and Podman remote-client build arguments used by the toolbox.
   The `mise install` layer names tools without versions (`python`, `uv`,

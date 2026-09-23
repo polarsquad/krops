@@ -147,6 +147,8 @@ jobs:
         run: python3 tests/test-renovate-cluster-api-grouping.py
 
       - name: Verify cert-manager's chart and images.txt image tags group together (#322)
+        env:
+          RENOVATE_GITHUB_COM_TOKEN: ${{ github.token }}
         run: python3 tests/test-renovate-cert-manager-grouping.py
 
       - name: Verify airgap digest pinning

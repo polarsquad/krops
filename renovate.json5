@@ -585,7 +585,8 @@
       "description": "Resolve cert-manager Helm repo once across declarative and imperative pins",
       "matchDatasources": ["helm"],
       "matchPackageNames": ["cert-manager"],
-      "registryUrls": ["https://charts.jetstack.io"]
+      "registryUrls": ["https://charts.jetstack.io"],
+      "extractVersion": "^v(?<version>.+)$"
     },
     {
       "description": "Resolve cluster-api-operator Helm repo once across declarative and imperative pins",

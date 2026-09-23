@@ -215,6 +215,7 @@ for (const dependency of dependencies) {
     results.push({
         groupName: result.groupName ?? null,
         separateMajorMinor: result.separateMajorMinor ?? null,
+        extractVersion: result.extractVersion ?? null,
     });
 }
 process.stdout.write(JSON.stringify(results));

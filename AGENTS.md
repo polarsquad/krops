@@ -117,7 +117,10 @@ resources. There is no app source code here, only declarative infrastructure.
   Zarf fetches SHA-256-pinned CAAPH release assets and bundles arm64
   `clusterctl`; its bounded deploy action renders and applies CAAPH from those
   staged assets (the supported kind-cluster teardown, not `zarf package remove`,
-  removes those resources).
+  removes those resources). The capi-core, capi-providers, and caaph deploy
+  actions source the shared `scripts/resolve-clusterctl.sh` (staged by
+  capi-core); `airgap/tests/test-resolve-clusterctl.py` (in `mise run
+  validate` and CI) exercises it against a temp-dir copy.
   Every build is signed and contains Zarf-generated per-component Syft SBOMs.
   `offline-run.sh` verifies the signature, checksums, and extracted SBOMs
   before staging; operator builds use `ZARF_SIGNING_KEY` / `ZARF_VERIFY_KEY`,
@@ -275,6 +278,16 @@ Traps that have bitten this repo (each caught in a live review):
   (`gh api repos/<owner>/<repo>`); three 404 depNames have shipped.
   `github-releases` returns nothing for tag-only repos (golang/go,
   python/cpython); use `github-tags` or `golang-version`.
+- `autoReplaceStringTemplate` only sees the dependency's standard fields
+  (`depName`, `currentValue`, `newValue`, `newDigest`, ...). Custom capture
+  groups (`indent`, `header`, `urlPrefix`, ...) render empty, `registryUrl`
+  is stored as `registryUrls`, and `depName` is the `depNameTemplate`
+  result. Prefer no template: the default replacement swaps every
+  `currentValue`/`currentDigest` inside the match. That swap also hits a
+  pure-numeric tag (`registry:2`) inside its hex digest, so pin full
+  tags (`2.8.3`). Lookbehind is not an escape hatch: Renovate compiles
+  `matchStrings` with RE2, which rejects it (only a Node without RE2
+  falls back to JS `RegExp` and hides that).
 
 Repo gates: `tests/test-renovate-coverage.py` (every managed pin is
 discovered) and the digest-pinning test run in CI only (the validate.yml
@@ -286,9 +299,11 @@ locally: `mise x node@24 -- python3 tests/test-renovate-coverage.py`.
 The offline unit test `tests/test-renovate-actions-grouping.py` also runs in
 that CI job and uses the shared harness to apply Renovate's real package-rule
 engine, checking that only action dependencies join the GitHub Actions group.
-Run locally with Renovate on PATH and Node >= 24.11. These tests
-do not cover lookup liveness or the replacement path; only the
-dry-run and the handlebars simulation cover those.
+Run locally with Renovate on PATH and Node >= 24.11. The offline
+`tests/test-renovate-auto-replace.py` (same CI job) covers the replacement
+path: it runs Renovate's real `doAutoReplace` on every dependency every regex
+manager extracts and fails unless only the version/digest changed. None of
+these cover lookup liveness; only the dry-run does.
 
 The digest-pinning, coverage, and release-assets tests all run sequentially
 in the same CI job and their fixtures overlap on `airgap/zarf.yaml`'s

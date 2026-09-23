@@ -246,8 +246,7 @@
       "managerFilePatterns": ["/(^|/)bootstrap\\.toml$/"],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z0-9-]+)(?: registryUrl=(?<registryUrl>\\S+))? depName=(?<depName>\\S+)(?: versioning=(?<versioning>[a-z0-9-]+))?\\n(?<depKey>[a-zA-Z0-9_-]+) = \\\"(?<currentValue>[^\\\"]+)\\\""
-      ],
-      "autoReplaceStringTemplate": "# renovate: datasource={{{datasource}}}{{#if registryUrl}} registryUrl={{{registryUrl}}}{{/if}} depName={{{depName}}}{{#if versioning}} versioning={{{versioning}}}{{/if}}\n{{{depKey}}} = \"{{{newValue}}}\""
+      ]
     },
     {
       "customType": "regex",
@@ -400,8 +399,7 @@
       "matchStrings": ["(?<indent>[ \t]+)version: v(?<currentValue>[0-9A-Za-z.\\-]+)"],
       "depNameTemplate": "kindest/node",
       "datasourceTemplate": "docker",
-      "versioningTemplate": "docker",
-      "autoReplaceStringTemplate": "{{{indent}}}version: v{{{newValue}}}"
+      "versioningTemplate": "docker"
     },
     // ── virtualized-e2e harness images ───────────────────────────────────
     {
@@ -441,7 +439,6 @@
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z0-9-]+)(?: registryUrl=(?<registryUrl>\\S+))? depName=(?<depName>\\S+)\\n\\s+version: v(?<currentValue>[^\\s]+)"
       ],
-      "autoReplaceStringTemplate": "# renovate: datasource={{{datasource}}}{{#if registryUrl}} registryUrl={{{registryUrl}}}{{/if}} depName={{{depName}}}\n        version: v{{{newValue}}}"
     },
     {
       "customType": "regex",
@@ -460,8 +457,7 @@
       "matchStrings": [
         "(?<header># renovate: datasource=(?<datasource>github-release-attachments) depName=(?<depName>kubernetes-sigs/cluster-api-addon-provider-helm)\\n)(?<indent>\\s*)- source: (?<urlPrefix>https://github\\.com/[^/]+/[^/]+/releases/download/)(?<currentValue>v[^/]+)/(?<asset>[^\\n]+)\\n\\s*shasum: (?<currentDigest>[a-fA-F0-9]{64})\\n\\s*target: (?<targetPrefix>[^\\n]*?/)(?:v[^/]+)/(?<targetAsset>[^\\n]+)"
       ],
-      "versioningTemplate": "loose",
-      "autoReplaceStringTemplate": "{{{header}}}{{{indent}}}- source: {{{urlPrefix}}}{{{newValue}}}/{{{asset}}}\n{{{indent}}}  shasum: {{{newDigest}}}\n{{{indent}}}  target: {{{targetPrefix}}}{{{newValue}}}/{{{targetAsset}}}"
+      "versioningTemplate": "loose"
     },
     {
       "customType": "regex",
@@ -471,8 +467,7 @@
         "# renovate: datasource=(?<datasource>github-releases) depName=(?<depName>kubernetes-sigs/cluster-api-addon-provider-helm)\\n(?<indent>[ \\t]*)\\\"\\$clusterctl\\\" generate provider --addon helm:v(?<currentValue>[^\\s\\\\]+)"
       ],
       "extractVersionTemplate": "^v(?<version>.+)",
-      "versioningTemplate": "semver-coerced",
-      "autoReplaceStringTemplate": "# renovate: datasource={{{datasource}}} depName={{{depName}}}\n{{{indent}}}\"$clusterctl\" generate provider --addon helm:v{{newValue}}"
+      "versioningTemplate": "semver-coerced"
     },
     {
       "customType": "regex",
@@ -481,8 +476,7 @@
       "matchStrings": [
         "(?<header># renovate: datasource=(?<datasource>github-release-attachments) depName=(?<depName>kubernetes-sigs/cluster-api)\\n)(?<indent>\\s*)- source: (?<urlPrefix>https://github\\.com/[^/]+/[^/]+/releases/download/)(?<currentValue>v[^/]+)/(?<asset>[^\\n]+)\\n\\s*shasum: (?<currentDigest>[a-fA-F0-9]{64})"
       ],
-      "versioningTemplate": "loose",
-      "autoReplaceStringTemplate": "{{{header}}}{{{indent}}}- source: {{{urlPrefix}}}{{{newValue}}}/{{{asset}}}\n{{{indent}}}  shasum: {{{newDigest}}}"
+      "versioningTemplate": "loose"
     },
     // ── CAPI provider (core, bootstrap, control-plane, CAPD) Zarf release
     // files (see docs/dependencies.md's "Managed surfaces") ──────────────
@@ -494,8 +488,7 @@
         "(?<header># renovate: datasource=(?<datasource>github-release-attachments) depName=(?<depName>kubernetes-sigs/cluster-api-(?:core|bootstrap-kubeadm|control-plane-kubeadm|infrastructure-docker))\\n)(?<indent>\\s*)- source: (?<urlPrefix>https://github\\.com/[^/]+/[^/]+/releases/download/)(?<currentValue>v[^/]+)/(?<asset>[^\\n]+)\\n\\s*shasum: (?<currentDigest>[a-fA-F0-9]{64})\\n\\s*target: (?<targetPrefix>[^\\n]*?/)(?:v[^/]+)/(?<targetAsset>[^\\n]+)",
       ],
       "depNameTemplate": "kubernetes-sigs/cluster-api",
-      "versioningTemplate": "loose",
-      "autoReplaceStringTemplate": "{{{header}}}{{{indent}}}- source: {{{urlPrefix}}}{{{newValue}}}/{{{asset}}}\n{{{indent}}}  shasum: {{{newDigest}}}\n{{{indent}}}  target: {{{targetPrefix}}}{{{newValue}}}/{{{targetAsset}}}"
+      "versioningTemplate": "loose"
     },
     // ── versions rendered by each provider's Zarf deployment action ──────
     {
@@ -507,19 +500,17 @@
       ],
       "depNameTemplate": "kubernetes-sigs/cluster-api",
       "extractVersionTemplate": "^v(?<version>.+)",
-      "versioningTemplate": "semver-coerced",
-      "autoReplaceStringTemplate": "# renovate: datasource={{{datasource}}} depName={{{depName}}}\n{{{indent}}}\"$clusterctl\" generate provider {{{providerSpec}}}:v{{newValue}}"
+      "versioningTemplate": "semver-coerced"
     },
     {
       "customType": "regex",
       "description": "CAAPH clusterctl config staged release path",
       "managerFilePatterns": ["/(^|/)airgap/files/clusterctl-providers\\.yaml$/"],
       "matchStrings": [
-        "(?<header># renovate: datasource=(?<datasource>github-releases) depName=(?<depName>kubernetes-sigs/cluster-api-addon-provider-helm)\\n)\\s*url: (?<urlPrefix>.*?/)(?<currentValue>v[^/]+)/components\\.yaml"
+        "(?<header># renovate: datasource=(?<datasource>github-releases) depName=(?<depName>kubernetes-sigs/cluster-api-addon-provider-helm)\\n)\\s*url: (?<urlPrefix>.*?/)v(?<currentValue>[^/]+)/components\\.yaml"
       ],
       "extractVersionTemplate": "^v(?<version>.+)",
-      "versioningTemplate": "semver-coerced",
-      "autoReplaceStringTemplate": "{{{header}}}    url: {{{urlPrefix}}}v{{newValue}}/components.yaml"
+      "versioningTemplate": "semver-coerced"
     },
     // ── clusterctl-providers.yaml staged-version paths for the 4 CAPI
     // providers above (CAAPH's own entry is the manager just above) ──────
@@ -528,12 +519,11 @@
       "description": "CAPI provider (core, bootstrap-kubeadm, control-plane-kubeadm, CAPD) clusterctl config staged release path",
       "managerFilePatterns": ["/(^|/)airgap/files/clusterctl-providers\\.yaml$/"],
       "matchStrings": [
-        "(?<header># renovate: datasource=(?<datasource>github-releases) depName=(?<depName>kubernetes-sigs/cluster-api-(?:core|bootstrap-kubeadm|control-plane-kubeadm|infrastructure-docker))\\n)\\s*url: (?<urlPrefix>.*?/)(?<currentValue>v[^/]+)/(?<asset>[^\\n]+)"
+        "(?<header># renovate: datasource=(?<datasource>github-releases) depName=(?<depName>kubernetes-sigs/cluster-api-(?:core|bootstrap-kubeadm|control-plane-kubeadm|infrastructure-docker))\\n)\\s*url: (?<urlPrefix>.*?/)v(?<currentValue>[^/]+)/(?<asset>[^\\n]+)"
       ],
       "depNameTemplate": "kubernetes-sigs/cluster-api",
       "extractVersionTemplate": "^v(?<version>.+)",
-      "versioningTemplate": "semver-coerced",
-      "autoReplaceStringTemplate": "{{{header}}}    url: {{{urlPrefix}}}v{{newValue}}/{{{asset}}}"
+      "versioningTemplate": "semver-coerced"
     },
     // EKS addon versions (*-eksbuild.*) intentionally not managed: they have
     // no public registry datasource. Tracked in issue #74 as manual updates.
@@ -631,9 +621,9 @@
         "kubernetes-sigs/cluster-api-addon-provider-helm",
         "kubernetes-sigs/cluster-api-provider-azure",
         "kubernetes-sigs/cluster-api-provider-gcp",
-        "/^registry\\.k8s\\.io/cluster-api/",
-        "/^registry\\.k8s\\.io/cluster-api-helm/",
-        "/^gcr\\.io/k8s-staging-cluster-api/"
+        "/^registry\\.k8s\\.io/cluster-api//",
+        "/^registry\\.k8s\\.io/cluster-api-helm//",
+        "/^gcr\\.io/k8s-staging-cluster-api//"
       ],
       "groupName": "cluster-api"
     },

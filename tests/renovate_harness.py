@@ -226,3 +226,89 @@ process.stdout.write(JSON.stringify(results));
         check=True, env={**os.environ, "LOG_LEVEL": "fatal"},
     )
     return json.loads(completed.stdout)
+
+
+def simulate_auto_replace(package_files, repo_root=REPO_ROOT):
+    """Run Renovate's real autoReplace for every regex-manager dependency, offline.
+
+    Each extracted dependency gets a synthetic bump (last digit of
+    currentValue and every hex digit of currentDigest changed) applied through
+    `doAutoReplace`, which re-extracts the result and throws on a mismatch.
+    Returns one record per dependency: the manager description, package file,
+    replaceString, and either the replaced span or the error.
+    """
+    executable = shutil.which("renovate")
+    if executable is None:
+        raise RuntimeError("renovate must be installed and on PATH")
+    renovate_root = Path(executable).resolve().parent.parent
+    script = r"""
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+const [root, repoRoot, filesJson] = process.argv.slice(1);
+const require = createRequire(`${root}/package.json`);
+const JSON5 = require('json5');
+const load = (p) => import(pathToFileURL(`${root}/dist/${p}`).href);
+const { GlobalConfig } = await load('config/global.js');
+const { getConfig } = await load('config/defaults.js');
+const defaults = getConfig();
+const { extractPackageFile } = await load('modules/manager/index.js');
+const { doAutoReplace } = await load('workers/repository/update/branch/auto-replace.js');
+const localDir = fs.mkdtempSync(path.join(os.tmpdir(), 'krops-autoreplace-'));
+GlobalConfig.set({ localDir });
+const { customManagers } = JSON5.parse(fs.readFileSync(`${repoRoot}/renovate.json5`, 'utf8'));
+const bumpValue = (v) => v.replace(/(\d)(?!.*\d)/, (d) => (d === '9' ? '8' : '9'));
+const bumpDigest = (d) => d.replace(/[0-9a-f]+$/i, (hex) => hex.replace(/./g, (c) => (c.toLowerCase() === 'f' ? 'e' : 'f')));
+const records = [];
+for (const manager of customManagers.filter((m) => m.customType === 'regex')) {
+    const patterns = manager.managerFilePatterns.map((p) => new RegExp(p.slice(1, -1)));
+    for (const packageFile of JSON.parse(filesJson)) {
+        if (!patterns.some((re) => re.test(packageFile))) continue;
+        const content = fs.readFileSync(`${repoRoot}/${packageFile}`, 'utf8');
+        const config = { ...defaults, ...manager, manager: 'regex' };
+        const extracted = await extractPackageFile('regex', content, packageFile, config);
+        for (const [depIndex, dep] of (extracted?.deps ?? []).entries()) {
+            const upgrade = { ...config, ...extracted, ...dep, packageFile, depIndex };
+            delete upgrade.deps;
+            if (dep.currentValue && /\d/.test(dep.currentValue)) upgrade.newValue = bumpValue(dep.currentValue);
+            if (dep.currentDigest) upgrade.newDigest = bumpDigest(dep.currentDigest);
+            const record = { manager: manager.description, packageFile, replaceString: dep.replaceString };
+            if (!upgrade.newValue && !upgrade.newDigest) continue;
+            let swap = dep.replaceString;
+            if (upgrade.newValue) swap = swap.replaceAll(dep.currentValue, upgrade.newValue);
+            if (upgrade.newDigest) swap = swap.replaceAll(dep.currentDigest, upgrade.newDigest);
+            fs.mkdirSync(path.dirname(path.join(localDir, packageFile)), { recursive: true });
+            fs.writeFileSync(path.join(localDir, packageFile), content);
+            // The dependency owns one occurrence of replaceString; accept a swap at any.
+            const candidates = [];
+            for (let at = content.indexOf(dep.replaceString); at !== -1; at = content.indexOf(dep.replaceString, at + 1)) {
+                candidates.push(content.slice(0, at) + swap + content.slice(at + dep.replaceString.length));
+            }
+            try {
+                const updated = await doAutoReplace(upgrade, content, false);
+                record.ok = candidates.includes(updated);
+                if (!record.ok) {
+                    let from = 0;
+                    while (from < content.length && content[from] === updated[from]) from += 1;
+                    record.error = `replacement differs from a pure version/digest swap near: ${JSON.stringify(updated.slice(Math.max(0, from - 40), from + 80))}`;
+                }
+            } catch (err) {
+                record.ok = false;
+                record.error = String(err.message ?? err);
+            }
+            records.push(record);
+        }
+    }
+}
+fs.rmSync(localDir, { recursive: true, force: true });
+process.stdout.write(JSON.stringify(records));
+"""
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script,
+         str(renovate_root), str(repo_root), json.dumps(package_files)],
+        text=True, capture_output=True, check=True,
+        env={**os.environ, "LOG_LEVEL": "fatal"},
+    )
+    return json.loads(completed.stdout)

@@ -9,7 +9,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from renovate_harness import run_renovate
 
 PACKAGE_FILE = "airgap/zarf.yaml"
-CONFIG_FILE = "renovate.json5"
 DEP_NAME = "kubernetes-sigs/cluster-api"
 OLD_VERSION = "v1.14.0"
 OLD_DIGESTS = {
@@ -36,19 +35,7 @@ def main() -> int:
         if dep.get("depName") == DEP_NAME and dep.get("currentValue") == OLD_VERSION
     ]
     errors = []
-    # JSON5 must decode template newlines and quotes before Renovate passes the
-    # template to bare Handlebars. A double-escaped sequence is emitted as a
-    # literal backslash sequence and corrupts the YAML on the first update.
-    replacement_templates = [
-        line
-        for line in (Path(__file__).resolve().parents[1] / CONFIG_FILE)
-        .read_text()
-        .splitlines()
-        if '"autoReplaceStringTemplate"' in line
-        and ("urlPrefix" in line or "clusterctl" in line)
-    ]
-    if any("\\\\n" in line or "\\\\\\\"" in line for line in replacement_templates):
-        errors.append("release-asset replacement template double-escapes a newline or quote")
+    # The replacement itself is covered by tests/test-renovate-auto-replace.py.
     if result.returncode:
         errors.append(f"Renovate exited {result.returncode}")
     if len(dependencies) != 2:

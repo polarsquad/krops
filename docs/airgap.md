@@ -255,7 +255,7 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
    source `resolve-clusterctl.sh` rather than repeating its arch-detection
    and executable check inline (issue #354: a third copy of that block was
    the point a shared script paid off). The bundled `clusterctl` release
-   itself versions independently of the providers it renders — it does not
+   itself versions independently of the providers it renders: it does not
    need to track their version, and pinning it separately is intentional,
    not a stale pin.
 2. **`spec.distribution.artifact` must be omitted** from the FluxInstance.

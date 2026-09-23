@@ -6,7 +6,7 @@
 #      - kindest/node v1.37.0 (mgmt kind node and CAPD workload/management
 #        nodes) — kind and CAPD `docker run` these directly from the host
 #        daemon, outside kubelet, so the Zarf agent cannot rewrite them.
-#      - kindest/haproxy (CAPD load balancer) and registry:2 (krops-registry,
+#      - kindest/haproxy (CAPD load balancer) and registry:2.8.3 (krops-registry,
 #        recreated in Phase 5 for the workload cluster's Flux).
 #      - workload-pod-images.tar: flux-operator, flux controllers, podinfo —
 #        consumed via preLoadImages by CAPD DevMachineTemplates (Phase 5).
@@ -57,7 +57,7 @@ kubectl wait --for=condition=Ready node --all --timeout=60s
 
 # Recreate krops-registry (the workload cluster's Flux and CAAPH fetch from it;
 # the Zarf internal registry is only reachable inside the mgmt cluster).
-REGISTRY_IMAGE="${REGISTRY_IMAGE:-registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373}"
+REGISTRY_IMAGE="${REGISTRY_IMAGE:-registry:2.8.3@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373}"
 REGISTRY_NAME="${REGISTRY_NAME:-krops-registry}"
 REGISTRY_PORT="${REGISTRY_PORT:-5001}"
 registry_failure() {

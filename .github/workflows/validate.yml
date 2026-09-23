@@ -162,6 +162,9 @@ jobs:
           RENOVATE_GITHUB_COM_TOKEN: ${{ github.token }}
         run: python3 tests/test-renovate-coverage.py
 
+      - name: Verify every regex-manager update rewrites only its version/digest
+        run: python3 tests/test-renovate-auto-replace.py
+
       - name: Verify Renovate updates Zarf release assets and checksums together
         env:
           RENOVATE_GITHUB_COM_TOKEN: ${{ github.token }}

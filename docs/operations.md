@@ -85,15 +85,23 @@ TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh bootstrap aws
 
 `KROPS_PROFILE` (or the positional profile argument after the lifecycle
 verb, which reaches `krops-bootstrap`) selects the environment. It loads
-every `.env` assignment with outer quote
-stripping before detecting the engine or resolving a socket for it, so a
+`.env` before detecting the engine or resolving a socket for it, so a
 `.env`-selected `CONTAINER_ENGINE` takes effect from the start (issue #257).
-An already-exported variable is left alone, so process environment wins over
-`.env` for the wrapper. Note the opposite rule for the helper tasks: mise's
-`env_file` loads `/workspace/.env` inside the container and its values
-override the process environment, so a `-e NAME=value` on a helper run
-loses to the same key in `.env` (see [Helper tasks in the
-toolbox](#helper-tasks-in-the-toolbox)). It then passes only this
+It resolves `.env` exactly as mise's `env_file` does, so
+`scripts/toolbox-run.sh` and `mise run bootstrap` hand the container the same
+values:
+
+- `.env` wins over the process environment: a `NAME=value` prefix on the
+  command line (such as `CONTAINER_ENGINE=podman` above) only applies when
+  `.env` does not set `NAME`. The helper tasks follow the same rule inside
+  the container (see [Helper tasks in the toolbox](#helper-tasks-in-the-toolbox)).
+- Line syntax: an optional `export` prefix, whitespace trimmed around keys
+  and values, `"..."` / `'...'` values taken verbatim up to the closing
+  quote, and a `#` after whitespace starting a comment in an unquoted
+  value. Lines without `=` or with an invalid key are skipped.
+
+`tests/test-toolbox-run-env-precedence.py` pins this behavior and, when mise
+is installed, checks it against mise itself. The wrapper then passes only this
 allowlist into the container:
 
 - Engine and lifecycle: `CONTAINER_ENGINE`, `ENGINE_SOCK`, `KROPS_PROFILE`,

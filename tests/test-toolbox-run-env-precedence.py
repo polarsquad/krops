@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-"""scripts/toolbox-run.sh must load .env before resolving the engine/socket,
-and process environment must win over .env (issue #257)."""
+"""scripts/toolbox-run.sh must load .env before resolving the engine/socket
+(issue #257), and must resolve .env the way mise's env_file does: .env wins
+over the process environment, with the same line syntax. Otherwise
+`scripts/toolbox-run.sh` and `mise run bootstrap` hand the container
+different values for the same checkout."""
 import os
 import shutil
 import subprocess
@@ -17,164 +20,150 @@ case "$1" in
   --version) echo "ENGINE_NAME version 1.0.0" ;;
   context) exit 0 ;;
   run)
-    shift
-    echo "ARGV: $*" >> "$STUB_LOG"
-    echo "CONTAINER_ENGINE=$CONTAINER_ENGINE" >> "$STUB_LOG"
-    echo "ENGINE_SOCK=$ENGINE_SOCK" >> "$STUB_LOG"
-    echo "GITHUB_USER=[$GITHUB_USER]" >> "$STUB_LOG"
-    echo "---" >> "$STUB_LOG"
+    echo "ENGINE=ENGINE_NAME" > "$STUB_LOG"
+    env >> "$STUB_LOG"
     exit 0
     ;;
   *) exit 1 ;;
 esac
 """
 
-
-def make_sandbox(tmp: Path, env_lines: list[str]) -> Path:
-    """A fake repo root with a copy of the real wrapper (so its self-relative
-    REPO_ROOT computation lands in the sandbox) plus a synthetic .env."""
-    scripts_dir = tmp / "scripts"
-    scripts_dir.mkdir()
-    wrapper = scripts_dir / "toolbox-run.sh"
-    shutil.copy(WRAPPER, wrapper)
-    os.chmod(wrapper, 0o755)
-    (tmp / ".env").write_text("\n".join(env_lines) + "\n")
-    return wrapper
-
-
-def install_stub(bin_dir: Path, name: str) -> None:
-    path = bin_dir / name
-    path.write_text(STUB_TEMPLATE.replace("ENGINE_NAME", name))
-    os.chmod(path, 0o755)
-
-
-def run_wrapper(tmp: Path, wrapper: Path, extra_env: dict):
-    """Run the wrapper against stub docker/podman; returns (result, log)."""
-    bin_dir = tmp / "bin"
-    bin_dir.mkdir(exist_ok=True)
-    install_stub(bin_dir, "docker")
-    install_stub(bin_dir, "podman")
-    log = tmp / "stub.log"
-    env = dict(os.environ)
-    env["PATH"] = f"{bin_dir}:{env['PATH']}"
-    env["STUB_LOG"] = str(log)
-    # Never let a real ambient CONTAINER_ENGINE/GITHUB_USER leak into the test.
-    for leaky in ("CONTAINER_ENGINE", "ENGINE_SOCK", "GITHUB_USER", "TOOLBOX_IMAGE"):
-        env.pop(leaky, None)
-    env.update(extra_env)
-    result = subprocess.run(
-        ["bash", str(wrapper), "bootstrap"],
-        cwd=tmp, env=env, capture_output=True, text=True, check=False,
-    )
-    seen = log.read_text() if log.exists() else ""
-    return result, seen
+# One case per mise env_file behavior the wrapper must reproduce; the values
+# are what mise 2026.9.12 exports for these lines.
+PARSE_CASES = {
+    "export KP_EXPORT=exported": ("KP_EXPORT", "exported"),
+    "KP_COMMENT=bar # note": ("KP_COMMENT", "bar"),
+    "KP_HASH=bar#nospace": ("KP_HASH", "bar#nospace"),
+    'KP_DQ="quoted # kept" # trailing': ("KP_DQ", "quoted # kept"),
+    "KP_SQ='single' # c": ("KP_SQ", "single"),
+    "KP_TRAIL=trail   ": ("KP_TRAIL", "trail"),
+    "  KP_LEAD=leading": ("KP_LEAD", "leading"),
+    "KP_SPACED = spaced": ("KP_SPACED", "spaced"),
+    'KP_EQ="a=b"': ("KP_EQ", "a=b"),
+    "KP_EMPTY=": ("KP_EMPTY", ""),
+}
+TEST_KEYS = ["CONTAINER_ENGINE", "ENGINE_SOCK", "GITHUB_USER", "TOOLBOX_IMAGE"] + [
+    key for key, _ in PARSE_CASES.values()
+]
 
 
-def expect_ok(result: subprocess.CompletedProcess, seen: str) -> None:
-    if result.returncode != 0:
-        raise AssertionError(
-            f"wrapper exited {result.returncode}\n"
-            f"stdout={result.stdout}\nstderr={result.stderr}"
+def run_wrapper(env_lines: list[str], extra_env=None) -> dict:
+    """Run a sandboxed copy of the wrapper against stub docker/podman and
+    return the environment the engine's `run` saw (plus ENGINE)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        # Copy the wrapper so its self-relative REPO_ROOT lands in the sandbox.
+        (tmp / "scripts").mkdir()
+        wrapper = tmp / "scripts/toolbox-run.sh"
+        shutil.copy(WRAPPER, wrapper)
+        (tmp / ".env").write_text("\n".join(env_lines) + "\n")
+        bin_dir = tmp / "bin"
+        bin_dir.mkdir()
+        for name in ("docker", "podman"):
+            stub = bin_dir / name
+            stub.write_text(STUB_TEMPLATE.replace("ENGINE_NAME", name))
+            os.chmod(stub, 0o755)
+        log = tmp / "stub.log"
+        env = {k: v for k, v in os.environ.items() if k not in TEST_KEYS}
+        env.update(PATH=f"{bin_dir}:{env['PATH']}", STUB_LOG=str(log))
+        env.update(extra_env or {})
+        result = subprocess.run(
+            ["bash", str(wrapper), "bootstrap"],
+            cwd=tmp, env=env, capture_output=True, text=True, check=False,
         )
-    if "ARGV:" not in seen:
-        raise AssertionError(f"wrapper never invoked the engine 'run'\nstderr={result.stderr}")
+        if result.returncode != 0 or not log.exists():
+            raise AssertionError(
+                f"wrapper exited {result.returncode} without running the engine\n"
+                f"stdout={result.stdout}\nstderr={result.stderr}"
+            )
+        return dict(line.split("=", 1) for line in log.read_text().splitlines() if "=" in line)
 
 
-def test_dotenv_engine_takes_effect_when_unset() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        wrapper = make_sandbox(tmp, ['CONTAINER_ENGINE="podman"'])
-        result, seen = run_wrapper(tmp, wrapper, {})
-        expect_ok(result, seen)
-        if "CONTAINER_ENGINE=podman" not in seen:
-            raise AssertionError(f".env CONTAINER_ENGINE was not applied: {seen}")
+def expect(seen: dict, key: str, want: str) -> None:
+    if seen.get(key) != want:
+        raise AssertionError(f"{key}: want {want!r}, got {seen.get(key)!r}")
 
 
-def test_process_env_wins_over_dotenv() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        wrapper = make_sandbox(tmp, ['CONTAINER_ENGINE="podman"'])
-        result, seen = run_wrapper(tmp, wrapper, {"CONTAINER_ENGINE": "docker"})
-        expect_ok(result, seen)
-        if "CONTAINER_ENGINE=docker" not in seen:
-            raise AssertionError(f"process env CONTAINER_ENGINE was overridden by .env: {seen}")
+def test_dotenv_engine_takes_effect() -> None:
+    seen = run_wrapper(['CONTAINER_ENGINE="podman"'])
+    expect(seen, "ENGINE", "podman")
+    expect(seen, "CONTAINER_ENGINE", "podman")
+
+
+def test_dotenv_wins_over_process_env() -> None:
+    seen = run_wrapper(['CONTAINER_ENGINE="podman"', "GITHUB_USER=from-dotenv"],
+                       {"CONTAINER_ENGINE": "docker", "GITHUB_USER": "from-shell"})
+    expect(seen, "ENGINE", "podman")
+    expect(seen, "GITHUB_USER", "from-dotenv")
+
+
+def test_process_env_used_when_dotenv_silent() -> None:
+    seen = run_wrapper(["CONTAINER_ENGINE=docker"], {"GITHUB_USER": "from-shell"})
+    expect(seen, "GITHUB_USER", "from-shell")
 
 
 def test_engine_and_socket_are_consistent() -> None:
-    """The socket resolved for the container must match the .env-selected
-    engine, not a stale docker-default resolved before .env loaded."""
+    """The socket must match the .env-selected engine, not a docker default
+    resolved before .env loaded."""
+    seen = run_wrapper(['CONTAINER_ENGINE="podman"'])
+    expect(seen, "ENGINE_SOCK", "/run/podman/podman.sock")
+
+
+def test_line_syntax_matches_mise() -> None:
+    seen = run_wrapper(["CONTAINER_ENGINE=docker", *PARSE_CASES])
+    for key, want in PARSE_CASES.values():
+        expect(seen, key, want)
+
+
+def test_malformed_lines_are_skipped() -> None:
+    seen = run_wrapper(["CONTAINER_ENGINE=docker", '1BAD="oops"', "just some garbage text"])
+    leaked = [k for k in seen if k.startswith("1BAD") or k.startswith("just")]
+    if leaked:
+        raise AssertionError(f"malformed .env lines were exported: {leaked}")
+
+
+def test_mise_agrees() -> None:
+    """Cross-check PARSE_CASES and precedence against the real mise, when
+    installed (CI's renovate job has it; the expectations above stand alone)."""
+    mise = shutil.which("mise")
+    if not mise:
+        print("   (skipped: mise not on PATH)")
+        return
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
-        wrapper = make_sandbox(tmp, ['CONTAINER_ENGINE="podman"'])
-        result, seen = run_wrapper(tmp, wrapper, {})
-        expect_ok(result, seen)
-        if "ENGINE_SOCK=/run/podman/podman.sock" not in seen:
-            raise AssertionError(f"ENGINE_SOCK did not match the podman engine: {seen}")
-
-
-def test_quoted_value_is_stripped() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        wrapper = make_sandbox(tmp, ['CONTAINER_ENGINE="docker"', 'GITHUB_USER="git"'])
-        result, seen = run_wrapper(tmp, wrapper, {})
-        expect_ok(result, seen)
-        if "GITHUB_USER=[git]" not in seen:
-            raise AssertionError(f"quoted .env value was not stripped correctly: {seen}")
-
-
-def test_unquoted_value() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        wrapper = make_sandbox(tmp, ['CONTAINER_ENGINE="docker"', "GITHUB_USER=git"])
-        result, seen = run_wrapper(tmp, wrapper, {})
-        expect_ok(result, seen)
-        if "GITHUB_USER=[git]" not in seen:
-            raise AssertionError(f"unquoted .env value was not applied: {seen}")
-
-
-def test_empty_value() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        wrapper = make_sandbox(tmp, ['CONTAINER_ENGINE="docker"', "GITHUB_USER="])
-        result, seen = run_wrapper(tmp, wrapper, {})
-        expect_ok(result, seen)
-        if "GITHUB_USER=[]" not in seen:
-            raise AssertionError(f"empty .env value handling broke: {seen}")
-
-
-def test_malformed_leading_digit_key_is_skipped() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        wrapper = make_sandbox(tmp, ['CONTAINER_ENGINE="docker"', '1BAD="oops"'])
-        result, seen = run_wrapper(tmp, wrapper, {})
-        expect_ok(result, seen)
-
-
-def test_line_without_equals_is_skipped() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        wrapper = make_sandbox(tmp, ['CONTAINER_ENGINE="docker"', "just some garbage text"])
-        result, seen = run_wrapper(tmp, wrapper, {})
-        expect_ok(result, seen)
+        (tmp / ".env").write_text("\n".join([*PARSE_CASES, "GITHUB_USER=from-dotenv"]) + "\n")
+        (tmp / "mise.toml").write_text(
+            '[settings]\nenv_file = ".env"\n[tasks.dump]\nrun = "env"\n'
+        )
+        env = {k: v for k, v in os.environ.items() if k not in TEST_KEYS}
+        env.update(GITHUB_USER="from-shell", MISE_AUTO_INSTALL="0")
+        subprocess.run([mise, "trust", "-q", str(tmp)], env=env, check=True, capture_output=True)
+        out = subprocess.run(
+            [mise, "run", "-q", "dump"], cwd=tmp, env=env,
+            capture_output=True, text=True, check=True,
+        ).stdout
+    seen = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
+    for key, want in PARSE_CASES.values():
+        expect(seen, key, want)
+    expect(seen, "GITHUB_USER", "from-dotenv")
 
 
 def main() -> int:
     tests = [
-        test_dotenv_engine_takes_effect_when_unset,
-        test_process_env_wins_over_dotenv,
+        test_dotenv_engine_takes_effect,
+        test_dotenv_wins_over_process_env,
+        test_process_env_used_when_dotenv_silent,
         test_engine_and_socket_are_consistent,
-        test_quoted_value_is_stripped,
-        test_unquoted_value,
-        test_empty_value,
-        test_malformed_leading_digit_key_is_skipped,
-        test_line_without_equals_is_skipped,
+        test_line_syntax_matches_mise,
+        test_malformed_lines_are_skipped,
+        test_mise_agrees,
     ]
     failed = 0
     for test in tests:
         try:
             test()
             print(f"ok - {test.__name__}")
-        except AssertionError as exc:
+        except (AssertionError, subprocess.CalledProcessError) as exc:
             print(f"FAILED: {test.__name__}: {exc}", file=sys.stderr)
             failed += 1
     if failed:

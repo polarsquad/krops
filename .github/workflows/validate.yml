@@ -179,6 +179,12 @@ jobs:
       - name: Docs show toolbox helper runs, not host mise (#423)
         run: python3 tests/test-docs-toolbox-helpers.py
 
+      - name: toolbox-run.sh syntax, exec, and .env parity with mise (#257)
+        run: |
+          bash -n scripts/toolbox-run.sh
+          python3 tests/test-toolbox-run-exec.py
+          python3 tests/test-toolbox-run-env-precedence.py
+
       - name: cert-manager version consistency (#322)
         run: python3 tests/test-cert-manager-version-consistency.py
 

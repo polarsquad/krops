@@ -12,7 +12,7 @@ usage() {
 Usage: scripts/toolbox-run.sh <bootstrap|pivot|teardown> [extra krops-bootstrap args]
 
 Env:
-  TOOLBOX_IMAGE   image reference (default: ${TOOLBOX_IMAGE:-ghcr.io/polarsquad/krops-toolbox:latest};
+  TOOLBOX_IMAGE   image reference (default: ghcr.io/polarsquad/krops-toolbox:latest;
                   build locally with: docker build -f bootstrap-rs/Dockerfile \\
                     -t krops-toolbox:dev . && TOOLBOX_IMAGE=krops-toolbox:dev)
   KROPS_PROFILE aws | azure | gcp | local-host | local-talos
@@ -25,32 +25,35 @@ EOF
 LIFECYCLE="$1"
 shift
 
-# ── .env passthrough with quote stripping ─────────────────────────────────────
-# Loaded before engine/socket resolution below; process env wins over .env.
-# Never log these values.
+# ── .env passthrough, parsed like mise's env_file ─────────────────────────────
+# Loaded before engine/socket resolution below; .env wins over the process
+# environment, as it does under mise. Never log these values.
+ltrim() { printf '%s' "${1#"${1%%[![:space:]]*}"}"; }
+rtrim() { printf '%s' "${1%"${1##*[![:space:]]}"}"; }
 if [ -f .env ]; then
   while IFS= read -r line || [ -n "$line" ]; do
+    line="$(rtrim "$(ltrim "$line")")"
     case "$line" in
       ''|'#'*) continue ;;
+      export[[:space:]]*) line="$(ltrim "${line#export}")" ;;
     esac
     case "$line" in
       *=*) ;;
       *) continue ;;
     esac
-    key="${line%%=*}"
-    value="${line#*=}"
+    key="$(rtrim "${line%%=*}")"
+    value="$(ltrim "${line#*=}")"
     case "$value" in
-      \"*\") value="${value#\"}"; value="${value%\"}" ;;
-      \'*\') value="${value#\'}"; value="${value%\'}" ;;
+      \"*) value="${value#\"}"; value="${value%%\"*}" ;;
+      \'*) value="${value#\'}"; value="${value%%\'*}" ;;
+      *)   value="$(rtrim "${value%%[[:space:]]#*}")" ;;
     esac
     # Only accept valid, non-empty identifiers not starting with a digit;
     # skip garbage lines instead of exporting them.
     case "$key" in
       ''|[0-9]*|*[!A-Za-z0-9_]*) continue ;;
     esac
-    if [ -z "${!key+x}" ]; then
-      export "$key=$value"
-    fi
+    export "$key=$value"
   done < .env
 fi
 

@@ -275,6 +275,16 @@ Traps that have bitten this repo (each caught in a live review):
   (`gh api repos/<owner>/<repo>`); three 404 depNames have shipped.
   `github-releases` returns nothing for tag-only repos (golang/go,
   python/cpython); use `github-tags` or `golang-version`.
+- `autoReplaceStringTemplate` only sees Renovate's fixed match fields
+  (`depName`, `currentValue`, `currentDigest`, `datasource`, `versioning`,
+  `indentation`, ...): any other named group (`header`, `indent`,
+  `urlPrefix`) renders empty, `registryUrl` is stored as `registryUrls`,
+  and `depName` is the `depNameTemplate` result, not the captured text.
+  Prefer no template: Renovate's default replaces every `currentValue` and
+  `currentDigest` inside the matched text, keeping the surrounding
+  comment, indentation, and paths. Capture `currentValue` without a `v`
+  prefix when `extractVersionTemplate` strips it from the looked-up
+  version, or the default replacement drops the `v`.
 
 Repo gates: `tests/test-renovate-coverage.py` (every managed pin is
 discovered) and the digest-pinning test run in CI only (the validate.yml
@@ -286,9 +296,12 @@ locally: `mise x node@24 -- python3 tests/test-renovate-coverage.py`.
 The offline unit test `tests/test-renovate-actions-grouping.py` also runs in
 that CI job and uses the shared harness to apply Renovate's real package-rule
 engine, checking that only action dependencies join the GitHub Actions group.
-Run locally with Renovate on PATH and Node >= 24.11. These tests
-do not cover lookup liveness or the replacement path; only the
-dry-run and the handlebars simulation cover those.
+Run locally with Renovate on PATH and Node >= 24.11. The offline
+`tests/test-renovate-replace-templates.py` (same CI job) renders every
+regex manager's `autoReplaceStringTemplate` as a no-op update through
+Renovate's own extraction and template compiler, and requires it to
+reproduce the matched text exactly. These tests do not cover lookup
+liveness; only the dry-run covers that.
 
 The digest-pinning, coverage, and release-assets tests all run sequentially
 in the same CI job and their fixtures overlap on `airgap/zarf.yaml`'s

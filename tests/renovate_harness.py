@@ -226,3 +226,66 @@ process.stdout.write(JSON.stringify(results));
         check=True, env={**os.environ, "LOG_LEVEL": "fatal"},
     )
     return json.loads(completed.stdout)
+
+
+def render_auto_replacements(repo_root=REPO_ROOT):
+    """Render every regex manager's autoReplaceStringTemplate, offline.
+
+    Each dep extracted from the tracked files is rendered as a no-op update
+    (newValue/newDigest equal to the current ones) through the same compile
+    call Renovate's auto-replace uses. Only Renovate's fixed match fields reach
+    the template context, so a template that relies on any other capture group
+    renders differently from the matched text.
+    """
+    executable = shutil.which("renovate")
+    if executable is None:
+        raise RuntimeError("renovate must be installed and on PATH")
+    renovate_root = Path(executable).resolve().parent.parent
+    script = r"""
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
+const [root, repoRoot] = process.argv.slice(1);
+const require = createRequire(`${root}/package.json`);
+const JSON5 = require('json5');
+const load = (path) => import(pathToFileURL(`${root}/dist/${path}`).href);
+const { extractPackageFile } = await load('modules/manager/custom/regex/index.js');
+const { compile } = await load('util/template/index.js');
+const { matchRegexOrGlobList } = await load('util/string-match.js');
+const { customManagers } = JSON5.parse(
+    fs.readFileSync(`${repoRoot}/renovate.json5`, 'utf8'),
+);
+const files = execFileSync('git', ['ls-files'], { cwd: repoRoot, encoding: 'utf8' })
+    .split('\n').filter(Boolean);
+const results = [];
+for (const manager of customManagers) {
+    if (manager.customType !== 'regex' || !manager.autoReplaceStringTemplate) continue;
+    const config = { matchStringsStrategy: 'any', ...manager };
+    for (const file of files.filter((f) => matchRegexOrGlobList(f, manager.managerFilePatterns))) {
+        const content = fs.readFileSync(`${repoRoot}/${file}`, 'utf8');
+        const extracted = await extractPackageFile(content, file, config);
+        for (const dep of extracted?.deps ?? []) {
+            const upgrade = {
+                ...config, ...dep,
+                newValue: dep.currentValue, newDigest: dep.currentDigest,
+            };
+            results.push({
+                manager: manager.description ?? manager.matchStrings[0],
+                file,
+                depName: dep.depName ?? null,
+                replaceString: dep.replaceString,
+                rendered: compile(manager.autoReplaceStringTemplate, upgrade, false),
+            });
+        }
+    }
+}
+process.stdout.write(JSON.stringify(results));
+"""
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script,
+         str(renovate_root), str(repo_root)],
+        text=True, capture_output=True,
+        check=True, env={**os.environ, "LOG_LEVEL": "fatal"},
+    )
+    return json.loads(completed.stdout)

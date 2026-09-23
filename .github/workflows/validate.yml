@@ -141,6 +141,9 @@ jobs:
       - name: Verify only actions join the GitHub Actions group
         run: python3 tests/test-renovate-actions-grouping.py
 
+      - name: Verify every Renovate replacement template round-trips its match
+        run: python3 tests/test-renovate-replace-templates.py
+
       - name: Verify Kubernetes version pins share one group
         run: python3 tests/test-renovate-kubernetes-version-grouping.py
       - name: Verify the cluster-api group's boundaries

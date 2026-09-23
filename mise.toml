@@ -74,7 +74,7 @@ if ! python3 airgap/tests/test-digest-regex.py; then
   fail=1
 fi
 echo "==> failure-notification job wiring"
-if ! python3 airgap/tests/test-airgap-failure-notification.py; then
+if ! uv run python airgap/tests/test-airgap-failure-notification.py; then
   echo "    FAILED: failure-notification job wiring" >&2
   fail=1
 fi

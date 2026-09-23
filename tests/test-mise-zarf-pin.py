@@ -8,23 +8,21 @@ checks the reported version matches the pin, rather than just re-checking
 the template string.
 """
 
-import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MISE_TOML = REPO_ROOT / "mise.toml"
-VERSION_RE = re.compile(r'\[tools\."github:zarf-dev/zarf"\]\s*\nversion = "(?P<version>[^"]+)"')
 
 
 def main() -> int:
-    text = MISE_TOML.read_text()
-    match = VERSION_RE.search(text)
-    if not match:
+    tools = tomllib.loads(MISE_TOML.read_text()).get("tools", {})
+    pinned_version = tools.get("github:zarf-dev/zarf", {}).get("version")
+    if not pinned_version:
         print("zarf mise pin FAILED: no github:zarf-dev/zarf version pin found in mise.toml")
         return 1
-    pinned_version = match.group("version")
 
     result = subprocess.run(
         ["mise", "x", "--", "zarf", "version"],

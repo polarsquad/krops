@@ -230,10 +230,11 @@ verify the pairing during review.
   `appVersion` values, `bootstrap-rs/Cargo.toml`'s package version, and the
   Zarf package `metadata.version` are not dependency pins.
 - The Zarf CLI pin in `mise.toml` keeps `version` unprefixed and adds `v`
-  literally in `asset_pattern` (issue #324): mise's `{{ version }}` template
-  variable has stripped a leading `v` inconsistently across mise releases, so
-  an unprefixed pin sidesteps that. `asset_pattern` also remaps `arch()` to
+  literally in `asset_pattern` (issue #324), so the rendered asset name does
+  not depend on how mise normalizes a `v`-prefixed version. `asset_pattern` also remaps `arch()` to
   `amd64`/`arm64`, since Zarf's release assets don't use mise's default
   `x64`/`arm64` naming. `tests/test-mise-zarf-pin.py` installs the pinned
   release via mise and checks the reported version, since a template mismatch
-  otherwise fails silently until the pin is exercised.
+  otherwise fails silently until the pin is exercised. The Renovate rule for
+  this pin anchors on the `[tools."github:zarf-dev/zarf"]` header; an
+  unanchored `version = "..."` pattern also matches inside `min_version`.

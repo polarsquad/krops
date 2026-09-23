@@ -297,6 +297,10 @@ a shared `RENOVATE_CACHE_DIR` (defaulting to a fixed path under the OS temp
 dir): repeat datasource lookups hit Renovate's on-disk cache instead of the
 GitHub API again.
 
+The CI-only `tests/test-mise-zarf-pin.py` (validate.yml `zarf-mise-pin`
+job) installs the zarf pin through mise and checks the reported version,
+catching an `asset_pattern` that matches no release asset.
+
 The offline `airgap/tests/test-airgap-image-digests.py` gate is separate from
 Renovate: it scans air-gap inventories and scripts changed by the PR, requires
 readable tags plus SHA-256 digests, and rejects inconsistent repeated

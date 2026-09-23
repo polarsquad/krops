@@ -150,11 +150,10 @@
       "customType": "regex",
       "description": "mise: zarf CLI pin (github backend)",
       "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
-      "matchStrings": ["version = \"(?<currentValue>[^\"]+)\""],
+      "matchStrings": ["\\[tools\\.\"github:zarf-dev/zarf\"\\]\\nversion = \"(?<currentValue>[^\"]+)\""],
       "depNameTemplate": "zarf-dev/zarf",
       "datasourceTemplate": "github-releases",
-      "extractVersionTemplate": "^v(?<version>.+)",
-      "autoReplaceStringTemplate": "version = \"{{newValue}}\""
+      "extractVersionTemplate": "^v(?<version>.+)"
     },
     {
       "customType": "regex",

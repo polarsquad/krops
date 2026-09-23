@@ -147,6 +147,12 @@ mise run validate            # host: shell syntax, bootstrap.toml cross-check, o
 scripts/toolbox-run.sh teardown      # toolbox: reverse-order lifecycle cleanup
 ```
 
+On macOS, a `local-host` run leaves the exported management kubeconfig
+pointing at the `kind` Docker network, which Docker Desktop does not
+route; rewrite a host copy before the `export` line above. See
+[Host-side access after a toolbox local-host run (macOS)](docs/operations.md#host-side-access-after-a-toolbox-local-host-run-macos).
+Linux hosts route the `kind` network directly and need no rewrite.
+
 Dependency versions are managed by Renovate
 ([renovate.json5](renovate.json5)) running as the hosted GitHub App; they live
 in their native consumer files and update PRs open weekly. See
@@ -296,6 +302,12 @@ docker run --rm -it --network kind -p 9898:9898 -v "$PWD:/workspace" -w /workspa
   port-forward -n podinfo --address 0.0.0.0 service/podinfo 9898:9898   # http://localhost:9898
 scripts/toolbox-run.sh teardown local-host
 ```
+
+On macOS, rewrite a host copy of the management kubeconfig and export
+that copy in place of `.kube/krops-mgmt.yaml` above: Docker Desktop does
+not route the `kind` network address the file carries. See
+[Host-side access after a toolbox local-host run (macOS)](docs/operations.md#host-side-access-after-a-toolbox-local-host-run-macos).
+Linux hosts need no rewrite.
 
 With a host `mise` and `kubectl`, `mise -E local-host run kubeconfigs` followed
 by `mise -E local-host run podinfo-port-forward` is the host-side equivalent

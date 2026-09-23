@@ -132,6 +132,10 @@ Inside the toolbox:
 - Kind's internal API endpoint and `krops-registry:5000` then resolve by name.
 - Host-only CAPD endpoint rewrites are skipped because the recorded endpoints
   already resolve on that network.
+- On macOS the persisted `.kube/krops-mgmt.yaml` keeps the `kind` network
+  address, which Docker Desktop does not route; see
+  [Host-side access after a toolbox local-host run (macOS)](#host-side-access-after-a-toolbox-local-host-run-macos)
+  for the host rewrite.
 - `KUBECONFIG` must name one writable file. The documented invocation uses
   `/workspace/.kube/kind.yaml`, and the CLI replaces it with kind's internal
   kubeconfig after creation.
@@ -447,6 +451,12 @@ export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
 flux get kustomizations --watch
 ```
 
+After a toolbox `local-host` run on macOS the persisted file carries the
+`kind` Docker network address, which Docker Desktop does not route;
+export the host copy from
+[Host-side access after a toolbox local-host run (macOS)](#host-side-access-after-a-toolbox-local-host-run-macos)
+instead.
+
 For the local-host environment, export the CAPD workload kubeconfig after
 `docker-workload-cluster` reports Ready. The toolbox run keeps the
 kind-network endpoint, so the file is read back through the toolbox too:
@@ -462,6 +472,11 @@ docker run --rm -it \
 docker run --rm --network kind -v "$PWD:/workspace" -w /workspace \
   --entrypoint kubectl "$TOOLBOX_IMAGE" --kubeconfig local-workload.kubeconfig get nodes
 ```
+
+The host task form of `kubeconfigs` still reads the persisted management
+kubeconfig before it can export the workload one, so on macOS it must run
+against the host copy from
+[Host-side access after a toolbox local-host run (macOS)](#host-side-access-after-a-toolbox-local-host-run-macos).
 
 The local workload Flux instance installs Podinfo from its OCI Helm chart.
 Open it in a host browser by running the port-forward in a separate
@@ -501,6 +516,72 @@ or fallback native run. The current wrapper does not forward that override.
 EKS clusters typically take 15–25 minutes to come up; node groups and the
 downstream app chain follow a few minutes after.
 
+### Host-side access after a toolbox local-host run (macOS)
+
+The pivot exports the management kubeconfig with the API server address CAPD
+recorded: the `local-management-lb` container IP on the `kind` Docker
+network. Native local-host runs rewrite that address to the localhost port,
+but toolbox runs skip the rewrite (`should_rewrite_capd_endpoint` in
+`bootstrap-rs/src/main.rs`) because the address resolves on the `kind`
+network the toolbox joins. Docker Desktop on macOS runs the engine in a VM
+and does not route the `kind` network from the host, so host commands
+against the persisted `.kube/krops-mgmt.yaml` time out. Rewrite a host copy
+to the port kind publishes on localhost:
+
+```sh
+cp .kube/krops-mgmt.yaml .kube/krops-mgmt.host.yaml
+PORT=$(docker port local-management-lb 6443/tcp | head -1 | sed 's/.*://')
+kubectl config set-cluster local-management --server="https://127.0.0.1:${PORT}" \
+  --kubeconfig .kube/krops-mgmt.host.yaml
+```
+
+Use the host copy for every host command that talks to the management
+cluster:
+
+```sh
+export KUBECONFIG="$PWD/.kube/krops-mgmt.host.yaml"
+flux get kustomizations --watch
+```
+
+The host form of the `kubeconfigs` task reads the management kubeconfig
+before it can export the workload one, so run it with the host copy
+exported; without `KROPS_TOOLBOX` it rewrites the workload endpoint to
+`127.0.0.1`, and `podinfo-port-forward` then needs no further changes:
+
+```sh
+mise -E local-host run podinfo-port-forward
+```
+
+The published port belongs to the `local-management-lb` container and stays
+the same while that container exists. It changes when the container is
+recreated, for example after teardown plus bootstrap. Re-run the
+`docker port` and `kubectl config set-cluster` lines whenever
+`docker port local-management-lb 6443/tcp` reports a different port than the
+kubeconfig carries.
+
+With Podman on macOS the same limitation applies inside the podman machine
+VM; use `podman port` in place of `docker port`.
+
+On Linux the host routes to the `kind` network directly, so
+`.kube/krops-mgmt.yaml` works as-is and no rewrite is needed.
+
+The unaffected alternative is a one-off toolbox container attached to the
+`kind` network, where the recorded address resolves with no rewrite:
+
+```sh
+docker run --rm -it --network kind \
+  -v "$PWD/.kube:/root/.kube" \
+  -e KUBECONFIG=/root/.kube/krops-mgmt.yaml \
+  --entrypoint flux \
+  "$TOOLBOX_IMAGE" get kustomizations --watch
+```
+
+Use `--entrypoint kubectl` for kubectl commands. The `mise` helper tasks are
+host forms; run them against the rewritten copy.
+
+Teardown is unaffected: it reads the management kubeconfig from inside the
+toolbox, which is attached to the `kind` network.
+
 ### Verifying the full chain
 
 For the local-host end-to-end chain:
@@ -518,6 +599,12 @@ docker run --rm --network kind -v "$PWD:/workspace" -w /workspace \
   --entrypoint flux "$TOOLBOX_IMAGE" --kubeconfig local-workload.kubeconfig get all --all-namespaces
 # then the port-forward from the section above, and browse to http://localhost:9898
 ```
+
+The toolbox form above needs no rewrite: the runs stay on the `kind`
+network. Running those steps as host commands instead needs the host copy
+from
+[Host-side access after a toolbox local-host run (macOS)](#host-side-access-after-a-toolbox-local-host-run-macos)
+in place of `.kube/krops-mgmt.yaml`.
 
 Bootstrap does not return until the management and workload root
 Kustomizations are Ready. The final port-forward verifies that the workload
@@ -584,7 +671,10 @@ state and is safe to re-run. If a pivot phase fails:
 The management kubeconfig is written to `MGMT_KUBECONFIG`, with context
 `krops-mgmt`. The toolbox mount makes its `/root/.kube/krops-mgmt.yaml`
 appear on the host as `./.kube/krops-mgmt.yaml`; a fallback native run
-defaults to `~/.kube/krops-mgmt.yaml`.
+defaults to `~/.kube/krops-mgmt.yaml`. After a toolbox `local-host` run on
+macOS the file carries the `kind` Docker network address; see
+[Host-side access after a toolbox local-host run (macOS)](#host-side-access-after-a-toolbox-local-host-run-macos)
+for host-side use.
 
 ## Teardown
 

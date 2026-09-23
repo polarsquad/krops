@@ -20,7 +20,6 @@ case "$1" in
     shift
     echo "ARGV: $*" >> "$STUB_LOG"
     echo "CONTAINER_ENGINE=$CONTAINER_ENGINE" >> "$STUB_LOG"
-    echo "ENGINE_SOCK=$ENGINE_SOCK" >> "$STUB_LOG"
     echo "GITHUB_USER=[$GITHUB_USER]" >> "$STUB_LOG"
     echo "---" >> "$STUB_LOG"
     exit 0

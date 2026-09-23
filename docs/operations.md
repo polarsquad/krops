@@ -93,25 +93,19 @@ An already-exported variable is left alone, so process environment wins over
 `env_file` loads `/workspace/.env` inside the container and its values
 override the process environment, so a `-e NAME=value` on a helper run
 loses to the same key in `.env` (see [Helper tasks in the
-toolbox](#helper-tasks-in-the-toolbox)). It then passes only this
-allowlist into the container:
+toolbox](#helper-tasks-in-the-toolbox)). It then passes only a fixed set of
+values into the container, built by `build_env_args` from the
+`TOOLBOX_ENV_SPEC` list, split into two groups: mutable (forwarded from
+whatever `.env` or the shell set) and immutable (a value the wrapper
+computes or hardcodes itself; never an operator override, even from
+`.env`). See `.env.example` for the full, per-environment list of both
+groups; the krops-bootstrap CLI's own knobs (`KROPS_PROFILE`,
+`REGISTRY_PORT`, ...) are covered separately in
+[bootstrap-cli.md](./bootstrap-cli.md) ("Bootstrap and pivot controls").
 
-- Engine and lifecycle: `CONTAINER_ENGINE`, `ENGINE_SOCK`, `KROPS_PROFILE`,
-  `REGISTRY_PORT`, `OCI_REPOSITORY`, `OCI_TAG`, `BOOTSTRAP_PIVOT`,
-  `PIVOT_SKIP_DELETE`
-- GitHub and age: `GIT_REPO_URL`, `GITHUB_TOKEN`, `GITHUB_USER`, `AGE_KEY_FILE`,
-  `AGE_PUBLIC_KEY`
-- AWS: `AWS_REGION`, `AWS_PROFILE`, `AWS_ACCESS_KEY_ID`,
-  `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`
-
-`CLOUDSDK_CONFIG` is forwarded twice: once through the GCP allowlist entry
-(an operator-set value, if any), then again as an explicit `-e
-CLOUDSDK_CONFIG=/workspace/.gcloud` appended after it. The container engine
-takes the last value for a repeated `-e` key, so the explicit one wins by
-design: the toolbox always uses the repo-local `.gcloud/` directory (inside
-the `/workspace` mount), shared with the host gcp session
-([gcp.md](./gcp.md)), never an operator override. Keep the two in sync if
-the mount path ever changes.
+If an operator value is set for an immutable key, `build_env_args` prints a
+warning to stderr instead of silently discarding it (this is what let #357
+happen for `CLOUDSDK_CONFIG`).
 
 It does not pass `BOOTSTRAP_CONFIG`, `REGISTRY_READY_RETRIES`,
 `LOCAL_RECONCILE_TIMEOUT`, `MGMT_KUBECONFIG`, `MGMT_READY_TIMEOUT`,

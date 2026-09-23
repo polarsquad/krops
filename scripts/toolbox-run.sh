@@ -97,43 +97,66 @@ case "$CONTAINER_ENGINE" in
     exit 1
     ;;
 esac
-# Forward the daemon-side socket path to the toolbox: the entrypoint's static
-# fallbacks cannot know the Linux-rootless session socket or a non-default
-# Docker context path.
-export ENGINE_SOCK="$ENGINE_SOCK_IN"
-
-# Forward lifecycle knobs and credentials into the container.
-PASS_ENV=(
-  -e CONTAINER_ENGINE
-  -e ENGINE_SOCK
-  -e KROPS_PROFILE
-  -e REGISTRY_PORT
-  -e OCI_REPOSITORY
-  -e OCI_TAG
-  -e BOOTSTRAP_PIVOT
-  -e PIVOT_SKIP_DELETE
-  -e GIT_REPO_URL
-  -e GITHUB_TOKEN
-  -e GITHUB_USER
-  -e AGE_KEY_FILE
-  -e AGE_PUBLIC_KEY
-  -e AWS_REGION
-  -e AWS_PROFILE
-  -e AWS_ACCESS_KEY_ID
-  -e AWS_SECRET_ACCESS_KEY
-  -e AWS_SESSION_TOKEN
-  -e AZURE_SUBSCRIPTION_ID
-  -e AZURE_LOCATION
-  -e AZURE_CONFIG_DIR
-  -e GCP_PROJECT
-  -e GCP_REGION
-  -e CLOUDSDK_CONFIG
-)
 
 # Repo-local persistent kubeconfig state (gitignored): the toolbox's internal
 # kind kubeconfig and the exported management kubeconfig live here.
 mkdir -p .kube
 KUBECONFIG_IN=/workspace/.kube/kind.yaml
+
+# Repo-local .gcloud/ directory, shared with the host gcp session (docs/gcp.md).
+CLOUDSDK_CONFIG_IN=/workspace/.gcloud
+
+# Splits TOOLBOX_ENV_SPEC into mutable/immutable -e flags; see
+# docs/operations.md ("Toolbox container").
+build_env_args() {
+  MUTABLE_ENV_ARGS=()
+  IMMUTABLE_ENV_ARGS=()
+  local spec key value
+  for spec in "$@"; do
+    case "$spec" in
+      *=*)
+        key="${spec%%=*}"
+        value="${spec#*=}"
+        if [ -n "${!key:-}" ] && [ "${!key}" != "$value" ]; then
+          echo "WARNING: $key is set to '${!key}' but toolbox-run.sh always overrides it with '$value'; see docs/operations.md (\"Toolbox container\")." >&2
+        fi
+        IMMUTABLE_ENV_ARGS+=(-e "$spec")
+        ;;
+      *)
+        MUTABLE_ENV_ARGS+=(-e "$spec")
+        ;;
+    esac
+  done
+}
+
+TOOLBOX_ENV_SPEC=(
+  CONTAINER_ENGINE
+  "ENGINE_SOCK=$ENGINE_SOCK_IN"
+  KROPS_PROFILE
+  REGISTRY_PORT
+  OCI_REPOSITORY
+  OCI_TAG
+  BOOTSTRAP_PIVOT
+  PIVOT_SKIP_DELETE
+  GIT_REPO_URL
+  GITHUB_TOKEN
+  GITHUB_USER
+  AGE_KEY_FILE
+  AGE_PUBLIC_KEY
+  AWS_REGION
+  AWS_PROFILE
+  AWS_ACCESS_KEY_ID
+  AWS_SECRET_ACCESS_KEY
+  AWS_SESSION_TOKEN
+  AZURE_SUBSCRIPTION_ID
+  AZURE_LOCATION
+  AZURE_CONFIG_DIR
+  GCP_PROJECT
+  GCP_REGION
+  "KUBECONFIG=$KUBECONFIG_IN"
+  "CLOUDSDK_CONFIG=$CLOUDSDK_CONFIG_IN"
+)
+build_env_args "${TOOLBOX_ENV_SPEC[@]}"
 
 # Interactive TTY when run from a terminal (pivot/teardown prompts, ctrl-c).
 TTY_ARGS=()
@@ -150,14 +173,12 @@ case "$LIFECYCLE" in
   *)         usage ;;
 esac
 
-# The duplicate CLOUDSDK_CONFIG below is intentional; see docs/operations.md.
 exec "$CONTAINER_ENGINE" run --rm ${TTY_ARGS[@]+"${TTY_ARGS[@]}"} \
   -v "$REPO_ROOT:/workspace" \
-  -w /workspace \
-  -v "$SOCK_SOURCE:/var/run/docker.sock" \
   -v "$REPO_ROOT/.kube:/root/.kube" \
-  -e KUBECONFIG="$KUBECONFIG_IN" \
-  "${PASS_ENV[@]}" \
-  -e CLOUDSDK_CONFIG=/workspace/.gcloud \
+  -v "$SOCK_SOURCE:/var/run/docker.sock" \
+  -w /workspace \
+  "${IMMUTABLE_ENV_ARGS[@]}" \
+  "${MUTABLE_ENV_ARGS[@]}" \
   "$TOOLBOX_IMAGE" \
   ${CLI_ARGS[@]+"${CLI_ARGS[@]}"}

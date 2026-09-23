@@ -149,7 +149,7 @@ else
     "$KUBECTL" --context "$MGMT_CTX" describe pods -n cert-manager
     echo
     echo "===== cert-manager namespace: pod logs ====="
-    for pod in $("$KUBECTL" --context "$MGMT_CTX" get pods -n cert-manager -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+    for pod in $("$KUBECTL" --context "$MGMT_CTX" get pods -n cert-manager -o jsonpath='{.items[*].metadata.name}'); do
       echo "--- $pod ---"
       "$KUBECTL" --context "$MGMT_CTX" logs -n cert-manager "$pod" --all-containers --tail=200
     done

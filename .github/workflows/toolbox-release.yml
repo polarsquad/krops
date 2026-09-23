@@ -1,21 +1,6 @@
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 name: toolbox-release
 
-# Publishes ghcr.io/polarsquad/krops-toolbox on semver tags (issue #104).
-# The tag must equal the version in bootstrap-rs/Cargo.toml; the gate job
-# fails the release when they disagree.
-#
-# Each supported architecture is built on a NATIVE runner (linux/amd64 on an
-# amd64 runner, linux/arm64 on an arm64 runner) and pushed as a single-arch
-# image tagged <version>-linux-<arch>; a merge job then combines the two into
-# the multi-arch manifest and publishes the stable tags (X.Y.Z, X.Y, latest).
-# This removes QEMU user-mode emulation of the amd64 rustc binary, which
-# segfaults deterministically on the arm64 runner and blocked the v0.2.0
-# release (issue #254).
-#
-# Signing is cosign keyless via the sign job's GitHub OIDC identity (same
-# identity model as the air-gapped workflow's keyless-signed Zarf packages);
-# the SBOM is Syft, matching the Zarf bundle's per-component SBOMs.
 on:
   push:
     tags: ["v*"]
@@ -46,17 +31,19 @@ jobs:
           fi
           echo "tag v${tag} matches Cargo.toml ${cargo_version}"
 
-  # One leg per architecture, each building on a runner of that architecture
-  # so the rustc compile never runs under QEMU. The two legs run in parallel.
   build:
     name: Build ${{ matrix.arch }} (native)
     needs: gate
-    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     permissions:
       contents: read
       packages: write
@@ -78,9 +65,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4.4.1
 
-      # Single-arch build, pushed under an internal <version>-linux-<arch> tag
-      # that the merge job consumes. OCI labels carry the version and source
-      # provenance (metadata-action was dropped; see merge/sign jobs).
       - name: Build and push single-arch
         uses: docker/build-push-action@v7.4.0
         with:
@@ -88,9 +72,8 @@ jobs:
           file: bootstrap-rs/Dockerfile
           platforms: linux/${{ matrix.arch }}
           push: true
-          # Disabled so the merge combines plain single-arch images; the
-          # default buildkit provenance would add unknown/unknown
-          # attestation children to the published index.
+          # provenance would add unknown/unknown attestation children to the
+          # multi-arch index the merge job creates from these single-arch tags
           provenance: false
           tags: ghcr.io/polarsquad/krops-toolbox:${{ steps.version.outputs.value }}-linux-${{ matrix.arch }}
           labels: |
@@ -102,17 +85,17 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
 
-  # Combines the two single-arch images into the multi-arch manifest and
-  # publishes the stable tags consumers pull. No compilation happens here, so
-  # the runner architecture is irrelevant.
   merge:
-    name: Merge multi-arch manifest
+    name: Merge multi-arch container image
     needs: build
     runs-on: ubuntu-26.04-arm
     timeout-minutes: 15
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.publish.outputs.digest }}
+      tags: ${{ steps.publish.outputs.tags }}
     steps:
       - name: Docker login to GHCR
         uses: docker/login-action@v4.6.0
@@ -124,13 +107,8 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4.4.1
 
-      # Stable tags are derived in plain bash rather than via
-      # docker/metadata-action: on the v0.2.1 run its `tags` output collapsed
-      # to the single version tag (0.2.1), silently dropping the 0.2 and
-      # latest aliases from the published manifest. X.Y.Z and X.Y are always
-      # published; latest moves only for stable versions (the prerelease
-      # guard mirrors metadata-action's latest=auto flavor).
-      - name: Merge and publish
+      - name: Merge and Publish
+        id: publish
         env:
           VERSION: ${{ github.ref_name }}
           IMAGE: ghcr.io/polarsquad/krops-toolbox
@@ -139,21 +117,39 @@ jobs:
           core="${version%%-*}"
           IFS=. read -r major minor _ <<< "$core"
           major_minor="$major.$minor"
-          target_args=()
-          target_args+=(-t "$IMAGE:$version")
-          target_args+=(-t "$IMAGE:$major_minor")
+          tags=("$IMAGE:$version" "$IMAGE:$major_minor")
           # latest moves only for stable X.Y.Z (no prerelease suffix)
           if [[ "$version" == "$core" && "$core" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            target_args+=(-t "$IMAGE:latest")
+            tags+=("$IMAGE:latest")
           fi
+          target_args=()
+          for t in "${tags[@]}"; do
+            target_args+=(-t "$t")
+          done
           echo "publishing: ${target_args[*]}"
           docker buildx imagetools create "${target_args[@]}" \
             "$IMAGE:${version}-linux-arm64" \
             "$IMAGE:${version}-linux-amd64"
 
-  # Signs the merged manifest and attaches the SBOM. Runs on an arm64 runner
-  # so syft's platform-pinned scan catalogs the arm64 child, as the original
-  # single-job layout did.
+          platforms="$(docker buildx imagetools inspect "$IMAGE:$version" \
+            --format '{{range .Manifest.Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')"
+          echo "published platforms: ${platforms}"
+          for want in linux/amd64 linux/arm64; do
+            if [[ "$platforms" != *"$want"* ]]; then
+              echo "::error::published manifest list is missing platform ${want} (got: ${platforms})"
+              exit 1
+            fi
+          done
+
+          digest="$(docker buildx imagetools inspect "$IMAGE:$version" --format '{{.Manifest.Digest}}')"
+          echo "merged index digest: ${digest}"
+
+          {
+            echo "digest=${digest}"
+            echo "tags=$(IFS=,; echo "${tags[*]}")"
+          } >> "$GITHUB_OUTPUT"
+
+  # arm64 runner so syft's platform-pinned scan catalogs the arm64 child
   sign-attest:
     name: Sign, attest
     needs: merge
@@ -180,54 +176,26 @@ jobs:
       - name: Install syft
         uses: anchore/sbom-action/download-syft@v0.24.2
 
-      # Tag set is derived exactly as in the merge job (see its comment):
-      # X.Y.Z + X.Y always, latest only for stable versions.
       - name: Sign the image (keyless, workflow identity)
         env:
-          VERSION: ${{ github.ref_name }}
-          IMAGE: ghcr.io/polarsquad/krops-toolbox
+          DIGEST: ${{ needs.merge.outputs.digest }}
+          TAGS: ${{ needs.merge.outputs.tags }}
         run: |
-          version="${VERSION#v}"
-          core="${version%%-*}"
-          IFS=. read -r major minor _ <<< "$core"
-          major_minor="$major.$minor"
-          # Resolve the merged index digest once, then sign each stable tag at
-          # it. Verification is against the workflow identity (certificate
-          # issuer/subject per cosign docs):
-          #   cosign verify ghcr.io/polarsquad/krops-toolbox:X.Y.Z \
-          #     --certificate-identity-regexp \
-          #       '^https://github.com/polarsquad/krops/.github/workflows/toolbox-release.yml@refs/tags/vX.Y.Z$' \
-          #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
-          digest="$(docker buildx imagetools inspect "$IMAGE:$version" \
-            | awk '$1 == "Digest:" {print $2; exit}')"
-          echo "merged index digest: ${digest}"
-          tags=("$IMAGE:$version" "$IMAGE:$major_minor")
-          if [[ "$version" == "$core" && "$core" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            tags+=("$IMAGE:latest")
-          fi
+          IFS=',' read -r -a tags <<< "$TAGS"
           for ref in "${tags[@]}"; do
-            ref="${ref}@${digest}"
+            ref="${ref}@${DIGEST}"
             echo "signing ${ref}"
             cosign sign --yes "${ref}"
           done
 
       - name: Attach SBOM (Syft) to each tag
         env:
-          VERSION: ${{ github.ref_name }}
-          IMAGE: ghcr.io/polarsquad/krops-toolbox
+          DIGEST: ${{ needs.merge.outputs.digest }}
+          TAGS: ${{ needs.merge.outputs.tags }}
         run: |
-          version="${VERSION#v}"
-          core="${version%%-*}"
-          IFS=. read -r major minor _ <<< "$core"
-          major_minor="$major.$minor"
-          digest="$(docker buildx imagetools inspect "$IMAGE:$version" \
-            | awk '$1 == "Digest:" {print $2; exit}')"
-          tags=("$IMAGE:$version" "$IMAGE:$major_minor")
-          if [[ "$version" == "$core" && "$core" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            tags+=("$IMAGE:latest")
-          fi
+          IFS=',' read -r -a tags <<< "$TAGS"
           for ref in "${tags[@]}"; do
-            ref="${ref}@${digest}"
+            ref="${ref}@${DIGEST}"
             syft "${ref}" -o spdx-json > sbom.json
             cosign attest --yes --predicate sbom.json --type spdxjson "${ref}"
             echo "SBOM attested to ${ref}"

@@ -24,11 +24,28 @@ pinned tools required by the lifecycle. See [Operations](./operations.md) for
 the container invocation and host runtime contract.
 
 The `toolbox-release` workflow runs on `v*` tags. It requires the tag to match
-`bootstrap-rs/Cargo.toml`, builds Linux amd64 and arm64 images natively on
-their own architecture (not under QEMU emulation), publishes `X.Y.Z`, `X.Y`,
-and stable `latest` tags, signs the image with GitHub OIDC, and attaches a
-Syft SPDX JSON SBOM attestation. The `bootstrap-rs` CI workflow also builds
-and smokes the arm64 image when its inputs change.
+`bootstrap-rs/Cargo.toml`, builds Linux amd64 and arm64 images each on a
+runner of that architecture, publishes `X.Y.Z`, `X.Y`, and stable `latest`
+tags, signs the image with GitHub OIDC, and attaches a Syft SPDX JSON SBOM
+attestation. The `bootstrap-rs` CI workflow also builds and smokes the arm64
+image when its inputs change.
+
+Each architecture builds natively rather than under QEMU: emulating the
+amd64 rustc binary on the arm64 runner segfaulted deterministically and
+blocked the v0.2.0 release (issue #254). The two single-arch images are
+merged into the multi-arch manifest with `docker buildx imagetools create`
+in plain bash rather than `docker/metadata-action`, after that action's
+`tags` output collapsed to a single tag on the v0.2.1 run and silently
+dropped the `X.Y` and `latest` aliases.
+
+Verify a published image against the workflow's OIDC identity:
+
+```sh
+cosign verify ghcr.io/polarsquad/krops-toolbox:X.Y.Z \
+  --certificate-identity-regexp \
+    '^https://github.com/polarsquad/krops/.github/workflows/toolbox-release.yml@refs/tags/vX.Y.Z$' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
 
 Published releases carry the stable tags described above; build the current
 checkout as shown in [Operations](./operations.md) only for unreleased

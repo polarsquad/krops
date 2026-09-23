@@ -67,5 +67,6 @@ jobs:
             /tmp/airgap-offline-summary.txt
             /tmp/airgap-sbom.*
             /tmp/airgap-cert-manager-debug.txt
+            /tmp/airgap-workload-debug.txt
           if-no-files-found: warn
           retention-days: 1

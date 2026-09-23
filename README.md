@@ -14,11 +14,15 @@ workloads. No HCL, no `.tfstate`, no second toolchain.
 [Crossplane](https://www.crossplane.io/) is the closer comparison because it
 also runs infrastructure reconciliation inside Kubernetes. Its providers expose
 managed resources, while XRDs and compositions can turn them into higher-level
-platform APIs. krops introduces no krops-specific CRD or controller: it combines
-[Cluster API](https://cluster-api.sigs.k8s.io/) for clusters,
-[ACK](https://aws-controllers-k8s.github.io/docs/) for AWS resources, and Flux
-for GitOps. If those resource APIs already say what you mean, krops does not
-wrap them to say it again.
+platform APIs. krops ships no controller of its own: it combines
+[Cluster API](https://cluster-api.sigs.k8s.io/) for clusters, each cloud's
+native operator ([ACK](https://aws-controllers-k8s.github.io/docs/) on AWS)
+for cloud resources, and Flux for GitOps. If those resource APIs already say
+what you mean, krops does not wrap them to say it again. Crossplane is not a
+competitor to that pattern but a planned alternative resource plane inside it:
+an environment will be able to select Crossplane instead of its native
+operator, never both, with Flux still delivering everything from Git. See
+[Crossplane as a resource plane](docs/crossplane.md).
 
 This repository demonstrates the pattern end to end on AWS EKS, Azure AKS,
 Google GKE, local Docker clusters, and a Tinkerbell-provisioned
@@ -35,9 +39,9 @@ it to your own cloud and clusters.
 
 Platform engineers who already run Kubernetes and want to manage their own
 cloud infrastructure with the same API, RBAC, audit trail, and GitOps workflow
-they use for workloads. If you're reaching for Terraform/OpenTofu, Pulumi, or
-Crossplane to stand up cloud resources for Kubernetes, this pattern is the
-alternative: the cluster you already operate becomes the control plane. It is
+they use for workloads. If you're reaching for Terraform/OpenTofu or Pulumi
+to stand up cloud resources for Kubernetes, this pattern is the alternative:
+the cluster you already operate becomes the control plane. It is
 not a developer self-service portal; you are the consumer.
 
 ## Problems the pattern solves
@@ -380,7 +384,8 @@ teardown controls, toolbox release, and current parity status.
 | [docs/azure.md](docs/azure.md) | Azure environment: subscription prep, credentials, AKS clusters, ASO on workload clusters, upgrades |
 | [docs/gcp.md](docs/gcp.md) | GCP environment: project prep, WIF credentials (no keys), GKE clusters, Config Connector on the workload cluster, upgrades |
 | [docs/airgap.md](docs/airgap.md) | Zarf air-gap bundle: package build, offline deploy, verification checklist, update drill |
-| [docs/proposals/](docs/proposals/README.md) | Design proposals under review (not yet decided or implemented) |
+| [docs/crossplane.md](docs/crossplane.md) | Crossplane as an alternative resource plane on the management cluster: selector design, ownership rules, slices (decided, not yet implemented) |
+| [docs/proposals/](docs/proposals/README.md) | Design proposals, under review or accepted |
 
 ## Repository layout
 

@@ -1,8 +1,8 @@
 # Crossplane on the management cluster, selectable per environment
 
-- Status: draft, for review
+- Status: accepted. The decisions, including the answers to the open questions below, are recorded in [docs/crossplane.md](https://github.com/polarsquad/krops/blob/main/docs/crossplane.md); this page is kept as the review record.
 - Tracking issue: [#313](https://github.com/polarsquad/krops/issues/313)
-- Next step once accepted: split the slices below into sub-issues and implement them one at a time.
+- Slices: sub-issues #446 to #455 of #313.
 
 ## Background
 

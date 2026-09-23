@@ -165,8 +165,9 @@ resources. There is no app source code here, only declarative infrastructure.
   `scripts/toolbox-run.sh` (issue #104); the scripts remain the native path
   for development.
 - `docs/`: detailed documentation (see the table in README.md).
-  `docs/proposals/` holds design proposals under review (not yet decided or
-  implemented); the docs site assembler includes that folder.
+  `docs/proposals/` holds design proposals, under review or accepted (an
+  accepted one points at the `docs/` page that records its decisions); the
+  docs site assembler includes that folder.
 - `mise.toml`: pinned tool versions and all task entrypoints.
   `mise.aws.toml` is the AWS tool layer (aws-cli, clusterawsadm),
   activated with `MISE_ENV=aws`. `mise.azure.toml` (azure-cli) and
@@ -320,3 +321,4 @@ Load these only when the task touches their domain:
 - `docs/operations.md`: quotas, configuration, bootstrap, verification.
 - `docs/workload-resources.md`: S3/RDS posture, known limitations.
 - `docs/airgap.md`: Zarf offline bundle for the local-host profile.
+- `docs/crossplane.md`: Crossplane as an alternative resource plane (decided, not yet implemented): per-environment selector, one plane per environment, ownership rules, slices #446 to #455.

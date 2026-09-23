@@ -61,7 +61,13 @@ chart pins with their declarative counterparts, and every pin whose value is a
 literal Kubernetes release version together. Renovate proposes one PR at the
 newest available version for each dependency, rather than parallel major and
 non-major update PRs. Base images in `bootstrap-rs/Dockerfile` and air-gap
-images are digest-pinned while retaining readable tags. Nothing automerges.
+images are digest-pinned while retaining readable tags. Nothing automerges
+except patch and minor bumps of the `renovate` CLI pin in
+`.github/workflows/validate.yml`: that pin only selects the CLI the CI Renovate
+tests run, and the `renovate-digest-pinning` job exercises the new version
+before the merge. A `minimumReleaseAge` of 3 days (npm's unpublish window)
+keeps a freshly published, possibly compromised release from landing on
+`main` unreviewed.
 
 The `kubernetes-version` group (#142) covers `kindest/node` (docker datasource:
 the local-host node image and both Cluster `topology.version` pins),

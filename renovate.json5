@@ -594,7 +594,7 @@
       "registryUrls": ["https://kubernetes-sigs.github.io/cluster-api-operator"]
     },
     {
-      "description": "No automerge anywhere; merges stay manual (issue #74)",
+      "description": "No automerge by default; merges stay manual (issue #74). The next rule is the only exception",
       "matchUpdateTypes": ["major", "minor", "patch", "digest", "pin", "pinDigest"],
       "automerge": false
     },
@@ -603,7 +603,8 @@
       "matchDepNames": ["renovate"],
       "matchUpdateTypes": ["patch", "minor"],
       "automerge": true,
-      "automergeType": "pr"
+      "automergeType": "pr",
+      "minimumReleaseAge": "3 days"
     },
     {
       "description": "Group GitHub Actions only, excluding workflow images and runners",

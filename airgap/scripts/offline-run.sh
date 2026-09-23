@@ -43,13 +43,10 @@ VERIFY_ARGS=()
 if [ -n "${ZARF_VERIFY_KEY:-}" ]; then
   VERIFY_ARGS+=(--key "$ZARF_VERIFY_KEY")
 else
-  # The build and deploy jobs run in the same workflow execution, so
-  # AIRGAP_VERIFY_REF (github.ref, set by air-gapped.yml) always matches the
-  # ref that actually signed this run's package, whether that's main on a
-  # schedule or a branch on a manual workflow_dispatch test run.
+  # AIRGAP_VERIFY_WORKFLOW_REF: see docs/airgap.md#empirical-findings.
   VERIFY_ARGS+=(
     --certificate-identity
-    "https://github.com/${AIRGAP_VERIFY_REPO:-polarsquad/krops}/.github/workflows/air-gapped.yml@${AIRGAP_VERIFY_REF:-refs/heads/main}"
+    "https://github.com/${AIRGAP_VERIFY_WORKFLOW_REF:-polarsquad/krops/.github/workflows/air-gapped.yml@refs/heads/main}"
     --certificate-oidc-issuer
     'https://token.actions.githubusercontent.com'
   )

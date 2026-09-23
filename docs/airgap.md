@@ -343,9 +343,15 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
    - When the workload cluster or its Flux does not come up, `offline-run.sh`
      writes cluster, machine, controller-log, container and event state to
      `/tmp/airgap-workload-debug.txt`, which the workflow uploads.
-   - The signature check derives the expected signer from `github.repository`
-     (`AIRGAP_VERIFY_REPO`, default `polarsquad/krops`), so a fork verifies the
-     bundle it signed itself.
+   - The signature check derives the expected signer from
+     `AIRGAP_VERIFY_WORKFLOW_REF: ${{ github.workflow_ref }}`, which GitHub
+     already populates as `owner/repo/.github/workflows/<file>@<ref>` for
+     every workflow and trigger, the same string keyless signing embeds in
+     the certificate SAN. Any workflow that reuses `offline-run.sh` verifies
+     correctly by setting that one variable, whether it's `air-gapped.yml`
+     on a schedule, a fork, or a differently-named workflow entirely
+     (`prototype-k3s-mgmt.yml`, issue #333) — no workflow name, repo, or ref
+     needs hardcoding, and none of it breaks if a workflow file is renamed.
 
 ## Known limitations / follow-ups
 

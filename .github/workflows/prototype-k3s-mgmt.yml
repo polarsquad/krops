@@ -53,7 +53,7 @@ jobs:
         env:
           SKIP_OFFLINE_CHECK: "1"
           MGMT_CLUSTER_ENGINE: k3s
-          AIRGAP_VERIFY_REF: ${{ github.ref }}
+          AIRGAP_VERIFY_WORKFLOW_REF: ${{ github.workflow_ref }}
         run: |
           airgap/scripts/offline-run.sh airgap/zarf-package-krops-airgap-*.tar.zst
 

@@ -87,8 +87,7 @@ jobs:
       - name: Deploy with external egress blocked
         env:
           SKIP_OFFLINE_CHECK: "1"
-          AIRGAP_VERIFY_REF: ${{ github.ref }}
-          AIRGAP_VERIFY_REPO: ${{ github.repository }}
+          AIRGAP_VERIFY_WORKFLOW_REF: ${{ github.workflow_ref }}
         run: |
           set -uo pipefail
 

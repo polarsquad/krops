@@ -346,6 +346,13 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
    - The signature check derives the expected signer from `github.repository`
      (`AIRGAP_VERIFY_REPO`, default `polarsquad/krops`), so a fork verifies the
      bundle it signed itself.
+   - Each kind/CAPD "node" is a container running a full nested systemd, and
+     a job with a management cluster plus a CAPD workload cluster runs four
+     of them at once. Default host inotify limits are sized for one, so
+     whichever node's systemd starts second can fail outright ("Failed to
+     allocate manager object: Too many open files"). `prototype-k3s-mgmt.yml`
+     raises `fs.inotify.max_user_watches`/`max_user_instances` (kind's own
+     documented values) before creating any node containers.
 
 ## Known limitations / follow-ups
 

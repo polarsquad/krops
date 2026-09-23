@@ -34,6 +34,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7.0.1
 
+      # See docs/airgap.md#empirical-findings for why (nested node containers
+      # exhaust the default host inotify limits).
+      - name: Raise inotify limits for nested node containers
+        run: |
+          sudo sysctl -w fs.inotify.max_user_watches=524288
+          sudo sysctl -w fs.inotify.max_user_instances=512
+
       - name: Install mise
         uses: jdx/mise-action@v4.3.0
         with:

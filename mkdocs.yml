@@ -89,3 +89,4 @@ nav:
   - Proposals:
       - Overview: proposals/README.md
       - Crossplane on the management cluster: proposals/crossplane-management-cluster.md
+      - Air-gap bundle update architectures: proposals/airgap-update-architectures.md

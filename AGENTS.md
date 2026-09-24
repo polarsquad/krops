@@ -98,7 +98,7 @@ resources. There is no app source code here, only declarative infrastructure.
   - `gcp-base/` (PR 2, issue #72): Config Connector (the same
     pinned operator bundle as the management side; it ships its own webhook
     certs, so no cert-manager) and the GCP resources
-    (PSA range + peering, storage bucket, Cloud SQL with IAM-only auth,
+    (PSA range + peering, storage bucket, Cloud SQL with IAM database auth,
     per-cluster reader GSA). `europe-north1-01/` points at it;
     `tests/test-gcp-identity-chain.py` cross-checks the WIF
     pool/provider/subject couplings against `mgmt/gcp/`.

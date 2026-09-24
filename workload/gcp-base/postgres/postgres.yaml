@@ -4,6 +4,7 @@
 # counterparts). Cloud SQL PostgreSQL 17, zonal, private IP only (no public
 # address; the private IP peers into the workload VPC through the PSA range
 # in networking/), IAM database authentication for the reader user, TLS required.
+# No rootPassword: the built-in postgres user is created passwordless and cannot log in; see docs/gcp.md (Known limitations).
 #
 # settings.diskType PD_HDD + db-f1-micro keep the default bill small; the
 # tier is a documented knob, not a pin. deletionProtectionEnabled stays

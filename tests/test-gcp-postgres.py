@@ -14,7 +14,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SQL = REPO_ROOT / "workload/gcp-base/postgres/postgres.yaml"
 DOC = REPO_ROOT / "docs/workload-resources.md"
 CLAIM_FILES = [DOC, REPO_ROOT / "docs/gcp.md", REPO_ROOT / "docs/architecture.md",
-               REPO_ROOT / "workload/gcp-base/postgres/flux-ks.yaml"]
+               REPO_ROOT / "workload/gcp-base/postgres/flux-ks.yaml",
+               REPO_ROOT / "AGENTS.md", REPO_ROOT / "docs/gcp-infra.svg"]
 
 
 def main() -> int:
@@ -36,15 +37,16 @@ def main() -> int:
     if "rootPassword" in spec:
         failures.append("rootPassword must not be set")
 
-    doc = DOC.read_text()
-    for path in CLAIM_FILES:
-        text = path.read_text()
-        for stale in ("no password exists", "IAM authentication only", "IAM auth only", "requireSsl: true"):
+    texts = {p: p.read_text() for p in CLAIM_FILES}
+    for path, text in texts.items():
+        for stale in ("no password exists", "IAM authentication only", "IAM auth only", "IAM-only auth", "requireSsl: true"):
             if stale in text:
                 failures.append(f"{path.relative_to(REPO_ROOT)}: stale claim `{stale}`")
     for needed in ("edition: ENTERPRISE", "built-in `postgres` user"):
-        if needed not in doc:
+        if needed not in texts[DOC]:
             failures.append(f"{DOC.relative_to(REPO_ROOT)}: must document `{needed}`")
+    if "built-in" not in texts[REPO_ROOT / "docs/gcp.md"]:
+        failures.append(f"docs/gcp.md: must document `built-in` in Known limitations")
 
     if failures:
         print("gcp postgres FAILED:")

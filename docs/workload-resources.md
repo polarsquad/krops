@@ -48,8 +48,8 @@ authenticates).
 (`krops-<project-number>-<cluster>-data`) with the same posture as the S3
 bucket: uniform bucket-level access on (no object ACLs), versioning on,
 no public access. GCS caps bucket names at 63 characters; the identity chain
-test checks the name against the real cluster name with a 19-digit project
-number.
+test checks the name against the real cluster name using up to a 19-digit
+project number (conservative upper bound; 12 digits today).
 
 ### Cloud SQL (private IP, IAM auth)
 

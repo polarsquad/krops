@@ -283,13 +283,16 @@ def main() -> int:
         if needed not in wl_doc:
             failures.append(f"(i) docs/workload-resources.md must document `{needed}`")
 
-    # ── (j) the bucket name fits GCP's 63-character limit for the real cluster
-    # name and a generous project number. ──────────────────────────────────
-    bucket = next(d for d in docs(REPO_ROOT / "workload/gcp-base/storage/bucket.yaml") if d.get("kind") == "StorageBucket")
+    # (j) check bucket name length
     if cluster_name is not None:
-        name = bucket["spec"]["resourceID"].replace("${GCP_PROJECT_NUMBER}", "9" * BUCKET_PROJECT_NUMBER_DIGITS).replace("${CLUSTER_NAME}", cluster_name)
-        if len(name) > 63:
-            failures.append(f"(j) bucket name `{name}` is {len(name)} chars; GCS bucket names are capped at 63")
+        bucket_path = REPO_ROOT / "workload/gcp-base/storage/bucket.yaml"
+        buckets = [d for d in docs(bucket_path) if d.get("kind") == "StorageBucket"]
+        if len(buckets) != 1:
+            failures.append(f"(j) {bucket_path.relative_to(REPO_ROOT)}: expected 1 StorageBucket, got {len(buckets)}")
+        else:
+            name = buckets[0]["spec"]["resourceID"].replace("${GCP_PROJECT_NUMBER}", "9" * BUCKET_PROJECT_NUMBER_DIGITS).replace("${CLUSTER_NAME}", cluster_name)
+            if len(name) > 63:
+                failures.append(f"(j) bucket name `{name}` is {len(name)} chars; GCS bucket names are capped at 63")
 
     if failures:
         print("gcp identity chain FAILED:")

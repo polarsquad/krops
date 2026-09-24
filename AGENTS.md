@@ -111,7 +111,10 @@ resources. There is no app source code here, only declarative infrastructure.
   `images.txt` with the identical tag and digest, guarding against partial
   air-gap updates (issue #228); the CI-only
   `airgap/tests/test-airgap-kubeadm-images.py` checks the k8s component pins in
-  `images.txt` against real `kubeadm config images list` (`--fix` regenerates them). `scripts/` builds,
+  `images.txt` against real `kubeadm config images list` (`--fix` regenerates them).
+  `airgap/tests/test-airgap-image-existence.py` confirms every `images.txt` digest is pullable
+  (live registry calls); it runs only in the path-filtered `airgap-image-existence` workflow, not
+  in `mise run validate`. `scripts/` builds,
   renders, and stages the bundle (`build-*`, `render-*`, `stage-*`,
   `offline-run.sh`); `archives/` and `rendered/` are gitignored outputs.
   Zarf fetches SHA-256-pinned CAAPH release assets and bundles arm64

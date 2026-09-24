@@ -53,8 +53,10 @@ covers that: it queries each shape-valid pin's registry with `docker buildx
 imagetools inspect` to confirm the manifest is real and pullable, catching a
 well-formed but wrong digest. It only runs against pins that already parse as
 shape-valid (a malformed digest is never queried), and needs registry
-network access, so it runs as its own CI job rather than in `mise run
-validate`.
+network access, so it runs in its own `airgap-image-existence` workflow rather
+than in `mise run validate`. That workflow triggers only when `airgap/images.txt`,
+the script, or the workflow file changes, keeping anonymous Docker Hub pulls
+well under the rate limit.
 
 ### Image pin ownership
 

@@ -106,7 +106,7 @@ reader (the grant above). The project-level `roles/cloudsql.viewer` grant
 22-character cluster name, `krops-<cluster>-r` is exactly 30, while
 `-reader` (35) and `-rd` (31) do not fit, and the identity chain test fails
 on a longer cluster name instead of the GCP API. The `iam` Kustomization
-depends on `storage` (the bucket the viewer grant references) and `postgres`
+depends on `storage` (the bucket the objectViewer grant references) and `postgres`
 (the SQLUser the `instanceUser` grant serves). `tests/test-gcp-identity-chain.py` (in `mise run
 validate` and CI) cross-checks the identity couplings between these and
 `mgmt/gcp/`.

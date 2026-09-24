@@ -30,6 +30,8 @@ KCC_WORKLOAD_SA = "cnrm-system/cnrm-controller-manager"
 # Per-cluster reader GSA accountId template (the -reader / -rd forms are 35 /
 # 31 chars, over GCP's 30-char service account ID limit; -r is 30 and fits).
 READER_ACCOUNT = "krops-${CLUSTER_NAME}-r"
+SA_ID_MAX_LEN = 30
+READER_ACCOUNT_DOC = READER_ACCOUNT.replace("${CLUSTER_NAME}", "<cluster>")
 
 # The service accounts the workload-identity pool admits. CAPG exchanges on
 # kind (provider `kind`) and post-pivot (provider `mgmt`); the management-side
@@ -210,10 +212,10 @@ def main() -> int:
         failures.append(f"{CLUSTER_VARS.relative_to(REPO_ROOT)}: CLUSTER_NAME not found in cluster-vars")
     else:
         sa_name = READER_ACCOUNT.replace("${CLUSTER_NAME}", cluster_name)
-        if len(sa_name) > 30:
+        if len(sa_name) > SA_ID_MAX_LEN:
             failures.append(
                 f"(g) per-cluster reader accountId `{sa_name}` is {len(sa_name)} chars; "
-                f"GCP service account IDs are capped at 30")
+                f"GCP service account IDs are capped at {SA_ID_MAX_LEN}")
 
     # KCC takes the GCP account ID from metadata.name (there is no accountId
     # field); a bare `krops-reader` would collide with the human GSA.
@@ -223,7 +225,7 @@ def main() -> int:
     elif reader_sa[0]["metadata"]["name"] != READER_ACCOUNT:
         failures.append(
             f"{READER.relative_to(REPO_ROOT)}: IAMServiceAccount metadata.name must be `{READER_ACCOUNT}` "
-            f"(the account ID, GCP 30-char limit), got {reader_sa[0]['metadata']['name']}")
+            f"(the account ID, GCP {SA_ID_MAX_LEN}-char limit), got {reader_sa[0]['metadata']['name']}")
     for d in docs(READER):
         ref = d.get("spec", {}).get("resourceRef", {})
         if ref.get("kind") == "IAMServiceAccount" and ref.get("name") != READER_ACCOUNT:
@@ -279,7 +281,7 @@ def main() -> int:
         if wanted not in deps:
             failures.append(f"(i) workload/gcp-base/iam/flux-ks.yaml: dependsOn must include `{wanted}`, got {sorted(deps)}")
     wl_doc = (REPO_ROOT / "docs/workload-resources.md").read_text()
-    for needed in ("roles/cloudsql.viewer", "`-reader` (35)"):
+    for needed in ("roles/cloudsql.viewer", f"`{READER_ACCOUNT_DOC}`", f"{SA_ID_MAX_LEN}-char"):
         if needed not in wl_doc:
             failures.append(f"(i) docs/workload-resources.md must document `{needed}`")
 

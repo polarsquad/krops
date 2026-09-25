@@ -118,6 +118,11 @@ if ! python3 tests/test-bootstrap-config.py; then
   echo "    FAILED: bootstrap.toml cross-check" >&2
   fail=1
 fi
+echo "==> shell REGION_PLAN vs bootstrap.toml"
+if ! python3 tests/test-bootstrap-shell-region-plan.py; then
+  echo "    FAILED: shell REGION_PLAN vs bootstrap.toml" >&2
+  fail=1
+fi
 echo "==> cert-manager version consistency"
 if ! python3 tests/test-cert-manager-version-consistency.py; then
   echo "    FAILED: cert-manager version consistency" >&2

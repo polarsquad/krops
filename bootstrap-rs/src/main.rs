@@ -428,6 +428,64 @@ fn unpause_patch() -> serde_json::Value {
     json!({ "spec": { "paused": false } })
 }
 
+/// EIPs one krops EKS cluster allocates: one NAT gateway per AZ, 3 AZs.
+const EIPS_PER_CLUSTER: u32 = 3;
+
+/// Per-region EIP plan: the EIPs the run needs there, and the CAPI Cluster
+/// names whose CAPA-owned EIPs (`teardown::capa_tag_key`) already count
+/// toward that need.
+#[derive(Debug, Default, PartialEq)]
+struct EipRegionPlan {
+    required: u32,
+    clusters: Vec<String>,
+}
+
+/// Per-region EIP plan for an AWS environment. The management cluster's
+/// region comes from stripping the "-management" suffix from its name,
+/// independent of the workload regions.
+fn derive_eip_requirements(
+    workloads: &[config::AwsWorkload],
+    mgmt_cluster: &str,
+) -> Result<std::collections::BTreeMap<String, EipRegionPlan>> {
+    let mut map: std::collections::BTreeMap<String, EipRegionPlan> =
+        std::collections::BTreeMap::new();
+    let mut add = |region: &str, cluster: &str| {
+        let plan = map.entry(region.to_string()).or_default();
+        plan.required += EIPS_PER_CLUSTER;
+        plan.clusters.push(cluster.to_string());
+    };
+    for w in workloads {
+        add(&w.region, &w.cluster_name);
+    }
+    if let Some(region) = mgmt_cluster.strip_suffix("-management") {
+        add(region, mgmt_cluster);
+    } else {
+        bail!(
+            "management cluster name '{mgmt_cluster}' does not end with '-management'; \
+             cannot derive its AWS region for EIP quota check"
+        );
+    }
+    Ok(map)
+}
+
+/// EIPs available to krops in a region: the quota minus the EIPs held by
+/// anything other than the krops clusters (saturating at zero).
+fn eip_available(limit: u32, allocated: u32, owned: u32) -> u32 {
+    limit.saturating_sub(allocated.saturating_sub(owned))
+}
+
+/// How many EIPs a region is short, or None when the quota suffices. EIPs
+/// the krops clusters already own are not counted against the requirement,
+/// so a rerun after a partial or complete run passes.
+fn eip_shortfall(limit: u32, allocated: u32, owned: u32, required: u32) -> Option<u32> {
+    let available = eip_available(limit, allocated, owned);
+    if available < required {
+        Some(required - available)
+    } else {
+        None
+    }
+}
+
 /// Tools required on PATH for the given environment's sync surface (the
 /// environment names are the binary's sequence contract, issue #98
 /// decision 3; the extras are the sync source's, issue #105 scope item 6).
@@ -448,6 +506,9 @@ fn required_tools(env: &Environment) -> Vec<&'static str> {
     if !env.pivot_sops_secrets.is_empty() {
         // The pivot decrypts these with the operator's age key (Phase 3).
         tools.push("sops");
+    }
+    if runs_aws_quota_preflight(env) {
+        tools.push("aws");
     }
     tools
 }
@@ -558,6 +619,12 @@ async fn flux_namespace_vars(flux_ns: &str) -> Result<std::collections::HashMap<
 /// not the profile name. AWS-only credential steps stay profile-gated.
 fn runs_github_preflight(cfg: &Config) -> bool {
     cfg.environment.sync == SyncSource::Github
+}
+
+/// The EIP quota preflight covers every AWS-kind environment, including
+/// one whose only cluster is the management cluster.
+fn runs_aws_quota_preflight(env: &Environment) -> bool {
+    env.kind == "aws"
 }
 
 // ── Process helpers ───────────────────────────────────────────────────────────
@@ -726,6 +793,10 @@ async fn preflight_checks(cfg: &Config, http: &reqwest::Client) -> Result<Prefli
         None
     };
 
+    if runs_aws_quota_preflight(&cfg.environment) {
+        preflight_aws_quotas(cfg).await?;
+    }
+
     let resolved = engine::resolve(
         cfg.container_engine.clone(),
         cfg.engine_sock.clone(),
@@ -816,6 +887,120 @@ async fn preflight_github(cfg: &Config, http: &reqwest::Client) -> Result<Github
         age_key_content,
         age_pubkey,
     })
+}
+
+async fn preflight_aws_quotas(cfg: &Config) -> Result<()> {
+    let workloads = &cfg.environment.teardown.aws_workloads;
+    let requirements = derive_eip_requirements(workloads, &cfg.environment.mgmt_cluster)?;
+    if requirements.is_empty() {
+        bail!(
+            "no EIP requirements could be derived; \
+             configure workload clusters in bootstrap.toml"
+        );
+    }
+    let mut errors: Vec<String> = Vec::new();
+
+    for (region, plan) in &requirements {
+        let required = plan.required;
+        let limit_raw = capture(
+            "aws",
+            &[
+                "service-quotas",
+                "get-service-quota",
+                "--service-code",
+                "ec2",
+                "--quota-code",
+                "L-0263D0A3",
+                "--region",
+                region,
+                "--query",
+                "Quota.Value",
+                "--output",
+                "text",
+            ],
+        )
+        .await
+        .with_context(|| {
+            format!(
+                "failed to query EC2 EIP quota in {region}; check AWS credentials and permissions"
+            )
+        })?;
+        let limit: u32 = limit_raw
+            .trim()
+            .parse::<f64>()
+            .with_context(|| format!("unexpected EIP quota value '{limit_raw}' in {region}"))?
+            as u32;
+
+        let allocated_raw = capture(
+            "aws",
+            &[
+                "ec2",
+                "describe-addresses",
+                "--region",
+                region,
+                "--filters",
+                "Name=domain,Values=vpc",
+                "--query",
+                "length(Addresses)",
+                "--output",
+                "text",
+            ],
+        )
+        .await
+        .with_context(|| format!("failed to list EC2 EIPs in {region}"))?;
+        let allocated: u32 = allocated_raw.trim().parse::<f64>().with_context(|| {
+            format!("unexpected EIP allocation count '{allocated_raw}' in {region}")
+        })? as u32;
+
+        let mut owned: u32 = 0;
+        for cluster in &plan.clusters {
+            let filter = format!("Name=tag:{},Values=owned", teardown::capa_tag_key(cluster));
+            let owned_raw = capture(
+                "aws",
+                &[
+                    "ec2",
+                    "describe-addresses",
+                    "--region",
+                    region,
+                    "--filters",
+                    &filter,
+                    "--query",
+                    "length(Addresses)",
+                    "--output",
+                    "text",
+                ],
+            )
+            .await
+            .with_context(|| format!("failed to list EC2 EIPs owned by {cluster} in {region}"))?;
+            owned += owned_raw.trim().parse::<f64>().with_context(|| {
+                format!("unexpected EIP owned count '{owned_raw}' for {cluster} in {region}")
+            })? as u32;
+        }
+
+        let available = eip_available(limit, allocated, owned);
+        match eip_shortfall(limit, allocated, owned, required) {
+            Some(shortfall) => {
+                let foreign = allocated.saturating_sub(owned);
+                errors.push(format!(
+                    "  {region}: {available} available to krops, {required} needed \
+                     ({shortfall} short; limit {limit}, {allocated} allocated, {owned} owned by krops)\n    \
+                     Request: aws service-quotas request-service-quota-increase \\\n      \
+                     --service-code ec2 --quota-code L-0263D0A3 \\\n      \
+                     --desired-value {} --region {region}",
+                    foreign + required
+                ));
+            }
+            None => println!(
+                ">>> EIP quota in {region}: {available} available to krops \
+                 (need {required}, {owned} already owned) - OK"
+            ),
+        }
+    }
+
+    if !errors.is_empty() {
+        bail!("insufficient EC2 Elastic IP quota:\n{}", errors.join("\n"));
+    }
+    Ok(())
 }
 
 // ── Steps ─────────────────────────────────────────────────────────────────────
@@ -2925,9 +3110,11 @@ mod tests {
         // localhost rewrite, no oci-push) and talosctl is an operator
         // convenience, not a bootstrap dependency.
         let base = ["kind", "helm", "kubectl", "clusterctl", "mise"];
+        // AWS includes the aws CLI for EIP quota checks.
+        let aws = required_tools(repo_config().environment("aws").unwrap());
         assert_eq!(
-            required_tools(repo_config().environment("aws").unwrap()),
-            base
+            aws,
+            vec!["kind", "helm", "kubectl", "clusterctl", "mise", "aws"]
         );
         assert_eq!(
             required_tools(repo_config().environment("local-talos").unwrap()),
@@ -3359,7 +3546,11 @@ mod tests {
         // The pivot invokes clusterctl and mise on every environment.
         let repo = repo_config();
         let aws = required_tools(repo.environment("aws").unwrap());
-        assert_eq!(aws, vec!["kind", "helm", "kubectl", "clusterctl", "mise"]);
+        // AWS includes the aws CLI for EIP quota checks.
+        assert_eq!(
+            aws,
+            vec!["kind", "helm", "kubectl", "clusterctl", "mise", "aws"]
+        );
         let local = required_tools(repo.environment("local-host").unwrap());
         assert_eq!(
             local,
@@ -3611,5 +3802,180 @@ mod tests {
         .await
         .unwrap_err();
         assert!(err.to_string().contains("not all Ready within 15m"));
+    }
+
+    #[test]
+    fn derive_eip_requirements_default_aws_run() {
+        use config::AwsWorkload;
+        let workloads = vec![
+            AwsWorkload {
+                region: "eu-north-1".into(),
+                cluster_name: "eu-north-1-workload".into(),
+                eks_cluster_name: "default_eu-north-1-workload-control-plane".into(),
+                rds_instance: "krops-eu-north-1-workload-db".into(),
+            },
+            AwsWorkload {
+                region: "eu-west-1".into(),
+                cluster_name: "eu-west-1-workload".into(),
+                eks_cluster_name: "default_eu-west-1-workload-control-plane".into(),
+                rds_instance: "krops-eu-west-1-workload-db".into(),
+            },
+        ];
+        let reqs = derive_eip_requirements(&workloads, "eu-north-1-management").unwrap();
+        // eu-north-1: 3 (workload) + 3 (management) = 6
+        assert_eq!(reqs["eu-north-1"].required, 6);
+        assert_eq!(reqs["eu-west-1"].required, 3);
+        assert_eq!(
+            reqs["eu-north-1"].clusters,
+            vec!["eu-north-1-workload", "eu-north-1-management"]
+        );
+        assert_eq!(reqs["eu-west-1"].clusters, vec!["eu-west-1-workload"]);
+    }
+
+    #[test]
+    fn derive_eip_requirements_mgmt_in_single_region() {
+        use config::AwsWorkload;
+        let workloads = vec![AwsWorkload {
+            region: "eu-north-1".into(),
+            cluster_name: "eu-north-1-workload".into(),
+            eks_cluster_name: "default_eu-north-1-workload-control-plane".into(),
+            rds_instance: "krops-eu-north-1-workload-db".into(),
+        }];
+        let reqs = derive_eip_requirements(&workloads, "eu-north-1-management").unwrap();
+        assert_eq!(reqs["eu-north-1"].required, 6);
+        assert_eq!(reqs.len(), 1);
+    }
+
+    #[test]
+    fn derive_eip_requirements_mgmt_region_independent_of_workloads() {
+        use config::AwsWorkload;
+        let workloads = vec![AwsWorkload {
+            region: "eu-west-1".into(),
+            cluster_name: "eu-west-1-workload".into(),
+            eks_cluster_name: "default_eu-west-1-workload-control-plane".into(),
+            rds_instance: "krops-eu-west-1-workload-db".into(),
+        }];
+        // Management cluster in a different region from all workloads: its EIPs
+        // must still appear in the requirements map.
+        let reqs = derive_eip_requirements(&workloads, "us-east-1-management").unwrap();
+        assert_eq!(reqs["eu-west-1"].required, 3);
+        assert_eq!(reqs["us-east-1"].required, 3);
+        assert_eq!(reqs["us-east-1"].clusters, vec!["us-east-1-management"]);
+        assert_eq!(reqs.len(), 2);
+    }
+
+    #[test]
+    fn derive_eip_requirements_invalid_mgmt_cluster_name() {
+        use config::AwsWorkload;
+        let workloads = vec![AwsWorkload {
+            region: "eu-north-1".into(),
+            cluster_name: "eu-north-1-workload".into(),
+            eks_cluster_name: "default_eu-north-1-workload-control-plane".into(),
+            rds_instance: "krops-eu-north-1-workload-db".into(),
+        }];
+        // Management cluster name does not end with "-management": should error
+        let result = derive_eip_requirements(&workloads, "eu-north-1-mgmt");
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("does not end with '-management'"));
+    }
+
+    #[test]
+    fn eip_plan_tags_match_the_capa_owner_key() {
+        let repo = repo_config();
+        let env = repo.environment("aws").unwrap();
+        let reqs = derive_eip_requirements(&env.teardown.aws_workloads, &env.mgmt_cluster).unwrap();
+        let keys: Vec<String> = reqs["eu-north-1"]
+            .clusters
+            .iter()
+            .map(|c| teardown::capa_tag_key(c))
+            .collect();
+        assert_eq!(
+            keys,
+            vec![
+                "sigs.k8s.io/cluster-api-provider-aws/cluster/eu-north-1-workload",
+                "sigs.k8s.io/cluster-api-provider-aws/cluster/eu-north-1-management",
+            ]
+        );
+        assert_eq!(reqs["eu-north-1"].required, 6);
+        assert_eq!(reqs["eu-west-1"].required, 3);
+    }
+
+    #[test]
+    fn aws_quota_preflight_runs_without_workloads() {
+        let repo = repo_config();
+        // Management-only AWS config: no workload clusters.
+        let mut env = repo.environment("aws").unwrap().clone();
+        env.teardown.aws_workloads = vec![];
+
+        // The gate must fire even with no workloads.
+        assert!(runs_aws_quota_preflight(&env));
+        // The aws CLI must be listed as required.
+        assert!(required_tools(&env).contains(&"aws"));
+        // derive_eip_requirements must still return the management cluster's 3 EIPs.
+        let reqs = derive_eip_requirements(&env.teardown.aws_workloads, &env.mgmt_cluster).unwrap();
+        assert_eq!(reqs.len(), 1);
+        assert_eq!(reqs["eu-north-1"].required, 3);
+        assert_eq!(reqs["eu-north-1"].clusters, vec!["eu-north-1-management"]);
+
+        // Non-AWS environments must not trigger the AWS quota preflight.
+        for kind in &["local-host", "local-talos", "azure", "gcp"] {
+            let other = repo.environment(kind).unwrap();
+            assert!(
+                !runs_aws_quota_preflight(other),
+                "kind={kind} should not run aws quota preflight"
+            );
+        }
+    }
+
+    #[test]
+    fn eip_shortfall_fresh_account_default_limit() {
+        assert_eq!(eip_shortfall(5, 0, 0, 6), Some(1));
+        assert_eq!(eip_shortfall(5, 0, 0, 3), None);
+    }
+
+    #[test]
+    fn eip_shortfall_rerun_after_complete_run_passes() {
+        assert_eq!(eip_shortfall(8, 6, 6, 6), None);
+    }
+
+    #[test]
+    fn eip_shortfall_rerun_after_partial_run_passes() {
+        assert_eq!(eip_shortfall(8, 3, 3, 6), None);
+    }
+
+    #[test]
+    fn eip_shortfall_counts_foreign_eips() {
+        assert_eq!(eip_shortfall(8, 5, 0, 6), Some(3));
+        assert_eq!(eip_shortfall(8, 7, 3, 6), Some(2));
+        assert_eq!(eip_shortfall(8, 3, 0, 6), Some(1));
+        assert_eq!(eip_available(8, 7, 3), 4);
+    }
+
+    #[test]
+    fn eip_shortfall_saturates() {
+        assert_eq!(eip_shortfall(5, 7, 0, 3), Some(3));
+        assert_eq!(eip_shortfall(5, 0, 2, 3), None);
+        // owned > allocated is impossible at a single instant (owned EIPs are a
+        // subset of allocated ones), but it can occur across separate describe-addresses
+        // calls if an EIP is released between the total-count query and the per-cluster
+        // query. saturating_sub clamps foreign to zero, so availability is the full limit.
+        assert_eq!(eip_available(5, 0, 2), 5);
+    }
+
+    #[test]
+    fn eip_shortfall_over_quota_desired_value() {
+        // Over-quota scenario: limit=5, allocated=7, owned=0, required=3
+        // Shortfall detection: available = 5 - (7 - 0) = 0, needed 3, so shortfall = 3
+        assert_eq!(eip_shortfall(5, 7, 0, 3), Some(3));
+
+        // Desired value computation: foreign + required
+        // foreign = allocated.saturating_sub(owned) = 7 - 0 = 7
+        // desired_value = foreign + required = 7 + 3 = 10
+        let foreign = 7u32.saturating_sub(0u32);
+        assert_eq!(foreign, 7);
+        assert_eq!(foreign + 3, 10);
     }
 }

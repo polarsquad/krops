@@ -244,6 +244,10 @@ increase before the first run with
 `aws service-quotas request-service-quota-increase --service-code ec2 --quota-code <code> --desired-value <n> --region <region>`
 (for VPCs use `--service-code vpc`).
 
+Bootstrap now enforces the EIP quota at runtime during preflight checks before
+any provisioning begins. The credentials used must have `servicequotas:GetServiceQuota`
+and `ec2:DescribeAddresses` permissions.
+
 ### E2E account budget
 
 The e2e AWS account 120392301094 carries a monthly cost budget

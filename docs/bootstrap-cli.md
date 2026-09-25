@@ -179,7 +179,12 @@ depend on engine- or version-specific error text.
    GitHub-synced environments (`aws`, `local-talos`). A fallback native run
    requires
    `kind`, `helm`, `kubectl`, `clusterctl`, and `mise`; OCI-synced
-   environments (`local-host`) also require `flux` and `curl`.
+   environments (`local-host`) also require `flux` and `curl`. The `aws`
+   profile additionally requires `aws` CLI on PATH. For the `aws` profile,
+   preflight checks the EC2 EIP quota per region before any provisioning begins.
+   The Rust CLI derives regions dynamically from `bootstrap.toml`; the shell
+   scripts use a hardcoded region list and must be kept in sync manually if
+   new AWS regions are added, making the Rust CLI the recommended path.
 2. **Bootstrap kind:** create or reuse `mgmt`, start the local registry for
    local-host, install the Flux Operator, create the Git and SOPS secrets
    (GitHub-synced environments) or publish the local OCI artifact, install

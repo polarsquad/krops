@@ -32,6 +32,7 @@ preflight_checks() {
 
   if [ "$PROFILE" = aws ]; then
     require_flux_env
+    preflight_aws_quotas
   fi
 
   detect_container_engine

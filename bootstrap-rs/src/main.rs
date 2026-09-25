@@ -298,7 +298,7 @@ fn validate_age_key(content: &str) -> Vec<&'static str> {
     if !content.lines().any(|l| l.starts_with("# created:")) {
         missing.push("# created: header");
     }
-    if !content.lines().any(|l| l.starts_with("# public key:")) {
+    if extract_age_pubkey(content).is_none() {
         missing.push("# public key: comment");
     }
     if !content.lines().any(|l| l.starts_with("AGE-SECRET-KEY-")) {
@@ -327,7 +327,7 @@ fn resolve_age_pubkey(
     override_key: Option<&str>,
     key_file_pubkey: Option<String>,
 ) -> Result<Option<String>> {
-    let override_key = override_key.filter(|k| !k.is_empty());
+    let override_key = override_key.map(str::trim).filter(|k| !k.is_empty());
     match (override_key, key_file_pubkey) {
         (Some(ovr), Some(file_key)) if ovr != file_key => bail!(
             "AGE_PUBLIC_KEY ('{ovr}') does not match the public key in the age key file ('{file_key}').\n       The override would plant the wrong key in the sops-age secret and Flux could not decrypt any *.sops.yaml.\n       Remove AGE_PUBLIC_KEY from .env or set it to the key file's public key. See docs/secrets.md."
@@ -3278,6 +3278,28 @@ mod tests {
     }
 
     #[test]
+    fn age_key_validation_rejects_malformed_public_key_line() {
+        let base = "# created: now\nAGE-SECRET-KEY-1XABCDEF\n";
+        for bad_line in &[
+            "# public key:",
+            "# public key: ",
+            "# public key:    ",
+            "# public key:age1abc",
+        ] {
+            let content = format!("{}\n{}", bad_line, base);
+            assert_eq!(
+                validate_age_key(&content),
+                vec!["# public key: comment"],
+                "expected validation to reject: {bad_line:?}"
+            );
+            assert!(
+                extract_age_pubkey(&content).is_none(),
+                "expected extraction to return None for: {bad_line:?}"
+            );
+        }
+    }
+
+    #[test]
     fn resolve_age_pubkey_accepts_matching_override() {
         let file_key = extract_age_pubkey(VALID_AGE_KEY);
         let resolved = resolve_age_pubkey(file_key.as_deref(), file_key.clone()).unwrap();
@@ -3295,6 +3317,31 @@ mod tests {
         assert!(
             err.contains(&file_key),
             "error must name the key-file pubkey: {err}"
+        );
+    }
+
+    #[test]
+    fn resolve_age_pubkey_trims_override() {
+        let file_key = extract_age_pubkey(VALID_AGE_KEY);
+        let key_str = file_key.as_deref().unwrap();
+
+        // padded correct key matches
+        let padded = format!(" {} \n", key_str);
+        assert_eq!(
+            resolve_age_pubkey(Some(&padded), file_key.clone()).unwrap(),
+            file_key.clone()
+        );
+
+        // whitespace-only override is treated as unset
+        assert_eq!(
+            resolve_age_pubkey(Some("   "), file_key.clone()).unwrap(),
+            file_key.clone()
+        );
+
+        // returned value is trimmed when no file key
+        assert_eq!(
+            resolve_age_pubkey(Some(" age1override "), None).unwrap(),
+            Some("age1override".to_string())
         );
     }
 

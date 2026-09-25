@@ -37,7 +37,7 @@ def main() -> int:
 
     for needle, why in (
         ('--registry-mode=nodeport --components="" --timeout 1m --confirm', "zarf init timeout"),
-        ('package deploy "$PACKAGE" --timeout 1m --confirm', "zarf deploy timeout"),
+        ('package deploy "$PACKAGE" --timeout 5m --confirm', "zarf deploy timeout"),
         ("seq 1 80", "20m workload cluster wait"),
     ):
         if needle not in OFFLINE_RUN:

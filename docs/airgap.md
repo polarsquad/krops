@@ -336,10 +336,14 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
    - The seeded podinfo chart version is read from
      `workload/local-host/podinfo/helm.yaml`, so the chart in the gap registry
      cannot drift from the tag the workload OCIRepository requests.
-   - Zarf deploy and Flux waits fail after 1m, so a pull failure surfaces
-     quickly; the workload cluster gets 20m to become Available. A healthy
-     deploy job takes about 10 minutes and the whole workflow about 14, so the
-     deploy job limit is 30 minutes.
+   - `zarf init` and the FluxInstance wait fail after 1m.
+   - `zarf package deploy` uses `--timeout 5m` because that single flag limits
+     both Helm `--wait` and each component's healthChecks. Zarf health checks
+     have no per-entry `maxTotalSeconds`, so cert-manager's three Deployments
+     share that deploy timeout.
+   - The workload cluster gets 20m to become Available. A healthy deploy job
+     takes about 10 minutes and the whole workflow about 14, so the deploy job
+     limit is 30 minutes.
    - When the workload cluster or its Flux does not come up, `offline-run.sh`
      writes cluster, machine, controller-log, container and event state to
      `/tmp/airgap-workload-debug.txt`, which the workflow uploads.

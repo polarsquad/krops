@@ -135,7 +135,7 @@ else
 fi
 
 step "4. zarf package deploy"
-if ( cd "$AIRGAP_DIR" && "$ZARF" package deploy "$PACKAGE" --timeout 1m --confirm ); then
+if ( cd "$AIRGAP_DIR" && "$ZARF" package deploy "$PACKAGE" --timeout 5m --confirm ); then
   pass "zarf package deploy"
 else
   fail "zarf package deploy"

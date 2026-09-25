@@ -64,6 +64,57 @@ require_flux_env() {
   fi
 }
 
+# ── Preflight: AWS service quotas ─────────────────────────────────────────────
+# Checks that the EC2-VPC Elastic IP quota is sufficient in every region the
+# default AWS run touches before provisioning begins. Requires aws CLI in PATH.
+preflight_aws_quotas() {
+  command -v aws >/dev/null 2>&1 \
+    || { echo "ERROR: aws CLI not found in PATH (required for EIP quota preflight)" >&2; exit 1; }
+
+  # Pairs of "region:required_free" – must stay in sync with docs/operations.md.
+  # eu-north-1: management + workload cluster = 6 EIPs (3 AZs × 2 clusters)
+  # eu-west-1:  workload cluster              = 3 EIPs (3 AZs × 1 cluster)
+  local REGION_PAIRS="eu-north-1:6 eu-west-1:3"
+  local all_ok=1
+
+  for pair in $REGION_PAIRS; do
+    local region="${pair%%:*}"
+    local required="${pair##*:}"
+
+    local limit_raw limit allocated available
+    limit_raw=$(aws service-quotas get-service-quota \
+      --service-code ec2 \
+      --quota-code L-0263D0A3 \
+      --region "$region" \
+      --query 'Quota.Value' \
+      --output text 2>/dev/null) || limit_raw=0
+    # Quota values come back as floats (e.g. "5.0"); truncate to integer.
+    limit=$(printf '%.0f' "${limit_raw:-0}" 2>/dev/null) || limit=0
+
+    allocated=$(aws ec2 describe-addresses \
+      --region "$region" \
+      --query 'length(Addresses)' \
+      --output text 2>/dev/null) || allocated=0
+    # describe-addresses also returns a float sometimes; normalize.
+    allocated=$(printf '%.0f' "${allocated:-0}" 2>/dev/null) || allocated=0
+
+    available=$(( limit - allocated ))
+
+    if [ "$available" -lt "$required" ]; then
+      echo "ERROR: Insufficient EC2 Elastic IP quota in ${region}: ${available} free, ${required} needed" >&2
+      echo "       Request an increase:" >&2
+      printf "         aws service-quotas request-service-quota-increase \\\\\n" >&2
+      printf "           --service-code ec2 --quota-code L-0263D0A3 \\\\\n" >&2
+      printf "           --desired-value %d --region %s\n" "$(( allocated + required ))" "$region" >&2
+      all_ok=0
+    else
+      echo ">>> EIP quota in ${region}: ${available} free (need ${required}) - OK"
+    fi
+  done
+
+  [ "$all_ok" -eq 1 ] || exit 1
+}
+
 # ── Preflight: container engine ───────────────────────────────────────────────
 # Detects and selects a running container engine. Sets: CONTAINER_ENGINE,
 # ENGINE_SOCK (and exports KIND_EXPERIMENTAL_PROVIDER for podman).

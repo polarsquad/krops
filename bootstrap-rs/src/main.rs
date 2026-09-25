@@ -428,6 +428,27 @@ fn unpause_patch() -> serde_json::Value {
     json!({ "spec": { "paused": false } })
 }
 
+/// Compute required free EIPs per region for the given AWS environment.
+/// Each cluster (workload or management) needs 3 EIPs (one NAT gateway per AZ,
+/// 3 AZs). The management cluster's region is detected from its name prefix
+/// matching a workload region (e.g. "eu-north-1-management" → "eu-north-1").
+fn derive_eip_requirements(
+    workloads: &[config::AwsWorkload],
+    mgmt_cluster: &str,
+) -> std::collections::HashMap<String, u32> {
+    let mut map: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    for w in workloads {
+        *map.entry(w.region.clone()).or_insert(0) += 3;
+    }
+    for w in workloads {
+        if mgmt_cluster.starts_with(&w.region) {
+            *map.entry(w.region.clone()).or_insert(0) += 3;
+            break;
+        }
+    }
+    map
+}
+
 /// Tools required on PATH for the given environment's sync surface (the
 /// environment names are the binary's sequence contract, issue #98
 /// decision 3; the extras are the sync source's, issue #105 scope item 6).
@@ -448,6 +469,9 @@ fn required_tools(env: &Environment) -> Vec<&'static str> {
     if !env.pivot_sops_secrets.is_empty() {
         // The pivot decrypts these with the operator's age key (Phase 3).
         tools.push("sops");
+    }
+    if !env.teardown.aws_workloads.is_empty() {
+        tools.push("aws");
     }
     tools
 }
@@ -726,6 +750,10 @@ async fn preflight_checks(cfg: &Config, http: &reqwest::Client) -> Result<Prefli
         None
     };
 
+    if !cfg.environment.teardown.aws_workloads.is_empty() {
+        preflight_aws_quotas(cfg).await?;
+    }
+
     let resolved = engine::resolve(
         cfg.container_engine.clone(),
         cfg.engine_sock.clone(),
@@ -816,6 +844,78 @@ async fn preflight_github(cfg: &Config, http: &reqwest::Client) -> Result<Github
         age_key_content,
         age_pubkey,
     })
+}
+
+async fn preflight_aws_quotas(cfg: &Config) -> Result<()> {
+    let workloads = &cfg.environment.teardown.aws_workloads;
+    if workloads.is_empty() {
+        return Ok(());
+    }
+    let requirements = derive_eip_requirements(workloads, &cfg.environment.mgmt_cluster);
+    let mut errors: Vec<String> = Vec::new();
+
+    for (region, required) in &requirements {
+        let limit_raw = capture(
+            "aws",
+            &[
+                "service-quotas",
+                "get-service-quota",
+                "--service-code",
+                "ec2",
+                "--quota-code",
+                "L-0263D0A3",
+                "--region",
+                region,
+                "--query",
+                "Quota.Value",
+                "--output",
+                "text",
+            ],
+        )
+        .await
+        .with_context(|| {
+            format!(
+                "failed to query EC2 EIP quota in {region}; check AWS credentials and permissions"
+            )
+        })?;
+        let limit = limit_raw.trim().parse::<f64>().unwrap_or(0.0) as u32;
+
+        let allocated_raw = capture(
+            "aws",
+            &[
+                "ec2",
+                "describe-addresses",
+                "--region",
+                region,
+                "--query",
+                "length(Addresses)",
+                "--output",
+                "text",
+            ],
+        )
+        .await
+        .with_context(|| format!("failed to list EC2 EIPs in {region}"))?;
+        let allocated: u32 = allocated_raw.trim().parse::<f64>().unwrap_or(0.0) as u32;
+
+        let available = limit.saturating_sub(allocated);
+        if available < *required {
+            errors.push(format!(
+                "  {region}: {available} free, {required} needed \
+                 (limit {limit}, {allocated} allocated)\n    \
+                 Request: aws service-quotas request-service-quota-increase \\\n      \
+                 --service-code ec2 --quota-code L-0263D0A3 \\\n      \
+                 --desired-value {} --region {region}",
+                allocated + required
+            ));
+        } else {
+            eprintln!(">>> EIP quota in {region}: {available} free (need {required}) - OK");
+        }
+    }
+
+    if !errors.is_empty() {
+        bail!("insufficient EC2 Elastic IP quota:\n{}", errors.join("\n"));
+    }
+    Ok(())
 }
 
 // ── Steps ─────────────────────────────────────────────────────────────────────
@@ -2925,10 +3025,9 @@ mod tests {
         // localhost rewrite, no oci-push) and talosctl is an operator
         // convenience, not a bootstrap dependency.
         let base = ["kind", "helm", "kubectl", "clusterctl", "mise"];
-        assert_eq!(
-            required_tools(repo_config().environment("aws").unwrap()),
-            base
-        );
+        // AWS includes the aws CLI for EIP quota checks.
+        let aws = required_tools(repo_config().environment("aws").unwrap());
+        assert_eq!(aws, vec!["kind", "helm", "kubectl", "clusterctl", "mise", "aws"]);
         assert_eq!(
             required_tools(repo_config().environment("local-talos").unwrap()),
             base
@@ -3359,7 +3458,11 @@ mod tests {
         // The pivot invokes clusterctl and mise on every environment.
         let repo = repo_config();
         let aws = required_tools(repo.environment("aws").unwrap());
-        assert_eq!(aws, vec!["kind", "helm", "kubectl", "clusterctl", "mise"]);
+        // AWS includes the aws CLI for EIP quota checks.
+        assert_eq!(
+            aws,
+            vec!["kind", "helm", "kubectl", "clusterctl", "mise", "aws"]
+        );
         let local = required_tools(repo.environment("local-host").unwrap());
         assert_eq!(
             local,
@@ -3611,5 +3714,57 @@ mod tests {
         .await
         .unwrap_err();
         assert!(err.to_string().contains("not all Ready within 15m"));
+    }
+
+    #[test]
+    fn derive_eip_requirements_default_aws_run() {
+        use config::AwsWorkload;
+        let workloads = vec![
+            AwsWorkload {
+                region: "eu-north-1".into(),
+                cluster_name: "eu-north-1-workload".into(),
+                eks_cluster_name: "default_eu-north-1-workload-control-plane".into(),
+                rds_instance: "krops-eu-north-1-workload-db".into(),
+            },
+            AwsWorkload {
+                region: "eu-west-1".into(),
+                cluster_name: "eu-west-1-workload".into(),
+                eks_cluster_name: "default_eu-west-1-workload-control-plane".into(),
+                rds_instance: "krops-eu-west-1-workload-db".into(),
+            },
+        ];
+        let reqs = derive_eip_requirements(&workloads, "eu-north-1-management");
+        // eu-north-1: 3 (workload) + 3 (management) = 6
+        assert_eq!(reqs["eu-north-1"], 6);
+        // eu-west-1: 3 (workload only)
+        assert_eq!(reqs["eu-west-1"], 3);
+    }
+
+    #[test]
+    fn derive_eip_requirements_mgmt_in_single_region() {
+        use config::AwsWorkload;
+        let workloads = vec![AwsWorkload {
+            region: "eu-north-1".into(),
+            cluster_name: "eu-north-1-workload".into(),
+            eks_cluster_name: "default_eu-north-1-workload-control-plane".into(),
+            rds_instance: "krops-eu-north-1-workload-db".into(),
+        }];
+        let reqs = derive_eip_requirements(&workloads, "eu-north-1-management");
+        assert_eq!(reqs["eu-north-1"], 6);
+        assert_eq!(reqs.len(), 1);
+    }
+
+    #[test]
+    fn derive_eip_requirements_no_mgmt_region_match_leaves_workload_only() {
+        use config::AwsWorkload;
+        let workloads = vec![AwsWorkload {
+            region: "eu-west-1".into(),
+            cluster_name: "eu-west-1-workload".into(),
+            eks_cluster_name: "default_eu-west-1-workload-control-plane".into(),
+            rds_instance: "krops-eu-west-1-workload-db".into(),
+        }];
+        // mgmt cluster name does not start with any workload region
+        let reqs = derive_eip_requirements(&workloads, "us-east-1-management");
+        assert_eq!(reqs["eu-west-1"], 3);
     }
 }

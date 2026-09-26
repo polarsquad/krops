@@ -175,6 +175,16 @@ for literal in ["krops-run", "KROPS_RUN_ID", "KROPS_REVISION", "KROPS_EXPIRES_AT
     if literal not in run_tags_text:
         errors.append(f"bootstrap-rs/src/run_tags.rs: missing literal {literal!r}")
 
+# (g) pivot.sh never generates run tags; it copies them from kind
+pivot_text = (REPO / "pivot.sh").read_text()
+for forbidden in ["_KROPS_RUN_ID", "date -u +%Y%m%dT", "KROPS_RUN_TTL"]:
+    if forbidden in pivot_text:
+        errors.append(f"pivot.sh: must not generate run tags (found {forbidden!r})")
+if "get configmap krops-run" not in pivot_text:
+    errors.append("pivot.sh: must read krops-run ConfigMap from kind (missing 'get configmap krops-run')")
+if not re.search(r'--context\s+\S+\s+get configmap krops-run|get configmap krops-run.*--context', pivot_text):
+    errors.append("pivot.sh: must use explicit --context when reading from kind (missing '--context' in krops-run read)")
+
 if errors:
     for e in errors:
         print(f"FAIL: {e}", file=sys.stderr)

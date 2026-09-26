@@ -20,6 +20,26 @@ const KROPS_REVISION: &str = "KROPS_REVISION";
 const KROPS_EXPIRES_AT: &str = "KROPS_EXPIRES_AT";
 const KROPS_RUN_KIND: &str = "KROPS_RUN_KIND";
 
+/// Check if KROPS_RUN_ID environment variable is set and non-empty.
+fn run_id_env_set(v: Option<String>) -> bool {
+    v.map(|v| !v.is_empty()).unwrap_or(false)
+}
+
+/// Build kubectl args to fetch the krops-run ConfigMap from a given context.
+fn source_get_args(ctx: &str) -> Vec<String> {
+    vec![
+        "--context".to_string(),
+        ctx.to_string(),
+        "get".to_string(),
+        "cm".to_string(),
+        RUN_CONFIGMAP_NAME.to_string(),
+        "-n".to_string(),
+        NS.to_string(),
+        "-o".to_string(),
+        "json".to_string(),
+    ]
+}
+
 /// Run tags resolved from environment, defaults, or Flux ConfigMap.
 pub struct RunTags {
     pub run_id: String,
@@ -66,6 +86,34 @@ impl RunTags {
             revision,
             expires_at,
             run_kind,
+        })
+    }
+
+    /// Parse RunTags from a ConfigMap JSON value, dropping server-side metadata.
+    /// Returns None if the ConfigMap lacks a data field.
+    pub fn from_configmap_value(cm: &serde_json::Value) -> Option<RunTags> {
+        let data = cm.get("data")?;
+        Some(RunTags {
+            run_id: data
+                .get("KROPS_RUN_ID")
+                .and_then(|v| v.as_str())
+                .unwrap_or("manual")
+                .to_string(),
+            revision: data
+                .get("KROPS_REVISION")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string(),
+            expires_at: data
+                .get("KROPS_EXPIRES_AT")
+                .and_then(|v| v.as_str())
+                .unwrap_or("never")
+                .to_string(),
+            run_kind: data
+                .get("KROPS_RUN_KIND")
+                .and_then(|v| v.as_str())
+                .unwrap_or("manual")
+                .to_string(),
         })
     }
 
@@ -164,7 +212,7 @@ fn format_rfc3339_utc(secs: i64) -> String {
 /// of generating new ones. Otherwise, generate values and apply the ConfigMap.
 pub async fn ensure_in_source(cfg: &crate::Config, branch_sha: Option<&str>) -> Result<RunTags> {
     // Check if already set (rerun-safe)
-    if std::env::var(KROPS_RUN_ID).is_ok() {
+    if run_id_env_set(std::env::var(KROPS_RUN_ID).ok()) {
         // Environment already set, try to read from cluster to be consistent
         let existing = crate::capture(
             "kubectl",
@@ -233,17 +281,20 @@ pub async fn ensure_in_source(cfg: &crate::Config, branch_sha: Option<&str>) -> 
 }
 
 /// Seed the ConfigMap from the source (kind) cluster to the target cluster.
-pub async fn seed_target(_cfg: &crate::Config, kubeconfig: &str) -> Result<()> {
-    // Reads from the default context, which must still point at the kind bootstrap cluster at this point in the pivot flow.
-    let json_str = crate::capture(
-        "kubectl",
-        &["get", "cm", RUN_CONFIGMAP_NAME, "-n", NS, "-o", "json"],
-    )
-    .await?;
+/// Reads using explicit --context to ensure the source cluster is consulted (not ambient context).
+/// Parses cleanly to drop server metadata (resourceVersion, uid, etc.) before applying to target.
+pub async fn seed_target(cfg: &crate::Config, kubeconfig: &str) -> Result<()> {
+    let args_owned = source_get_args(&cfg.bootstrap_kubecontext);
+    let args_str: Vec<&str> = args_owned.iter().map(|s| s.as_str()).collect();
+    let json_str = crate::capture("kubectl", &args_str).await?;
 
-    // Apply to target
     let cm_json = serde_json::from_str::<serde_json::Value>(&json_str)?;
-    crate::kubectl_apply(Some(kubeconfig), &cm_json).await?;
+    let tags = RunTags::from_configmap_value(&cm_json)
+        .ok_or_else(|| anyhow::anyhow!("ConfigMap data field missing or invalid"))?;
+
+    // Rebuild the ConfigMap from data fields only (drops server metadata)
+    let clean_cm = serde_json::from_str::<serde_json::Value>(&tags.configmap_json(NS))?;
+    crate::kubectl_apply(Some(kubeconfig), &clean_cm).await?;
 
     Ok(())
 }
@@ -297,5 +348,47 @@ mod tests {
     fn test_rfc3339_leap_day() {
         // 2024-03-01T00:00:00Z (day after leap day 2024-02-29)
         assert_eq!(format_rfc3339_utc(1709251200), "2024-03-01T00:00:00Z");
+    }
+
+    #[test]
+    fn run_id_env_set_rejects_empty() {
+        assert!(!run_id_env_set(Some(String::new())));
+        assert!(!run_id_env_set(None));
+        assert!(run_id_env_set(Some("gha-1".to_string())));
+    }
+
+    #[test]
+    fn from_configmap_value_drops_server_metadata() {
+        let cm = serde_json::json!({
+            "metadata": {
+                "resourceVersion": "12345",
+                "uid": "abc-def",
+                "managedFields": []
+            },
+            "data": {
+                "KROPS_RUN_ID": "test-run",
+                "KROPS_REVISION": "abc123",
+                "KROPS_EXPIRES_AT": "2026-10-01T00:00:00Z",
+                "KROPS_RUN_KIND": "ci"
+            }
+        });
+        let tags = RunTags::from_configmap_value(&cm).expect("should parse");
+        assert_eq!(tags.run_id, "test-run");
+        assert_eq!(tags.revision, "abc123");
+        let json = tags.configmap_json(NS);
+        assert!(!json.contains("resourceVersion"));
+        assert!(!json.contains("uid"));
+    }
+
+    #[test]
+    fn from_configmap_value_none_without_data() {
+        let cm = serde_json::json!({"metadata": {}});
+        assert!(RunTags::from_configmap_value(&cm).is_none());
+    }
+
+    #[test]
+    fn source_get_args_pins_context() {
+        let args = source_get_args("kind-mgmt");
+        assert_eq!(&args[..2], &["--context", "kind-mgmt"]);
     }
 }

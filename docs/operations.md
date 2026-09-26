@@ -288,11 +288,26 @@ ConfigMap values via `postBuild.substituteFrom` to apply them to:
 
 #### Rerun behavior
 
-Re-runs preserve all tag values if the `krops-run` ConfigMap still exists in
-`flux-system`. If the ConfigMap was removed between runs, a new one is created;
-`KROPS_RUN_ID` is honoured from the environment, but `krops.io/expires-at` is
-recalculated from `KROPS_RUN_TTL`. Omit `KROPS_RUN_ID` to get a fresh run-id
-tied to the current time and profile.
+Three paths handle reruns differently:
+
+**Rust CLI (`krops-bootstrap`)**:
+When `KROPS_RUN_ID` is set and non-empty, and the `krops-run` ConfigMap
+exists in kind's `flux-system`, all four values are reused without change
+(rerun-safe). If the ConfigMap is gone but `KROPS_RUN_ID` was set, a fresh
+ConfigMap is written with `KROPS_RUN_ID` from the environment and expires-at
+recalculated from `KROPS_RUN_TTL`. With `KROPS_RUN_ID` unset or empty, a
+fresh run-id is generated (profile + timestamp) and the ConfigMap is
+overwritten.
+
+**`bootstrap.sh`**:
+Always rewrites the `krops-run` ConfigMap from environment variables. To
+preserve the same identity across reruns, export `KROPS_RUN_ID` (and
+optionally `KROPS_RUN_TTL`) before calling bootstrap.
+
+**Pivot (`pivot.sh` and the CLI's pivot phase)**:
+Never generates tag values. Copies the four data keys from the kind cluster's
+`krops-run` ConfigMap using the `BOOTSTRAP_KUBECONTEXT` (default `kind-mgmt`);
+fails if the ConfigMap is missing.
 
 #### TTL and expiry
 

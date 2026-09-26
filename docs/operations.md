@@ -231,6 +231,38 @@ cosign verify-attestation \
   "$IMAGE"
 ```
 
+### E2E AWS account
+
+**Designation:** Account `120392301094` was designated on 2026-09-20 ([#239](https://github.com/polarsquad/krops/issues/239)) as the single account for all krops end-to-end testing (live acceptance [#143](https://github.com/polarsquad/krops/issues/143), scheduled e2e [#185](https://github.com/polarsquad/krops/issues/185)). It is a Control Tower-managed Organizations member account.
+
+**Owner and escalation contact:** joseph.shriner@polarsquad.com
+
+**Shared sandbox warning:** This is a shared account with non-krops resources (training EKS clusters, Terraform VPCs, workshop buckets). Every krops tool filters on `default_*`, `krops-*`, and CAPA ownership tags. Do not run account-wide cleanup commands; use the [teardown](#teardown) path which scopes deletions to krops-owned resources.
+
+**Runbook index:**
+
+| What | Where |
+|---|---|
+| Spend ceiling and alert contact | [E2E account budget](#e2e-account-budget) |
+| Service quotas and first-run errors | [AWS service quotas](#aws-service-quotas-common-first-run-blockers) |
+| CI access (GitHub Actions OIDC) | [CI access in aws-iam.md](./aws-iam.md#ci-access-github-actions-oidc-and-the-krops-ci-e2e-role) |
+| Incident and credential revocation | [E2E account incident and credential revocation in aws-iam.md](./aws-iam.md#e2e-account-incident-and-credential-revocation) |
+| Cluster teardown and leftover cleanup | [Teardown](#teardown) |
+| Orphan reporting | issue [#380](https://github.com/polarsquad/krops/issues/380) |
+| Resource tagging standard | issue [#381](https://github.com/polarsquad/krops/issues/381) |
+
+**When a budget alert fires:**
+
+1. Check for live krops clusters:
+   ```sh
+   aws eks list-clusters --region eu-north-1
+   aws eks list-clusters --region eu-west-1
+   ```
+2. Use the AWS Cost Explorer console (group by service) to distinguish krops spend from other shared-account spend.
+3. If the spend is from leftover krops resources, clean them up through the [teardown](#teardown) path.
+4. If the spend is from non-krops resources, escalate to the account owner (joseph.shriner@polarsquad.com).
+5. To adjust the ceiling, update the budget in the AWS Budgets console and update the budget paragraph in `docs/operations.md` in the same PR.
+
 ### AWS service quotas (common first-run blockers)
 
 | Quota | Code | Needed | Why |

@@ -316,7 +316,7 @@ Load these only when the task touches their domain:
 - `docs/extending.md`: adding a workload cluster, adding apps, adding other providers (Azure, Talos, k0smotron).
 - `docs/secrets.md`: SOPS + age setup, credential rotation.
 - `docs/konflate.md`: rendered PR review, CI gate, tokens, write-back.
-- `docs/aws-iam.md`: management-cluster ACK controllers (static SOPS credentials, union scope), reader roles, reader user.
-- `docs/operations.md`: quotas, configuration, bootstrap, verification.
+- `docs/aws-iam.md`: management-cluster ACK controllers (static SOPS credentials, union scope), reader roles, reader user, CI OIDC role, e2e account incident and credential revocation.
+- `docs/operations.md`: e2e AWS account designation and budget, quotas, configuration, bootstrap, verification.
 - `docs/workload-resources.md`: S3/RDS posture, known limitations.
 - `docs/airgap.md`: Zarf offline bundle for the local-host profile.

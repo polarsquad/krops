@@ -1379,8 +1379,7 @@ async fn wait_for_resource(args: &[&str], attempts: u32) -> bool {
 
 /// Poll `probe` immediately, then every `interval_s` after a failure, until
 /// it reports success or the `timeout_s` budget is spent. One final probe
-/// runs past the budget, mirroring the script's until-loop which tests the
-/// condition once more before declaring failure.
+/// runs at the budget boundary (after `timeout_s / interval_s` sleeps), mirroring the script's until-loop which tests the condition once more before declaring failure.
 async fn poll_until<F, Fut>(timeout_s: u64, interval_s: u64, mut probe: F) -> bool
 where
     F: FnMut() -> Fut,
@@ -1712,7 +1711,7 @@ async fn pivot_wait_for_management_cluster(cfg: &Config, mgmt_cluster: &str) -> 
         tokio::time::sleep(Duration::from_secs(cfg.mgmt_poll_interval)).await;
     }
     if !found {
-        // One final probe past the budget, mirroring the script's until-loop
+        // One final probe at the budget boundary, mirroring the script's until-loop
         // which tests the condition before declaring failure.
         found = run_quiet("kubectl", &["get", &secret, "-n", mgmt_ns]).await;
     }
@@ -3488,9 +3487,9 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn poll_until_probes_once_past_the_budget_before_failing() {
+    async fn poll_until_probes_once_at_the_budget_boundary_before_failing() {
         // A 30s budget at a 10s interval is 3 attempts, plus the final
-        // past-budget probe (the until-loop tests once more before failing).
+        // probe at the 30s boundary (the until-loop tests once more before failing).
         let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let counter = calls.clone();
         let found = poll_until(30, 10, move || {

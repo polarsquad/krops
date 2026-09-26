@@ -131,9 +131,11 @@ pins together with their declarative counterparts. See
 | `BOOTSTRAP_PIVOT` | `1` | Any value other than literal `1` skips pivot |
 | `MGMT_KUBECONFIG` | `~/.kube/krops-mgmt.yaml` | Exported management kubeconfig for native fallback runs |
 | `MGMT_READY_TIMEOUT` | `40m` for aws, `15m` for local-host, `30m` for local-talos (PXE install + first Talos boot) | Management cluster definition and provisioning waits |
-| `MGMT_POLL_INTERVAL` | `10` seconds | Management cluster definition and provisioning poll |
+| `MGMT_POLL_INTERVAL` | `10` seconds | Management cluster definition, provisioning, and node-readiness polls |
 | `BOOTSTRAP_KUBECONTEXT` | config value `kind-mgmt` | Source context required by pivot |
 | `PIVOT_SKIP_DELETE` | `0` | Literal `1` keeps kind after a successful pivot |
+
+The pivot's target node-readiness wait uses a fixed 15m budget (`MGMT_NODE_READY_TIMEOUT` in `pivot.sh` and `bootstrap-rs/src/main.rs`). It is not an environment knob and is separate from `MGMT_READY_TIMEOUT`.
 
 ### Toolbox runtime contracts
 

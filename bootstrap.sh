@@ -141,6 +141,32 @@ cleanup_bootstrap() {
 trap cleanup_bootstrap EXIT
 seed_flux
 
+# Write run-identity ConfigMap for Flux tag substitution (#381)
+_KROPS_RUN_KIND="${KROPS_RUN_KIND:-manual}"
+_KROPS_RUN_ID="${KROPS_RUN_ID:-${PROFILE:-unknown}-$(date -u +%Y%m%dT%H%M%SZ)}"
+_KROPS_REVISION="${KROPS_REVISION:-unknown}"
+if [ "${KROPS_RUN_TTL:-}" = "none" ]; then
+  _KROPS_EXPIRES_AT="never"
+elif [ -n "${KROPS_RUN_TTL:-}" ]; then
+  case "${KROPS_RUN_TTL}" in
+    *h) _KROPS_TTL_SECS=$(( ${KROPS_RUN_TTL%h} * 3600 )) ;;
+    *m) _KROPS_TTL_SECS=$(( ${KROPS_RUN_TTL%m} * 60 )) ;;
+    *s) _KROPS_TTL_SECS=$(( ${KROPS_RUN_TTL%s} )) ;;
+    *) echo "ERROR: KROPS_RUN_TTL must be a number followed by h, m, or s (e.g. 2h, 30m, 90s)" >&2; exit 1 ;;
+  esac
+  _KROPS_EXPIRES_AT=$(date -u -d "+${_KROPS_TTL_SECS} seconds" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -v+${_KROPS_TTL_SECS}S '+%Y-%m-%dT%H:%M:%SZ')
+else
+  _KROPS_EXPIRES_AT=$(date -u -d "+86400 seconds" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -v+86400S '+%Y-%m-%dT%H:%M:%SZ')
+fi
+kubectl create configmap krops-run \
+  --namespace flux-system \
+  --from-literal=KROPS_RUN_ID="${_KROPS_RUN_ID}" \
+  --from-literal=KROPS_REVISION="${_KROPS_REVISION}" \
+  --from-literal=KROPS_EXPIRES_AT="${_KROPS_EXPIRES_AT}" \
+  --from-literal=KROPS_RUN_KIND="${_KROPS_RUN_KIND}" \
+  --dry-run=client -o yaml | kubectl apply -f -
+echo ">>> Run tags: run-id=${_KROPS_RUN_ID} revision=${_KROPS_REVISION} expires-at=${_KROPS_EXPIRES_AT} run-kind=${_KROPS_RUN_KIND}"
+
 # ── Step 5: Watch local-host reconciliation ──────────────────────────────────
 # Stream the GitOps handoff in the bootstrap terminal for the local profile.
 # The final Kustomization is created by the OCI root, so wait for it to appear

@@ -134,6 +134,10 @@ pins together with their declarative counterparts. See
 | `MGMT_POLL_INTERVAL` | `10` seconds | Management cluster definition and provisioning poll |
 | `BOOTSTRAP_KUBECONTEXT` | config value `kind-mgmt` | Source context required by pivot |
 | `PIVOT_SKIP_DELETE` | `0` | Literal `1` keeps kind after a successful pivot |
+| `KROPS_RUN_ID` | `{profile}-{timestamp}` | Bootstrap/pivot run identifier for resource tagging; set to override auto-generation |
+| `KROPS_RUN_TTL` | `86400s` (24h) | Resource time-to-live duration (e.g. `2h`, `30m`, `3600s`), or literal `none` for persistent tags |
+| `KROPS_REVISION` | Git branch HEAD SHA | Git revision tag for resource tagging; auto-extracted from GitHub during bootstrap |
+| `KROPS_RUN_KIND` | `manual` | Bootstrap/pivot invocation kind for resource tagging (e.g. `manual`, `scheduled`, `emergency`) |
 
 ### Toolbox runtime contracts
 

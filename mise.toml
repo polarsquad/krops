@@ -138,6 +138,11 @@ if ! uv run python tests/test-gcp-postgres.py; then
   echo "    FAILED: gcp postgres" >&2
   fail=1
 fi
+echo "==> AWS run-tag standard (#381)"
+if ! uv run python tests/test-aws-run-tags.py; then
+  echo "    FAILED: AWS run-tag standard" >&2
+  fail=1
+fi
 echo "==> kcc operator pin"
 if ! python3 tests/test-kcc-operator-pin.py; then
   echo "    FAILED: kcc operator pin" >&2

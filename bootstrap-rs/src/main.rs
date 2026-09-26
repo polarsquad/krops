@@ -19,6 +19,7 @@
 
 mod config;
 mod engine;
+mod run_tags;
 mod teardown;
 
 use config::{BootstrapConfig, Environment, SyncSource};
@@ -702,6 +703,7 @@ struct GithubContext {
     github_token: String,
     age_key_content: String,
     age_pubkey: String,
+    branch_sha: Option<String>,
 }
 
 struct Preflight {
@@ -758,20 +760,33 @@ async fn preflight_github(cfg: &Config, http: &reqwest::Client) -> Result<Github
 
     let branch_path = cfg.repo.bootstrap.git_branch.replace('/', "%2F");
     let url = format!("https://api.github.com/repos/{github_repo}/branches/{branch_path}");
-    let status = http
+    let response = http
         .get(&url)
         .header("Accept", "application/vnd.github+json")
         .header("Authorization", format!("Bearer {github_token}"))
         .send()
         .await
-        .map(|r| r.status().as_u16())
-        .unwrap_or(0);
+        .context("failed to query GitHub API")?;
+
+    let status = response.status().as_u16();
     if status != 200 {
         bail!(
             "GitHub repository or branch '{}' is unavailable at '{git_repo_url}' (HTTP {status})",
             cfg.repo.bootstrap.git_branch
         );
     }
+
+    // Extract commit SHA from response
+    let branch_sha = response
+        .json::<serde_json::Value>()
+        .await
+        .ok()
+        .and_then(|body| {
+            body.get("commit")
+                .and_then(|c| c.get("sha"))
+                .and_then(|s| s.as_str())
+                .map(|s| s.to_string())
+        });
 
     let age_key_file = cfg.age_key_file.clone();
     if !age_key_file.is_file() {
@@ -815,6 +830,7 @@ async fn preflight_github(cfg: &Config, http: &reqwest::Client) -> Result<Github
         github_token,
         age_key_content,
         age_pubkey,
+        branch_sha,
     })
 }
 
@@ -2359,6 +2375,10 @@ async fn pivot_seed_target(
     // seed_flux against the target: the same operator + secrets + instance
     // sequence the bootstrap ran against kind.
     install_flux_operator(&cfg.repo, registry_config, Some(kc)).await?;
+
+    // Seed the run tags ConfigMap to the target before Flux starts.
+    run_tags::seed_target(cfg, kc).await?;
+
     if let Some(github) = preflight.github.as_ref() {
         create_github_secrets(&cfg.repo, github, Some(kc)).await?;
     }
@@ -2630,6 +2650,13 @@ async fn run_bootstrap(cfg: &Config, http: &reqwest::Client) -> Result<()> {
 
     // Step 2: install the Flux Operator.
     install_flux_operator(&cfg.repo, registry_config.path(), None).await?;
+
+    // Step 2.5: Ensure the krops-run ConfigMap with run tags exists.
+    let branch_sha = preflight
+        .github
+        .as_ref()
+        .and_then(|g| g.branch_sha.as_deref());
+    let _tags = run_tags::ensure_in_source(cfg, branch_sha).await?;
 
     // Step 3: GitHub PAT + SOPS age secrets (github-sync environments).
     if let Some(github) = preflight.github.as_ref() {

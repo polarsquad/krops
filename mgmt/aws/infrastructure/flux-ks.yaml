@@ -109,6 +109,11 @@ spec:
     kind: GitRepository
     name: flux-system
   path: ./mgmt/aws/infrastructure/workload-resources
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: krops-run
+        optional: true
   dependsOn:
     - name: ack-controllers
 ---
@@ -127,6 +132,11 @@ spec:
     kind: GitRepository
     name: flux-system
   path: ./mgmt/aws/infrastructure/aws-global-iam
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: krops-run
+        optional: true
   dependsOn:
     - name: ack-controllers
 ---

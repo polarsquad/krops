@@ -254,6 +254,73 @@ joseph.shriner@polarsquad.com, the escalation path for budget alerts. The
 email subscription only activates after the SNS confirmation email is
 accepted.
 
+### E2E resource tagging standard
+
+Every e2e AWS resource created by a bootstrap or pivot run carries four tags
+for lifecycle tracking and cost attribution (#381):
+
+| Tag key | ConfigMap key | Default | Meaning |
+|---|---|---|---|
+| `krops.io/run-id` | `KROPS_RUN_ID` | `{profile}-{timestamp}` (auto-generated) | Bootstrap/pivot invocation identifier (e.g. `gha-123` for GitHub Actions run, or `{profile}-{timestamp}` auto-generated) |
+| `krops.io/revision` | `KROPS_REVISION` | `unknown` | Git branch HEAD SHA; extracted from GitHub API during bootstrap |
+| `krops.io/expires-at` | `KROPS_EXPIRES_AT`[^expires-at-derived] | `{now + 24h}` | Resource expiry target (RFC3339 timestamp or literal `never`) |
+| `krops.io/run-kind` | `KROPS_RUN_KIND` | `manual` | Lifecycle context (`manual`, `scheduled`, `emergency`, etc.) |
+
+[^expires-at-derived]: The `krops.io/expires-at` value is derived from `KROPS_RUN_TTL` (default `24h`); use `KROPS_RUN_TTL=none` for no expiry.
+
+#### Tag application
+
+Tags are written imperatively to the `krops-run` ConfigMap in `flux-system`
+during bootstrap (before Flux instance installation). Flux then uses the
+ConfigMap values via `postBuild.substituteFrom` to apply them to:
+
+- **CAPA control planes** (`AWSManagedControlPlane` spec): VPC, subnets, NAT
+  gateways, Elastic IPs, and node groups inherit the control plane's tags
+  automatically.
+- **ACK-managed resources**: S3 Bucket, RDS DBInstance, IAM Role, and IAM User
+  CRs apply tags directly in their specs.
+
+**Not tagged:**
+- CloudFormation stacks backing CAPA (account-global, persistent); would need
+  stack-level parameters outside the current scope.
+- kind bootstrap cluster (ephemeral, purely local); lifecycle tags are
+  meaningless for a temporary local fixture.
+
+#### Rerun behavior
+
+Re-runs preserve all tag values if the `krops-run` ConfigMap still exists in
+`flux-system`. If the ConfigMap was removed between runs, a new one is created;
+`KROPS_RUN_ID` is honoured from the environment, but `krops.io/expires-at` is
+recalculated from `KROPS_RUN_TTL`. Omit `KROPS_RUN_ID` to get a fresh run-id
+tied to the current time and profile.
+
+#### TTL and expiry
+
+- Default: resources tagged with a 24-hour expiry
+  (`krops.io/expires-at={now + 24h}`).
+- Override with `KROPS_RUN_TTL=<duration>`: parses durations like `2h`, `30m`,
+  `3600s`.
+- `KROPS_RUN_TTL=none` tags with `krops.io/expires-at=never` (no auto-expiry).
+
+#### Post-pivot seeding
+
+The `krops-run` ConfigMap created in the kind bootstrap cluster is seeded to
+the management cluster before Flux starts, so tags survive the pivot and
+workload reconciliation reads the same values.
+
+#### Lookup and cleanup
+
+Find resources by run-id:
+```sh
+aws resourcegroupstaggingapi get-resources --region <region> \
+  --tag-filters Key=krops.io/run-id,Values=<run-id>
+aws iam list-role-tags --role-name <name>
+aws s3api get-bucket-tagging --bucket <name>
+```
+
+Group orphaned resources by `krops.io/run-id` and flag any where
+`krops.io/expires-at` is in the past for manual teardown.
+
 ### local-talos prerequisites
 
 In addition to the PAT and age key shared with the AWS environment

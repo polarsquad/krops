@@ -158,6 +158,11 @@ resources. There is no app source code here, only declarative infrastructure.
   plus `pivot-manifest-vars` (key/value overrides merged onto the
   flux-system ConfigMap data before `pivot-manifests` substitution; also
   supports `${VAR:=default}` placeholders in those manifests, issue #72).
+  `run_tags.rs` writes and seeds the `krops-run` ConfigMap (four env knobs:
+  `KROPS_RUN_ID`, `KROPS_RUN_TTL`, `KROPS_REVISION`, `KROPS_RUN_KIND`) during
+  bootstrap/pivot for Flux `postBuild` substitution onto tagged AWS resources
+  (#381); the regression gate is `tests/test-aws-run-tags.py`; see
+  `docs/operations.md` for the full tagging standard.
 - `bootstrap.sh` / `pivot.sh` / `teardown.sh`: the shell equivalents of the
   CLI's phases. Kept until the binary completes full parity runs per
   environment, then retired (issues #92/#95/#100). The lifecycle mise tasks

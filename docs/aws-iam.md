@@ -217,8 +217,8 @@ steps:
 ```
 
 The action exchanges the workflow's OIDC token for session credentials;
-nothing is stored. The role is not wired into any workflow yet; CI
-integration is tracked in #185.
+nothing is stored. The `aws-orphan-report` workflow assumes this role for
+read-only orphan discovery (issue #380). Full e2e CI wiring is tracked in #185.
 
 ### Revocation
 

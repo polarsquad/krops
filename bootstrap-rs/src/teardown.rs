@@ -679,6 +679,31 @@ impl AwsSweepTarget {
     }
 }
 
+/// Extract AWS sweep targets from the environment's aws_workloads and
+/// management cluster configuration. Mirrors the logic in run_teardown (step 4).
+pub fn aws_sweep_targets(env: &crate::config::Environment, td: &crate::config::TeardownEnv) -> Vec<AwsSweepTarget> {
+    let mut targets: Vec<AwsSweepTarget> = td
+        .aws_workloads
+        .iter()
+        .map(AwsSweepTarget::from_workload)
+        .collect();
+    // The self-managed mgmt joins the sweep (post-pivot semantics):
+    // its EKS cluster is removed AWS-side, never via its own API.
+    if let (Some(eks), Some(prefix)) = (
+        td.mgmt_eks_cluster_name.as_deref(),
+        td.mgmt_iam_role_prefix.as_deref(),
+    ) {
+        let region = env
+            .mgmt_cluster
+            .split('-')
+            .take(3)
+            .collect::<Vec<_>>()
+            .join("-");
+        targets.push(AwsSweepTarget::mgmt(&region, prefix, eks));
+    }
+    targets
+}
+
 fn aws_base(region: &str) -> Vec<String> {
     vec!["--region".into(), region.into()]
 }
@@ -2160,25 +2185,7 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
     // documented AWS-only recovery path).
     if aws_available {
         println!(">>> Cleaning up orphaned AWS resources...");
-        let mut targets: Vec<AwsSweepTarget> = td
-            .aws_workloads
-            .iter()
-            .map(AwsSweepTarget::from_workload)
-            .collect();
-        // The self-managed mgmt joins the sweep (post-pivot semantics):
-        // its EKS cluster is removed AWS-side, never via its own API.
-        if let (Some(eks), Some(prefix)) = (
-            td.mgmt_eks_cluster_name.as_deref(),
-            td.mgmt_iam_role_prefix.as_deref(),
-        ) {
-            let region = env
-                .mgmt_cluster
-                .split('-')
-                .take(3)
-                .collect::<Vec<_>>()
-                .join("-");
-            targets.push(AwsSweepTarget::mgmt(&region, prefix, eks));
-        }
+        let targets = aws_sweep_targets(env, td);
         // 4a: nodegroups in all regions, then wait.
         for target in &targets {
             println!(

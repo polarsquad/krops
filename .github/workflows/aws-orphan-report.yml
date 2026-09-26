@@ -1,0 +1,180 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: aws-orphan-report
+
+"on":
+  schedule:
+    - cron: "41 5 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: aws-e2e-account
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    name: Discover orphaned resources
+    runs-on: ubuntu-latest
+    if: github.repository == 'polarsquad/krops'
+    permissions:
+      contents: read
+      id-token: write
+    timeout-minutes: 20
+    outputs:
+      orphan_count: ${{ steps.report.outputs.orphan_count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Install pinned toolchain
+        run: rustup show active-toolchain
+
+      - name: Cache cargo
+        uses: actions/cache@v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            bootstrap-rs/target
+          key: bootstrap-rs-${{ runner.os }}-${{ hashFiles('bootstrap-rs/Cargo.lock', 'bootstrap-rs/rust-toolchain.toml') }}
+
+      - name: Build krops-bootstrap
+        run: cargo build --locked --release
+        working-directory: bootstrap-rs
+
+      - name: Set up aws-cli (mise)
+        uses: jdx/mise-action@v4.3.0
+        with:
+          install_args: "aws-cli"
+        env:
+          MISE_ENV: aws
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::120392301094:role/krops-ci-e2e
+          aws-region: eu-north-1
+          role-session-name: krops-orphan-report-${{ github.run_id }}
+          role-duration-seconds: 3600
+
+      - name: Run orphan report
+        id: report
+        run: |
+          set -o pipefail
+          ORPHAN_REPORT_JSON=orphan-report.json \
+            ./bootstrap-rs/target/release/krops-bootstrap orphans aws \
+            | tee orphan-report.md
+          echo "orphan_count=$(jq -r .orphan_count orphan-report.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Add to job summary
+        if: always()
+        run: cat orphan-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report artifacts
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: orphan-report
+          path: |
+            orphan-report.md
+            orphan-report.json
+
+  report-status:
+    name: Update tracking issue
+    needs: discover
+    if: always() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Download report artifacts
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: orphan-report
+
+      - name: Open, update or close the orphan discovery issue
+        uses: actions/github-script@v9.0.0
+        env:
+          JOB_RESULT: ${{ needs.discover.result }}
+          ORPHAN_COUNT: ${{ needs.discover.outputs.orphan_count || 0 }}
+        with:
+          script: |
+            const title = "aws-e2e: orphaned resources detected in the e2e account";
+            const labels = ["area:operations", "area:environments"];
+            const { owner, repo } = context.repo;
+
+            async function getIssue() {
+              const { data: issues } = await github.rest.issues.listForRepo({
+                owner,
+                repo,
+                state: "open",
+                per_page: 100,
+              });
+              return issues.find(i => i.title === title);
+            }
+
+            const jobStatus = process.env.JOB_RESULT;
+            const orphanCount = parseInt(process.env.ORPHAN_COUNT, 10);
+
+            let issue = await getIssue();
+
+            if (jobStatus === "failure") {
+              // Job failed: open or update
+              if (!issue) {
+                const { data: created } = await github.rest.issues.create({
+                  owner,
+                  repo,
+                  title,
+                  labels,
+                  body: `Orphan discovery job failed. Check [workflow run](${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}) for details.`,
+                });
+                console.log(`Opened issue #${created.number}`);
+              } else {
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: issue.number,
+                  body: `Orphan discovery job failed in [workflow run](${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}).`,
+                });
+                console.log(`Commented on issue #${issue.number}`);
+              }
+            } else if (orphanCount > 0) {
+              // Job succeeded but orphans found: open or update
+              if (!issue) {
+                const { data: created } = await github.rest.issues.create({
+                  owner,
+                  repo,
+                  title,
+                  labels,
+                  body: `${orphanCount} orphaned resource(s) detected. Check [workflow artifacts](${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}) for the full report.`,
+                });
+                console.log(`Opened issue #${created.number}`);
+              } else {
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: issue.number,
+                  body: `${orphanCount} orphaned resource(s) detected in [workflow run](${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}).`,
+                });
+                console.log(`Commented on issue #${issue.number}`);
+              }
+            } else {
+              // Job succeeded and no orphans: close if open
+              if (issue) {
+                await github.rest.issues.update({
+                  owner,
+                  repo,
+                  issue_number: issue.number,
+                  state: "closed",
+                });
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: issue.number,
+                  body: `Resolved: no orphaned resources in [workflow run](${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}).`,
+                });
+                console.log(`Closed issue #${issue.number}`);
+              }
+            }

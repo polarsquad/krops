@@ -254,6 +254,35 @@ joseph.shriner@polarsquad.com, the escalation path for budget alerts. The
 email subscription only activates after the SNS confirmation email is
 accepted.
 
+### E2E account orphan report
+
+Daily at 05:41 UTC (or manual dispatch) the `aws-orphan-report` workflow
+discovers unowned AWS resources. The `discover` job runs `krops-bootstrap
+orphans aws` to scan:
+
+- EKS clusters and nodegroups
+- RDS instances
+- VPCs with CAPA ownership tags
+- NAT gateways and Elastic IPs
+- S3 buckets matching cluster name patterns
+
+Resources older than `ORPHAN_MIN_AGE_HOURS` (default 6 hours) are flagged as
+orphans. The `ORPHAN_REPORT_JSON` environment variable is set to capture the
+report as JSON, and the markdown report is posted to the job summary.
+
+**Not scanned**: IAM roles/users (usually free) and CloudFormation bootstrap
+stacks (also free). See the teardown section below for cleanup.
+
+When orphans are found or the discovery fails, the `report-status` job opens
+or comments on the tracking issue `aws-e2e: orphaned resources detected in the
+e2e account`. The issue is closed when the next run finds no orphans.
+
+The report is read-only; no resources are deleted. To clean up orphans, run:
+
+```sh
+AWS_ONLY=1 mise run teardown aws
+```
+
 ### local-talos prerequisites
 
 In addition to the PAT and age key shared with the AWS environment
@@ -697,7 +726,9 @@ CAPI controllers are running:
 - the `mgmt` kind cluster before pivot
 - the exported self-managed management kubeconfig after pivot
 - no reachable Kubernetes controller host, which falls back to AWS orphan
-  cleanup for the AWS environment
+  cleanup for the AWS environment (see the
+  [orphan report](./operations.md#e2e-account-orphan-report) section above for
+  daily discovery with no deletion)
 
 The main controls keep the shell interface:
 

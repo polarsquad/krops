@@ -259,6 +259,33 @@ fails preflight before mutation; in the normal AWS path, a missing AWS CLI is
 reported and the orphan sweep is skipped rather than misclassified as an
 empty account.
 
+## Orphan discovery (read-only)
+
+```sh
+krops-bootstrap orphans [PROFILE]
+```
+
+Discovers unowned AWS resources without deleting anything. Supported profiles:
+`aws` only (local-host, local-talos, azure, gcp are refused with a clear
+error).
+
+| Variable | Default | Effect |
+|---|---|---|
+| `ORPHAN_MIN_AGE_HOURS` | `6` | Minimum age in hours; resources younger than this are "recent" not "orphaned" |
+| `ORPHAN_REPORT_JSON` | unset | Optional path to write JSON report |
+
+Exit code is `0` when a report is produced (whether orphans are found or not);
+nonzero when a query failed or the profile is unsupported.
+
+The report scans EKS clusters and nodegroups, RDS instances, VPCs with CAPA
+ownership tags, NAT gateways, Elastic IPs, and S3 buckets matching cluster name
+patterns. Markdown is printed to stdout and appended to `$GITHUB_STEP_SUMMARY`
+(if set). The report is read-only: see the
+[teardown section](./operations.md#teardown) for cleanup.
+
+IAM roles/users and CloudFormation bootstrap stacks are not scanned (usually
+free resources).
+
 ## Entry-point and parity status
 
 `scripts/toolbox-run.sh bootstrap`, `scripts/toolbox-run.sh pivot`, and

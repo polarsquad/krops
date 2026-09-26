@@ -19,6 +19,7 @@
 
 mod config;
 mod engine;
+mod orphans;
 mod teardown;
 
 use config::{BootstrapConfig, Environment, SyncSource};
@@ -116,6 +117,12 @@ struct Cli {
 enum SubCommand {
     /// Destroy all infrastructure the bootstrap created, in reverse order.
     Teardown {
+        /// Deployment profile (KROPS_PROFILE takes precedence, as
+        /// everywhere else; default: bootstrap.default-environment).
+        profile: Option<String>,
+    },
+    /// Discover orphaned AWS resources without deleting them (read-only).
+    Orphans {
         /// Deployment profile (KROPS_PROFILE takes precedence, as
         /// everywhere else; default: bootstrap.default-environment).
         profile: Option<String>,
@@ -2530,51 +2537,97 @@ async fn main() -> Result<()> {
     let repo = BootstrapConfig::locate_and_load()?;
     let cli = Cli::parse();
 
-    // The teardown subcommand has its own knob set; it does not run the
+    // The teardown and orphans subcommands have their own knob sets; they do not run the
     // bootstrap Config resolution (which validates bootstrap/pivot knobs).
-    if let Some(SubCommand::Teardown { profile }) = &cli.command {
-        let name = resolve_environment(
-            std::env::var("KROPS_PROFILE")
-                .ok()
-                .filter(|v| !v.is_empty())
-                .as_deref(),
-            profile.as_deref(),
-            &repo,
-        )?;
-        let environment = repo
-            .environment(&name)
-            .with_context(|| "internal: environment vanished between resolution and lookup")?
-            .clone();
-        // A minimal Config carrying what teardown needs (profile,
-        // environment section, repository config).
-        let cfg = Config {
-            repo,
-            profile: name,
-            environment,
-            recreate: false,
-            registry_port: DEFAULT_REGISTRY_PORT,
-            registry_ready_retries: DEFAULT_REGISTRY_READY_RETRIES,
-            local_reconcile_timeout: DEFAULT_LOCAL_RECONCILE_TIMEOUT.to_string(),
-            container_engine: std::env::var("CONTAINER_ENGINE").ok(),
-            engine_sock: std::env::var("ENGINE_SOCK").ok(),
-            toolbox: std::env::var("KROPS_TOOLBOX").is_ok_and(|value| value == "1"),
-            git_repo_url: None,
-            github_token: None,
-            github_user: DEFAULT_GITHUB_USER.to_string(),
-            age_key_file: PathBuf::from(DEFAULT_AGE_KEY_FILE),
-            age_public_key: None,
-            oci_repository: DEFAULT_OCI_REPOSITORY.to_string(),
-            oci_tag: DEFAULT_OCI_TAG.to_string(),
-            bootstrap_pivot: true,
-            pivot_skip_delete: false,
-            mgmt_kubeconfig: teardown::TeardownConfig::from_env(|n| std::env::var(n).ok())?
-                .mgmt_kubeconfig,
-            mgmt_ready_timeout: String::new(),
-            mgmt_poll_interval: DEFAULT_MGMT_POLL_INTERVAL,
-            bootstrap_kubecontext: String::new(),
-        };
-        let tcfg = teardown::TeardownConfig::from_env(|n| std::env::var(n).ok())?;
-        return teardown::run_teardown(&cfg, &tcfg).await;
+    match &cli.command {
+        Some(SubCommand::Teardown { profile }) => {
+            let name = resolve_environment(
+                std::env::var("KROPS_PROFILE")
+                    .ok()
+                    .filter(|v| !v.is_empty())
+                    .as_deref(),
+                profile.as_deref(),
+                &repo,
+            )?;
+            let environment = repo
+                .environment(&name)
+                .with_context(|| "internal: environment vanished between resolution and lookup")?
+                .clone();
+            // A minimal Config carrying what teardown needs (profile,
+            // environment section, repository config).
+            let cfg = Config {
+                repo,
+                profile: name,
+                environment,
+                recreate: false,
+                registry_port: DEFAULT_REGISTRY_PORT,
+                registry_ready_retries: DEFAULT_REGISTRY_READY_RETRIES,
+                local_reconcile_timeout: DEFAULT_LOCAL_RECONCILE_TIMEOUT.to_string(),
+                container_engine: std::env::var("CONTAINER_ENGINE").ok(),
+                engine_sock: std::env::var("ENGINE_SOCK").ok(),
+                toolbox: std::env::var("KROPS_TOOLBOX").is_ok_and(|value| value == "1"),
+                git_repo_url: None,
+                github_token: None,
+                github_user: DEFAULT_GITHUB_USER.to_string(),
+                age_key_file: PathBuf::from(DEFAULT_AGE_KEY_FILE),
+                age_public_key: None,
+                oci_repository: DEFAULT_OCI_REPOSITORY.to_string(),
+                oci_tag: DEFAULT_OCI_TAG.to_string(),
+                bootstrap_pivot: true,
+                pivot_skip_delete: false,
+                mgmt_kubeconfig: teardown::TeardownConfig::from_env(|n| std::env::var(n).ok())?
+                    .mgmt_kubeconfig,
+                mgmt_ready_timeout: String::new(),
+                mgmt_poll_interval: DEFAULT_MGMT_POLL_INTERVAL,
+                bootstrap_kubecontext: String::new(),
+            };
+            let tcfg = teardown::TeardownConfig::from_env(|n| std::env::var(n).ok())?;
+            return teardown::run_teardown(&cfg, &tcfg).await;
+        }
+        Some(SubCommand::Orphans { profile }) => {
+            let name = resolve_environment(
+                std::env::var("KROPS_PROFILE")
+                    .ok()
+                    .filter(|v| !v.is_empty())
+                    .as_deref(),
+                profile.as_deref(),
+                &repo,
+            )?;
+            let environment = repo
+                .environment(&name)
+                .with_context(|| "internal: environment vanished between resolution and lookup")?
+                .clone();
+            // A minimal Config carrying what orphans needs (profile,
+            // environment section, repository config).
+            let cfg = Config {
+                repo,
+                profile: name,
+                environment,
+                recreate: false,
+                registry_port: DEFAULT_REGISTRY_PORT,
+                registry_ready_retries: DEFAULT_REGISTRY_READY_RETRIES,
+                local_reconcile_timeout: DEFAULT_LOCAL_RECONCILE_TIMEOUT.to_string(),
+                container_engine: std::env::var("CONTAINER_ENGINE").ok(),
+                engine_sock: std::env::var("ENGINE_SOCK").ok(),
+                toolbox: std::env::var("KROPS_TOOLBOX").is_ok_and(|value| value == "1"),
+                git_repo_url: None,
+                github_token: None,
+                github_user: DEFAULT_GITHUB_USER.to_string(),
+                age_key_file: PathBuf::from(DEFAULT_AGE_KEY_FILE),
+                age_public_key: None,
+                oci_repository: DEFAULT_OCI_REPOSITORY.to_string(),
+                oci_tag: DEFAULT_OCI_TAG.to_string(),
+                bootstrap_pivot: true,
+                pivot_skip_delete: false,
+                mgmt_kubeconfig: PathBuf::new(),
+                mgmt_ready_timeout: String::new(),
+                mgmt_poll_interval: DEFAULT_MGMT_POLL_INTERVAL,
+                bootstrap_kubecontext: String::new(),
+            };
+            let ocfg = orphans::OrphansConfig::from_env();
+            return orphans::run_orphans(&cfg, ocfg).await;
+        }
+        None => {}
     }
 
     let cfg = Config::load(&cli, repo)?;

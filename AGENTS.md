@@ -145,19 +145,27 @@ resources. There is no app source code here, only declarative infrastructure.
   overlays here are built by `mise run validate` like the `mgmt`/`workload`
   ones.
 - `bootstrap-rs/`: `krops-bootstrap`, the Rust CLI that ports the imperative
-  lifecycle (bootstrap + pivot; teardown under issue #100). Behavioral port:
-  same step order, messages, and env interface as the scripts, plus
-  rerun-safe-by-default semantics. Chart versions it installs imperatively
-  are Renovate-annotated constants in `src/main.rs`. CI (bootstrap-rs
-  workflow) runs fmt/clippy/build/test; the toolchain is pinned in
-  `rust-toolchain.toml`. Five config-driven knobs added for azure and gcp:
-  `pivot-sops-secrets` (SOPS manifests applied in the pivot target before
-  the move), `teardown.manual` (refuse with operator text),
+  lifecycle (bootstrap + pivot; teardown under issue #100; read-only orphan
+  discovery under issue #380). Behavioral port: same step order, messages, and
+  env interface as the scripts, plus rerun-safe-by-default semantics. Chart
+  versions it installs imperatively are Renovate-annotated constants in
+  `src/main.rs`. CI (bootstrap-rs workflow) runs fmt/clippy/build/test; the
+  toolchain is pinned in `rust-toolchain.toml`. Five config-driven knobs added
+  for azure and gcp: `pivot-sops-secrets` (SOPS manifests applied in the pivot
+  target before the move), `teardown.manual` (refuse with operator text),
   `post-kind-create-task` (mise task run after kind creation) and
   `pivot-manifests` (plain manifests applied in the target before the move),
   plus `pivot-manifest-vars` (key/value overrides merged onto the
   flux-system ConfigMap data before `pivot-manifests` substitution; also
   supports `${VAR:=default}` placeholders in those manifests, issue #72).
+- `.github/workflows/aws-orphan-report.yml`: Daily discovery of unowned AWS
+  resources in the e2e account (no deletion; issue #380). The `discover` job
+  runs `krops-bootstrap orphans aws` with OIDC assumption of the
+  `krops-ci-e2e` role. The `report-status` job opens/updates or closes a
+  tracking issue "aws-e2e: orphaned resources detected in the e2e account"
+  based on whether orphans were found or a query failed. No step invokes
+  mutating AWS verbs. `tests/test-aws-orphan-report-workflow.py` guards the
+  workflow structure (schedule trigger, permissions, role ARN, no mutation).
 - `bootstrap.sh` / `pivot.sh` / `teardown.sh`: the shell equivalents of the
   CLI's phases. Kept until the binary completes full parity runs per
   environment, then retired (issues #92/#95/#100). The lifecycle mise tasks

@@ -43,6 +43,9 @@ jobs:
       - name: Verify the air-gapped workflow triggers, guards, and timeouts
         run: python3 airgap/tests/test-airgap-workflow-config.py
 
+      - name: Verify aws-orphan-report workflow (#380)
+        run: python3 tests/test-aws-orphan-report-workflow.py
+
   zarf-mise-pin:
     name: Zarf mise asset pin
     runs-on: ubuntu-latest

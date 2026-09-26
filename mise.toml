@@ -153,6 +153,11 @@ if ! python3 tests/test-aws-iam-doc-scope.py; then
   echo "    FAILED: ACK CR scope vs docs/aws-iam.md" >&2
   fail=1
 fi
+echo "==> aws-orphan-report workflow (#380)"
+if ! uv run python tests/test-aws-orphan-report-workflow.py; then
+  echo "    FAILED: aws-orphan-report workflow" >&2
+  fail=1
+fi
 echo "==> Python lint (ruff: unused imports, subprocess.run check=)"
 if ! uv run ruff check .; then
   echo "    FAILED: Python lint" >&2

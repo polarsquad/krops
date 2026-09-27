@@ -102,6 +102,20 @@ any manager at all before this (confirmed with a real `renovate
 annotation-driven custom manager was added for it, mirroring
 `bootstrap.toml`'s pattern.
 
+cert-manager 1.21 officially supports Kubernetes 1.33-1.36 according to its
+published support window, but the repo pins Kubernetes v1.37.0 in
+`mgmt/local-host/clusters/docker/cluster.yaml`. This pairing is tolerated:
+the scheduled air-gapped deploy with this exact combination passed on
+2026-09-21 (issue #384). The test `tests/test-cert-manager-kubernetes-support.py`
+validates the pairing against a hardcoded list of empirically tested
+combinations. It warns with a GitHub annotation when the pairing is not yet
+validated, but never fails the build; it only fails if it cannot parse the
+version pins themselves. When a Renovate PR changes either the cert-manager
+version in `bootstrap.toml` or the Kubernetes version in
+`mgmt/local-host/clusters/docker/cluster.yaml`, trigger or wait for a green
+air-gapped nightly deploy on that new pairing, then add the row to the
+`VALIDATED_PAIRINGS` list in that test file.
+
 The CAPI group spans both the `github-releases`/`github-release-attachments`
 release lookups and the `docker`-datasource digest-pinned images those same
 providers deploy (`registry.k8s.io/cluster-api*`,

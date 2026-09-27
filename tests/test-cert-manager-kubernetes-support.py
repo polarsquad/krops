@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Warn (never fail) when the cert-manager/Kubernetes pairing is untested.
+"""Notice (never fail) when the cert-manager/Kubernetes pairing is untested.
 
 cert-manager 1.21 officially supports Kubernetes 1.33-1.36, but the repo
 pins v1.37.0 and that pairing passed the air-gapped nightly (issue #384).
@@ -62,9 +62,9 @@ def main() -> int:
         f"cert-manager {cert_manager} has not been empirically tested with"
         f" Kubernetes v{kubernetes}. Verify compatibility before merging."
     )
-    print(f"WARNING: {message}", file=sys.stderr)
+    print(f"NOTICE: {message}")
     if os.environ.get("GITHUB_ACTIONS") == "true":
-        print(f"::warning title=cert-manager/Kubernetes pairing::{message}")
+        print(f"::notice title=cert-manager/Kubernetes pairing::{message}")
     return 0
 
 

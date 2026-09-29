@@ -12,7 +12,7 @@ usage() {
 Usage: scripts/toolbox-run.sh <bootstrap|pivot|teardown> [extra krops-bootstrap args]
 
 Env:
-  TOOLBOX_IMAGE   image reference (default: ${TOOLBOX_IMAGE:-ghcr.io/polarsquad/krops-toolbox:latest};
+  TOOLBOX_IMAGE   image reference (default: ghcr.io/polarsquad/krops-toolbox:latest;
                   build locally with: docker build -f bootstrap-rs/Dockerfile \\
                     -t krops-toolbox:dev . && TOOLBOX_IMAGE=krops-toolbox:dev)
   KROPS_PROFILE aws | azure | gcp | local-host | local-talos
@@ -25,32 +25,35 @@ EOF
 LIFECYCLE="$1"
 shift
 
-# ── .env passthrough with quote stripping ─────────────────────────────────────
-# Loaded before engine/socket resolution below; process env wins over .env.
-# Never log these values.
+# ── .env passthrough, parsed like mise's env_file ─────────────────────────────
+# Loaded before engine/socket resolution below; .env wins over the process
+# environment, as it does under mise. Never log these values.
+ltrim() { printf '%s' "${1#"${1%%[![:space:]]*}"}"; }
+rtrim() { printf '%s' "${1%"${1##*[![:space:]]}"}"; }
 if [ -f .env ]; then
   while IFS= read -r line || [ -n "$line" ]; do
+    line="$(rtrim "$(ltrim "$line")")"
     case "$line" in
       ''|'#'*) continue ;;
+      export[[:space:]]*) line="$(ltrim "${line#export}")" ;;
     esac
     case "$line" in
       *=*) ;;
       *) continue ;;
     esac
-    key="${line%%=*}"
-    value="${line#*=}"
+    key="$(rtrim "${line%%=*}")"
+    value="$(ltrim "${line#*=}")"
     case "$value" in
-      \"*\") value="${value#\"}"; value="${value%\"}" ;;
-      \'*\') value="${value#\'}"; value="${value%\'}" ;;
+      \"*) value="${value#\"}"; value="${value%%\"*}" ;;
+      \'*) value="${value#\'}"; value="${value%%\'*}" ;;
+      *)   value="$(rtrim "${value%%[[:space:]]#*}")" ;;
     esac
     # Only accept valid, non-empty identifiers not starting with a digit;
     # skip garbage lines instead of exporting them.
     case "$key" in
       ''|[0-9]*|*[!A-Za-z0-9_]*) continue ;;
     esac
-    if [ -z "${!key+x}" ]; then
-      export "$key=$value"
-    fi
+    export "$key=$value"
   done < .env
 fi
 
@@ -98,6 +101,11 @@ case "$CONTAINER_ENGINE" in
     ;;
 esac
 
+# Forward the daemon-side socket path to the toolbox: the entrypoint's static
+# fallbacks cannot know the Linux-rootless session socket or a non-default
+# Docker context path.
+export ENGINE_SOCK="$ENGINE_SOCK_IN"
+
 # Repo-local persistent kubeconfig state (gitignored): the toolbox's internal
 # kind kubeconfig and the exported management kubeconfig live here.
 mkdir -p .kube
@@ -106,18 +114,31 @@ KUBECONFIG_IN=/workspace/.kube/kind.yaml
 # Repo-local .gcloud/ directory, shared with the host gcp session (docs/gcp.md).
 CLOUDSDK_CONFIG_IN=/workspace/.gcloud
 
+# Immutable keys that build_env_args forces silently instead of warning:
+# they are ambient on most host shells, so the override is expected rather
+# than a mistake. CLOUDSDK_CONFIG is deliberately not in the list (that was
+# the case #357 was about).
+NO_WARN_IMMUTABLE_KEYS=(KUBECONFIG ENGINE_SOCK)
+
 # Splits TOOLBOX_ENV_SPEC into mutable/immutable -e flags; see
 # docs/operations.md ("Toolbox container").
 build_env_args() {
   MUTABLE_ENV_ARGS=()
   IMMUTABLE_ENV_ARGS=()
-  local spec key value
+  local spec key value skip_warn no_warn_key
   for spec in "$@"; do
     case "$spec" in
       *=*)
         key="${spec%%=*}"
         value="${spec#*=}"
-        if [ -n "${!key:-}" ] && [ "${!key}" != "$value" ]; then
+        skip_warn=false
+        for no_warn_key in "${NO_WARN_IMMUTABLE_KEYS[@]}"; do
+          if [ "$key" = "$no_warn_key" ]; then
+            skip_warn=true
+            break
+          fi
+        done
+        if ! $skip_warn && [ -n "${!key:-}" ] && [ "${!key}" != "$value" ]; then
           echo "WARNING: $key is set to '${!key}' but toolbox-run.sh always overrides it with '$value'; see docs/operations.md (\"Toolbox container\")." >&2
         fi
         IMMUTABLE_ENV_ARGS+=(-e "$spec")
@@ -133,6 +154,10 @@ TOOLBOX_ENV_SPEC=(
   CONTAINER_ENGINE
   "ENGINE_SOCK=$ENGINE_SOCK_IN"
   KROPS_PROFILE
+  KROPS_RUN_ID
+  KROPS_RUN_TTL
+  KROPS_REVISION
+  KROPS_RUN_KIND
   REGISTRY_PORT
   OCI_REPOSITORY
   OCI_TAG

@@ -37,7 +37,7 @@ jobs:
       - name: Install mise
         uses: jdx/mise-action@v4.3.0
         with:
-          version: 2026.9.12
+          version: 2026.9.16
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
@@ -53,7 +53,7 @@ jobs:
         env:
           SKIP_OFFLINE_CHECK: "1"
           MGMT_CLUSTER_ENGINE: k3s
-          AIRGAP_VERIFY_REF: ${{ github.ref }}
+          AIRGAP_VERIFY_WORKFLOW_REF: ${{ github.workflow_ref }}
         run: |
           airgap/scripts/offline-run.sh airgap/zarf-package-krops-airgap-*.tar.zst
 
@@ -67,5 +67,6 @@ jobs:
             /tmp/airgap-offline-summary.txt
             /tmp/airgap-sbom.*
             /tmp/airgap-cert-manager-debug.txt
+            /tmp/airgap-workload-debug.txt
           if-no-files-found: warn
           retention-days: 1

@@ -131,9 +131,15 @@ pins together with their declarative counterparts. See
 | `BOOTSTRAP_PIVOT` | `1` | Any value other than literal `1` skips pivot |
 | `MGMT_KUBECONFIG` | `~/.kube/krops-mgmt.yaml` | Exported management kubeconfig for native fallback runs |
 | `MGMT_READY_TIMEOUT` | `40m` for aws, `15m` for local-host, `30m` for local-talos (PXE install + first Talos boot) | Management cluster definition and provisioning waits |
-| `MGMT_POLL_INTERVAL` | `10` seconds | Management cluster definition and provisioning poll |
+| `MGMT_POLL_INTERVAL` | `10` seconds | Management cluster definition, provisioning, and node-readiness polls |
 | `BOOTSTRAP_KUBECONTEXT` | config value `kind-mgmt` | Source context required by pivot |
 | `PIVOT_SKIP_DELETE` | `0` | Literal `1` keeps kind after a successful pivot |
+| `KROPS_RUN_ID` | `{profile}-{timestamp}` | Bootstrap/pivot run identifier for resource tagging; set to override auto-generation |
+| `KROPS_RUN_TTL` | `86400s` (24h) | Resource time-to-live duration (e.g. `2h`, `30m`, `3600s`), or literal `none` for persistent tags |
+| `KROPS_REVISION` | Git branch HEAD SHA | Git revision tag for resource tagging; auto-extracted from GitHub during bootstrap |
+| `KROPS_RUN_KIND` | `manual` | Bootstrap/pivot invocation kind for resource tagging (e.g. `manual`, `scheduled`, `emergency`) |
+
+The pivot's target node-readiness wait uses a fixed 15m budget (`MGMT_NODE_READY_TIMEOUT` in `pivot.sh` and `bootstrap-rs/src/main.rs`). It is not an environment knob and is separate from `MGMT_READY_TIMEOUT`.
 
 ### Toolbox runtime contracts
 
@@ -179,7 +185,12 @@ depend on engine- or version-specific error text.
    GitHub-synced environments (`aws`, `local-talos`). A fallback native run
    requires
    `kind`, `helm`, `kubectl`, `clusterctl`, and `mise`; OCI-synced
-   environments (`local-host`) also require `flux` and `curl`.
+   environments (`local-host`) also require `flux` and `curl`. The `aws`
+   profile additionally requires `aws` CLI on PATH. For the `aws` profile,
+   preflight checks the EC2 EIP quota per region before any provisioning begins.
+   The Rust CLI derives regions dynamically from `bootstrap.toml`; the shell
+   scripts use a hardcoded region list and must be kept in sync manually if
+   new AWS regions are added, making the Rust CLI the recommended path.
 2. **Bootstrap kind:** create or reuse `mgmt`, start the local registry for
    local-host, install the Flux Operator, create the Git and SOPS secrets
    (GitHub-synced environments) or publish the local OCI artifact, install

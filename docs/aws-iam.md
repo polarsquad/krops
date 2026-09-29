@@ -233,3 +233,80 @@ integration is tracked in #185.
   refs (above).
 - Rotate: nothing to rotate; STS sessions are short-lived (1 hour typical,
   4 hour maximum) and independent of the short-lived OIDC token.
+
+## E2E account incident and credential revocation
+
+If a credential is suspected compromised, contain it immediately, then assess impact.
+
+### Containment
+
+**(a) `capi-demo` long-lived IAM key** (stored in `.env`, `mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml`, and `mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml`):
+
+1. Disable the key immediately:
+   ```sh
+   aws iam update-access-key --user-name capi-demo --access-key-id <ACCESS_KEY_ID> --status Inactive
+   ```
+2. Issue a new key, re-encrypt both SOPS secrets, and merge to main so Flux converges, following [Setting / rotating AWS credentials](./secrets.md#setting-rotating-aws-credentials).
+3. Delete the old key once the new one is live.
+
+**(b) `krops-ci-e2e` OIDC role** (normally covers itself; see [CI access](#ci-access-github-actions-oidc-and-the-krops-ci-e2e-role)):
+
+1. Delete or update the OIDC provider to break new assumptions.
+2. To cut in-flight sessions (which otherwise survive up to 4 hours), attach an inline Deny to the role:
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Deny",
+         "Action": "*",
+         "Resource": "*",
+         "Condition": {
+           "DateLessThan": {
+             "aws:TokenIssueTime": "<ISO-8601 timestamp of the revocation>"
+           }
+         }
+       }
+     ]
+   }
+   ```
+   Remove the inline Deny once the investigation is complete.
+
+**(c) `krops-reader` console login:**
+
+1. Delete the login profile to revoke console access:
+   ```sh
+   aws iam delete-login-profile --user-name krops-reader
+   ```
+2. Recreate it when ready to restore access.
+
+**(d) age key compromise:**
+
+An age-key compromise implies credential (a), because the age key decrypts both AWS credential SOPS secrets. Rotate per [Secrets management](./secrets.md).
+
+### Impact assessment
+
+Review CloudTrail event history for the affected principal (90 days of management events):
+
+```sh
+# IAM/global-service events (these are always recorded in us-east-1)
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=Username,AttributeValue=capi-demo \
+  --region us-east-1
+
+# Resource events in the krops e2e regions
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=Username,AttributeValue=capi-demo \
+  --region eu-north-1
+
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=Username,AttributeValue=capi-demo \
+  --region eu-west-1
+```
+
+The member-account CloudTrail covers API calls made within the account. The long-term organization trail is in the log-archive account (Control Tower-managed); contact the account owner (joseph.shriner@polarsquad.com) to retrieve it.
+
+### Cleanup and notification
+
+1. Clean up any resources provisioned by the compromised credential using the [teardown](./operations.md#teardown) path.
+2. Notify the account owner (joseph.shriner@polarsquad.com) and, for OIDC or age-key compromise, the repository maintainers.

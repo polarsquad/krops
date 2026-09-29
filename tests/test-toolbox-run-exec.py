@@ -3,8 +3,10 @@
 backslash continuation (#357): the image and CLI args must always reach the
 container engine, and CLOUDSDK_CONFIG must be forwarded exactly once, fixed
 to the repo-local path (never from PASS_ENV, so an operator value can't
-override it). An operator value for an immutable key must also warn on
-stderr instead of silently doing nothing."""
+override it). An operator value for an immutable key must warn on stderr
+instead of silently doing nothing, except the keys in
+NO_WARN_IMMUTABLE_KEYS (KUBECONFIG, ENGINE_SOCK), which are forced
+silently."""
 import os, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
@@ -84,10 +86,24 @@ def test_operator_override_of_immutable_key_warns_and_is_ignored() -> None:
         )
 
 
+def test_ambient_kubeconfig_is_overridden_silently() -> None:
+    argv, stderr = run_once({"KUBECONFIG": "/home/operator/.kube/config"})
+    kube = [a for a in argv if a.startswith("KUBECONFIG")]
+    if kube != ["KUBECONFIG=/workspace/.kube/kind.yaml"]:
+        raise AssertionError(
+            f"an ambient KUBECONFIG must still be overridden by the forced value: {argv}"
+        )
+    if "KUBECONFIG" in stderr:
+        raise AssertionError(
+            f"overriding an ambient KUBECONFIG must be silent (NO_WARN_IMMUTABLE_KEYS): {stderr!r}"
+        )
+
+
 def main() -> int:
     tests = [
         test_image_and_cli_args_reach_docker,
         test_operator_override_of_immutable_key_warns_and_is_ignored,
+        test_ambient_kubeconfig_is_overridden_silently,
     ]
     failed = 0
     for test in tests:

@@ -85,16 +85,24 @@ TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh bootstrap aws
 
 `KROPS_PROFILE` (or the positional profile argument after the lifecycle
 verb, which reaches `krops-bootstrap`) selects the environment. It loads
-every `.env` assignment with outer quote
-stripping before detecting the engine or resolving a socket for it, so a
+`.env` before detecting the engine or resolving a socket for it, so a
 `.env`-selected `CONTAINER_ENGINE` takes effect from the start (issue #257).
-An already-exported variable is left alone, so process environment wins over
-`.env` for the wrapper. Note the opposite rule for the helper tasks: mise's
-`env_file` loads `/workspace/.env` inside the container and its values
-override the process environment, so a `-e NAME=value` on a helper run
-loses to the same key in `.env` (see [Helper tasks in the
-toolbox](#helper-tasks-in-the-toolbox)). It then passes only a fixed set of
-values into the container, built by `build_env_args` from the
+It resolves `.env` exactly as mise's `env_file` does, so
+`scripts/toolbox-run.sh` and `mise run bootstrap` hand the container the same
+values:
+
+- `.env` wins over the process environment: a `NAME=value` prefix on the
+  command line (such as `CONTAINER_ENGINE=podman` above) only applies when
+  `.env` does not set `NAME`. The helper tasks follow the same rule inside
+  the container (see [Helper tasks in the toolbox](#helper-tasks-in-the-toolbox)).
+- Line syntax: an optional `export` prefix, whitespace trimmed around keys
+  and values, `"..."` / `'...'` values taken verbatim up to the closing
+  quote, and a `#` after whitespace starting a comment in an unquoted
+  value. Lines without `=` or with an invalid key are skipped.
+
+`tests/test-toolbox-run-env-precedence.py` pins this behavior and, when mise
+is installed, checks it against mise itself. The wrapper then passes only a
+fixed set of values into the container, built by `build_env_args` from the
 `TOOLBOX_ENV_SPEC` list, split into two groups: mutable (forwarded from
 whatever `.env` or the shell set) and immutable (a value the wrapper
 computes or hardcodes itself; never an operator override, even from
@@ -103,9 +111,11 @@ groups; the krops-bootstrap CLI's own knobs (`KROPS_PROFILE`,
 `REGISTRY_PORT`, ...) are covered separately in
 [bootstrap-cli.md](./bootstrap-cli.md) ("Bootstrap and pivot controls").
 
-If an operator value is set for an immutable key, `build_env_args` prints a
-warning to stderr instead of silently discarding it (this is what let #357
-happen for `CLOUDSDK_CONFIG`).
+An operator value for an immutable key is always overridden. `CLOUDSDK_CONFIG`
+(the case #357 was about) additionally prints a warning to stderr instead of
+silently discarding it; `KUBECONFIG` and `ENGINE_SOCK` are forced silently,
+because they are ambient on most host shells and the override is expected,
+not a mistake.
 
 It does not pass `BOOTSTRAP_CONFIG`, `REGISTRY_READY_RETRIES`,
 `LOCAL_RECONCILE_TIMEOUT`, `MGMT_KUBECONFIG`, `MGMT_READY_TIMEOUT`,
@@ -126,6 +136,10 @@ Inside the toolbox:
 - Kind's internal API endpoint and `krops-registry:5000` then resolve by name.
 - Host-only CAPD endpoint rewrites are skipped because the recorded endpoints
   already resolve on that network.
+- On macOS the persisted `.kube/krops-mgmt.yaml` keeps the `kind` network
+  address, which Docker Desktop does not route; see
+  [Host-side access after a toolbox local-host run (macOS)](#host-side-access-after-a-toolbox-local-host-run-macos)
+  for the host rewrite.
 - `KUBECONFIG` must name one writable file. The documented invocation uses
   `/workspace/.kube/kind.yaml`, and the CLI replaces it with kind's internal
   kubeconfig after creation.
@@ -221,6 +235,38 @@ cosign verify-attestation \
   "$IMAGE"
 ```
 
+### E2E AWS account
+
+**Designation:** Account `120392301094` was designated on 2026-09-20 ([#239](https://github.com/polarsquad/krops/issues/239)) as the single account for all krops end-to-end testing (live acceptance [#143](https://github.com/polarsquad/krops/issues/143), scheduled e2e [#185](https://github.com/polarsquad/krops/issues/185)). It is a Control Tower-managed Organizations member account.
+
+**Owner and escalation contact:** joseph.shriner@polarsquad.com
+
+**Shared sandbox warning:** This is a shared account with non-krops resources (training EKS clusters, Terraform VPCs, workshop buckets). Every krops tool filters on `default_*`, `krops-*`, and CAPA ownership tags. Do not run account-wide cleanup commands; use the [teardown](#teardown) path which scopes deletions to krops-owned resources.
+
+**Runbook index:**
+
+| What | Where |
+|---|---|
+| Spend ceiling and alert contact | [E2E account budget](#e2e-account-budget) |
+| Service quotas and first-run errors | [AWS service quotas](#aws-service-quotas-common-first-run-blockers) |
+| CI access (GitHub Actions OIDC) | [CI access in aws-iam.md](./aws-iam.md#ci-access-github-actions-oidc-and-the-krops-ci-e2e-role) |
+| Incident and credential revocation | [E2E account incident and credential revocation in aws-iam.md](./aws-iam.md#e2e-account-incident-and-credential-revocation) |
+| Cluster teardown and leftover cleanup | [Teardown](#teardown) |
+| Orphan reporting | issue [#380](https://github.com/polarsquad/krops/issues/380) |
+| Resource tagging standard | issue [#381](https://github.com/polarsquad/krops/issues/381) |
+
+**When a budget alert fires:**
+
+1. Check for live krops clusters:
+   ```sh
+   aws eks list-clusters --region eu-north-1
+   aws eks list-clusters --region eu-west-1
+   ```
+2. Use the AWS Cost Explorer console (group by service) to distinguish krops spend from other shared-account spend.
+3. If the spend is from leftover krops resources, clean them up through the [teardown](#teardown) path.
+4. If the spend is from non-krops resources, escalate to the account owner (joseph.shriner@polarsquad.com).
+5. To adjust the ceiling, update the budget in the AWS Budgets console and update the budget paragraph in `docs/operations.md` in the same PR.
+
 ### AWS service quotas (common first-run blockers)
 
 | Quota | Code | Needed | Why |
@@ -234,6 +280,10 @@ increase before the first run with
 `aws service-quotas request-service-quota-increase --service-code ec2 --quota-code <code> --desired-value <n> --region <region>`
 (for VPCs use `--service-code vpc`).
 
+Bootstrap now enforces the EIP quota at runtime during preflight checks before
+any provisioning begins. The credentials used must have `servicequotas:GetServiceQuota`
+and `ec2:DescribeAddresses` permissions.
+
 ### E2E account budget
 
 The e2e AWS account 120392301094 carries a monthly cost budget
@@ -243,6 +293,88 @@ actual spend, and the topic's email subscription delivers them to
 joseph.shriner@polarsquad.com, the escalation path for budget alerts. The
 email subscription only activates after the SNS confirmation email is
 accepted.
+
+### E2E resource tagging standard
+
+Every e2e AWS resource created by a bootstrap or pivot run carries four tags
+for lifecycle tracking and cost attribution (#381):
+
+| Tag key | ConfigMap key | Default | Meaning |
+|---|---|---|---|
+| `krops.io/run-id` | `KROPS_RUN_ID` | `{profile}-{timestamp}` (auto-generated) | Bootstrap/pivot invocation identifier (e.g. `gha-123` for GitHub Actions run, or `{profile}-{timestamp}` auto-generated) |
+| `krops.io/revision` | `KROPS_REVISION` | `unknown` | Git branch HEAD SHA; extracted from GitHub API during bootstrap |
+| `krops.io/expires-at` | `KROPS_EXPIRES_AT`[^expires-at-derived] | `{now + 24h}` | Resource expiry target (RFC3339 timestamp or literal `never`) |
+| `krops.io/run-kind` | `KROPS_RUN_KIND` | `manual` | Lifecycle context (`manual`, `scheduled`, `emergency`, etc.) |
+
+[^expires-at-derived]: The `krops.io/expires-at` value is derived from `KROPS_RUN_TTL` (default `24h`); use `KROPS_RUN_TTL=none` for no expiry.
+
+#### Tag application
+
+Tags are written imperatively to the `krops-run` ConfigMap in `flux-system`
+during bootstrap (before Flux instance installation). Flux then uses the
+ConfigMap values via `postBuild.substituteFrom` to apply them to:
+
+- **CAPA control planes** (`AWSManagedControlPlane` spec): VPC, subnets, NAT
+  gateways, Elastic IPs, and node groups inherit the control plane's tags
+  automatically.
+- **ACK-managed resources**: S3 Bucket, RDS DBInstance, IAM Role, and IAM User
+  CRs apply tags directly in their specs.
+
+**Not tagged:**
+- CloudFormation stacks backing CAPA (account-global, persistent); would need
+  stack-level parameters outside the current scope.
+- kind bootstrap cluster (ephemeral, purely local); lifecycle tags are
+  meaningless for a temporary local fixture.
+
+#### Rerun behavior
+
+Three paths handle reruns differently:
+
+**Rust CLI (`krops-bootstrap`)**:
+When `KROPS_RUN_ID` is set and non-empty, and the `krops-run` ConfigMap
+exists in kind's `flux-system`, all four values are reused without change
+(rerun-safe). If the ConfigMap is gone but `KROPS_RUN_ID` was set, a fresh
+ConfigMap is written with `KROPS_RUN_ID` from the environment and expires-at
+recalculated from `KROPS_RUN_TTL`. With `KROPS_RUN_ID` unset or empty, a
+fresh run-id is generated (profile + timestamp) and the ConfigMap is
+overwritten.
+
+**`bootstrap.sh`**:
+Always rewrites the `krops-run` ConfigMap from environment variables. To
+preserve the same identity across reruns, export `KROPS_RUN_ID` (and
+optionally `KROPS_RUN_TTL`) before calling bootstrap.
+
+**Pivot (`pivot.sh` and the CLI's pivot phase)**:
+Never generates tag values. Copies the four data keys from the kind cluster's
+`krops-run` ConfigMap using the `BOOTSTRAP_KUBECONTEXT` (default `kind-mgmt`);
+fails if the ConfigMap is missing.
+
+#### TTL and expiry
+
+- Default: resources tagged with a 24-hour expiry
+  (`krops.io/expires-at={now + 24h}`).
+- Override with `KROPS_RUN_TTL=<duration>`: parses durations like `2h`, `30m`,
+  `3600s`.
+- `KROPS_RUN_TTL=none` tags with `krops.io/expires-at=never` (no auto-expiry).
+
+#### Post-pivot seeding
+
+The `krops-run` ConfigMap created in the kind bootstrap cluster is seeded to
+the management cluster before Flux starts, so tags survive the pivot and
+workload reconciliation reads the same values.
+
+#### Lookup and cleanup
+
+Find resources by run-id:
+```sh
+aws resourcegroupstaggingapi get-resources --region <region> \
+  --tag-filters Key=krops.io/run-id,Values=<run-id>
+aws iam list-role-tags --role-name <name>
+aws s3api get-bucket-tagging --bucket <name>
+```
+
+Group orphaned resources by `krops.io/run-id` and flag any where
+`krops.io/expires-at` is in the past for manual teardown.
 
 ### local-talos prerequisites
 
@@ -441,6 +573,12 @@ export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
 flux get kustomizations --watch
 ```
 
+After a toolbox `local-host` run on macOS the persisted file carries the
+`kind` Docker network address, which Docker Desktop does not route;
+export the host copy from
+[Host-side access after a toolbox local-host run (macOS)](#host-side-access-after-a-toolbox-local-host-run-macos)
+instead.
+
 For the local-host environment, export the CAPD workload kubeconfig after
 `docker-workload-cluster` reports Ready. The toolbox run keeps the
 kind-network endpoint, so the file is read back through the toolbox too:
@@ -456,6 +594,11 @@ docker run --rm -it \
 docker run --rm --network kind -v "$PWD:/workspace" -w /workspace \
   --entrypoint kubectl "$TOOLBOX_IMAGE" --kubeconfig local-workload.kubeconfig get nodes
 ```
+
+The host task form of `kubeconfigs` still reads the persisted management
+kubeconfig before it can export the workload one, so on macOS it must run
+against the host copy from
+[Host-side access after a toolbox local-host run (macOS)](#host-side-access-after-a-toolbox-local-host-run-macos).
 
 The local workload Flux instance installs Podinfo from its OCI Helm chart.
 Open it in a host browser by running the port-forward in a separate
@@ -495,6 +638,72 @@ or fallback native run. The current wrapper does not forward that override.
 EKS clusters typically take 15–25 minutes to come up; node groups and the
 downstream app chain follow a few minutes after.
 
+### Host-side access after a toolbox local-host run (macOS)
+
+The pivot exports the management kubeconfig with the API server address CAPD
+recorded: the `local-management-lb` container IP on the `kind` Docker
+network. Native local-host runs rewrite that address to the localhost port,
+but toolbox runs skip the rewrite (`should_rewrite_capd_endpoint` in
+`bootstrap-rs/src/main.rs`) because the address resolves on the `kind`
+network the toolbox joins. Docker Desktop on macOS runs the engine in a VM
+and does not route the `kind` network from the host, so host commands
+against the persisted `.kube/krops-mgmt.yaml` time out. Rewrite a host copy
+to the port kind publishes on localhost:
+
+```sh
+cp .kube/krops-mgmt.yaml .kube/krops-mgmt.host.yaml
+PORT=$(docker port local-management-lb 6443/tcp | head -1 | sed 's/.*://')
+kubectl config set-cluster local-management --server="https://127.0.0.1:${PORT}" \
+  --kubeconfig .kube/krops-mgmt.host.yaml
+```
+
+Use the host copy for every host command that talks to the management
+cluster:
+
+```sh
+export KUBECONFIG="$PWD/.kube/krops-mgmt.host.yaml"
+flux get kustomizations --watch
+```
+
+The host form of the `kubeconfigs` task reads the management kubeconfig
+before it can export the workload one, so run it with the host copy
+exported; without `KROPS_TOOLBOX` it rewrites the workload endpoint to
+`127.0.0.1`, and `podinfo-port-forward` then needs no further changes:
+
+```sh
+mise -E local-host run podinfo-port-forward
+```
+
+The published port belongs to the `local-management-lb` container and stays
+the same while that container exists. It changes when the container is
+recreated, for example after teardown plus bootstrap. Re-run the
+`docker port` and `kubectl config set-cluster` lines whenever
+`docker port local-management-lb 6443/tcp` reports a different port than the
+kubeconfig carries.
+
+With Podman on macOS the same limitation applies inside the podman machine
+VM; use `podman port` in place of `docker port`.
+
+On Linux the host routes to the `kind` network directly, so
+`.kube/krops-mgmt.yaml` works as-is and no rewrite is needed.
+
+The unaffected alternative is a one-off toolbox container attached to the
+`kind` network, where the recorded address resolves with no rewrite:
+
+```sh
+docker run --rm -it --network kind \
+  -v "$PWD/.kube:/root/.kube" \
+  -e KUBECONFIG=/root/.kube/krops-mgmt.yaml \
+  --entrypoint flux \
+  "$TOOLBOX_IMAGE" get kustomizations --watch
+```
+
+Use `--entrypoint kubectl` for kubectl commands. The `mise` helper tasks are
+host forms; run them against the rewritten copy.
+
+Teardown is unaffected: it reads the management kubeconfig from inside the
+toolbox, which is attached to the `kind` network.
+
 ### Verifying the full chain
 
 For the local-host end-to-end chain:
@@ -512,6 +721,12 @@ docker run --rm --network kind -v "$PWD:/workspace" -w /workspace \
   --entrypoint flux "$TOOLBOX_IMAGE" --kubeconfig local-workload.kubeconfig get all --all-namespaces
 # then the port-forward from the section above, and browse to http://localhost:9898
 ```
+
+The toolbox form above needs no rewrite: the runs stay on the `kind`
+network. Running those steps as host commands instead needs the host copy
+from
+[Host-side access after a toolbox local-host run (macOS)](#host-side-access-after-a-toolbox-local-host-run-macos)
+in place of `.kube/krops-mgmt.yaml`.
 
 Bootstrap does not return until the management and workload root
 Kustomizations are Ready. The final port-forward verifies that the workload
@@ -578,7 +793,10 @@ state and is safe to re-run. If a pivot phase fails:
 The management kubeconfig is written to `MGMT_KUBECONFIG`, with context
 `krops-mgmt`. The toolbox mount makes its `/root/.kube/krops-mgmt.yaml`
 appear on the host as `./.kube/krops-mgmt.yaml`; a fallback native run
-defaults to `~/.kube/krops-mgmt.yaml`.
+defaults to `~/.kube/krops-mgmt.yaml`. After a toolbox `local-host` run on
+macOS the file carries the `kind` Docker network address; see
+[Host-side access after a toolbox local-host run (macOS)](#host-side-access-after-a-toolbox-local-host-run-macos)
+for host-side use.
 
 ## Teardown
 

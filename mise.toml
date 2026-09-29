@@ -1,4 +1,4 @@
-min_version = "2026.9.12"
+min_version = "2026.9.16"
 
 [tools]
 go = "1.27.1"
@@ -10,7 +10,7 @@ clusterctl = "1.14.2"
 flux2 = "2.9.4"
 sops = "3.13.3"
 age = "1.3.2"
-uv = "0.12.17"
+uv = "0.12.20"
 
 # Zarf CLI (airgap prototype). See docs/dependencies.md's "Intentional
 # differences" for why version/asset_pattern are written this way.
@@ -74,7 +74,7 @@ if ! python3 airgap/tests/test-digest-regex.py; then
   fail=1
 fi
 echo "==> failure-notification job wiring"
-if ! python3 airgap/tests/test-airgap-failure-notification.py; then
+if ! uv run python airgap/tests/test-airgap-failure-notification.py; then
   echo "    FAILED: failure-notification job wiring" >&2
   fail=1
 fi
@@ -118,6 +118,11 @@ if ! python3 tests/test-bootstrap-config.py; then
   echo "    FAILED: bootstrap.toml cross-check" >&2
   fail=1
 fi
+echo "==> shell REGION_PLAN vs bootstrap.toml"
+if ! python3 tests/test-bootstrap-shell-region-plan.py; then
+  echo "    FAILED: shell REGION_PLAN vs bootstrap.toml" >&2
+  fail=1
+fi
 echo "==> cert-manager version consistency"
 if ! python3 tests/test-cert-manager-version-consistency.py; then
   echo "    FAILED: cert-manager version consistency" >&2
@@ -136,6 +141,11 @@ fi
 echo "==> gcp postgres"
 if ! uv run python tests/test-gcp-postgres.py; then
   echo "    FAILED: gcp postgres" >&2
+  fail=1
+fi
+echo "==> AWS run-tag standard (#381)"
+if ! uv run python tests/test-aws-run-tags.py; then
+  echo "    FAILED: AWS run-tag standard" >&2
   fail=1
 fi
 echo "==> kcc operator pin"

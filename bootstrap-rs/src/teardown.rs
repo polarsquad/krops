@@ -887,325 +887,6 @@ pub async fn cleanup_rds_instance(target: &AwsSweepTarget) {
     }
 }
 
-/// 4e. S3 buckets: versioned, so every object version AND delete marker
-/// must be purged before the bucket itself can be deleted.
-pub async fn cleanup_s3_bucket(bucket: &str, region: &str) {
-    let head = run_quiet(
-        "aws",
-        &[
-            "s3api",
-            "head-bucket",
-            "--bucket",
-            bucket,
-            "--region",
-            region,
-        ],
-    )
-    .await;
-    if !head {
-        println!("✓   S3 bucket {bucket} not found");
-        return;
-    }
-    println!(">>>   Emptying S3 bucket: {bucket} (all versions and delete markers)");
-    loop {
-        let batch = capture_lossy(
-            "aws",
-            &[
-                "s3api",
-                "list-object-versions",
-                "--bucket",
-                bucket,
-                "--region",
-                region,
-                "--max-items",
-                "500",
-                "--query",
-                "{Objects: [Versions, DeleteMarkers][][].{Key: Key, VersionId: VersionId}, Quiet: `true`}",
-                "--output",
-                "json",
-            ],
-        ).await;
-        if !batch.contains("\"Key\"") {
-            break;
-        }
-        let ok = run_with_stdin_str(
-            "aws",
-            &[
-                "s3api",
-                "delete-objects",
-                "--bucket",
-                bucket,
-                "--region",
-                region,
-                "--delete",
-                "fileb:///dev/stdin",
-            ],
-            &batch,
-        )
-        .await;
-        if !ok {
-            warn(&format!("Failed to purge objects from {bucket}"));
-            break;
-        }
-    }
-    println!(">>>   Deleting S3 bucket: {bucket}");
-    if !run_quiet(
-        "aws",
-        &[
-            "s3api",
-            "delete-bucket",
-            "--bucket",
-            bucket,
-            "--region",
-            region,
-        ],
-    )
-    .await
-    {
-        warn(&format!("Failed to delete S3 bucket {bucket}"));
-    }
-}
-
-/// 4f. IAM role (detach policies, instance profiles, inline policies,
-/// then the role). Skips silently when the role is absent.
-pub async fn cleanup_iam_role(role: &str) {
-    if !run_quiet("aws", &["iam", "get-role", "--role-name", role]).await {
-        return;
-    }
-    println!(">>>   Deleting IAM role: {role}");
-    let policies = capture_lossy(
-        "aws",
-        &[
-            "iam",
-            "list-attached-role-policies",
-            "--role-name",
-            role,
-            "--query",
-            "AttachedPolicies[].PolicyArn",
-            "--output",
-            "text",
-        ],
-    )
-    .await;
-    for arn in policies.split_whitespace() {
-        println!(">>>     Detaching policy: {arn}");
-        let _ = run_quiet(
-            "aws",
-            &[
-                "iam",
-                "detach-role-policy",
-                "--role-name",
-                role,
-                "--policy-arn",
-                arn,
-            ],
-        )
-        .await;
-    }
-    let profiles = capture_lossy(
-        "aws",
-        &[
-            "iam",
-            "list-instance-profiles-for-role",
-            "--role-name",
-            role,
-            "--query",
-            "InstanceProfiles[].InstanceProfileName",
-            "--output",
-            "text",
-        ],
-    )
-    .await;
-    for profile in profiles.split_whitespace() {
-        println!(">>>     Deleting instance profile: {profile}");
-        let _ = run_quiet(
-            "aws",
-            &[
-                "iam",
-                "remove-role-from-instance-profile",
-                "--instance-profile-name",
-                profile,
-                "--role-name",
-                role,
-            ],
-        )
-        .await;
-        let _ = run_quiet(
-            "aws",
-            &[
-                "iam",
-                "delete-instance-profile",
-                "--instance-profile-name",
-                profile,
-            ],
-        )
-        .await;
-    }
-    let inline = capture_lossy(
-        "aws",
-        &[
-            "iam",
-            "list-role-policies",
-            "--role-name",
-            role,
-            "--query",
-            "PolicyNames[]",
-            "--output",
-            "text",
-        ],
-    )
-    .await;
-    for policy in inline.split_whitespace() {
-        println!(">>>     Deleting inline policy: {policy}");
-        let _ = run_quiet(
-            "aws",
-            &[
-                "iam",
-                "delete-role-policy",
-                "--role-name",
-                role,
-                "--policy-name",
-                policy,
-            ],
-        )
-        .await;
-    }
-    if !run_quiet("aws", &["iam", "delete-role", "--role-name", role]).await {
-        warn(&format!("Failed to delete IAM role {role}"));
-    }
-}
-
-/// CAPA (EKSEnableIAM) auto-creates per-cluster roles not declared in
-/// Git; sweep every role whose name starts with the cluster name.
-pub async fn cleanup_capa_iam_roles(prefix: &str) {
-    // list-roles is paginated at 100 by the CLI without a paginator on
-    // server-side filters; use the query prefix sweep like the script.
-    let roles = capture_lossy(
-        "aws",
-        &[
-            "iam",
-            "list-roles",
-            "--query",
-            &format!("Roles[?starts_with(RoleName, `{prefix}`)].RoleName"),
-            "--output",
-            "text",
-            "--max-items",
-            "1000",
-        ],
-    )
-    .await;
-    for role in roles.split_whitespace() {
-        if role == "None" {
-            continue;
-        }
-        cleanup_iam_role(role).await;
-    }
-}
-
-/// 4f. IAM user (login profile, access keys, inline policies, user).
-pub async fn cleanup_iam_user(user: &str) {
-    if !run_quiet("aws", &["iam", "get-user", "--user-name", user]).await {
-        return;
-    }
-    println!(">>>   Deleting IAM user: {user}");
-    let _ = run_quiet("aws", &["iam", "delete-login-profile", "--user-name", user]).await;
-    let keys = capture_lossy(
-        "aws",
-        &[
-            "iam",
-            "list-access-keys",
-            "--user-name",
-            user,
-            "--query",
-            "AccessKeyMetadata[].AccessKeyId",
-            "--output",
-            "text",
-        ],
-    )
-    .await;
-    for key in keys.split_whitespace() {
-        println!(">>>     Deleting access key: {key}");
-        let _ = run_quiet(
-            "aws",
-            &[
-                "iam",
-                "delete-access-key",
-                "--user-name",
-                user,
-                "--access-key-id",
-                key,
-            ],
-        )
-        .await;
-    }
-    let inline = capture_lossy(
-        "aws",
-        &[
-            "iam",
-            "list-user-policies",
-            "--user-name",
-            user,
-            "--query",
-            "PolicyNames[]",
-            "--output",
-            "text",
-        ],
-    )
-    .await;
-    for policy in inline.split_whitespace() {
-        let _ = run_quiet(
-            "aws",
-            &[
-                "iam",
-                "delete-user-policy",
-                "--user-name",
-                user,
-                "--policy-name",
-                policy,
-            ],
-        )
-        .await;
-    }
-    if !run_quiet("aws", &["iam", "delete-user", "--user-name", user]).await {
-        warn(&format!("Failed to delete IAM user {user}"));
-    }
-}
-
-/// 4g. CloudFormation bootstrap stack.
-pub async fn cleanup_cfn_stack(stack: &str, region: &str) {
-    if !run_quiet(
-        "aws",
-        &[
-            "cloudformation",
-            "describe-stacks",
-            "--stack-name",
-            stack,
-            "--region",
-            region,
-        ],
-    )
-    .await
-    {
-        return;
-    }
-    println!(">>>   Deleting CFN stack: {stack} in {region}");
-    if !run_quiet(
-        "aws",
-        &[
-            "cloudformation",
-            "delete-stack",
-            "--stack-name",
-            stack,
-            "--region",
-            region,
-        ],
-    )
-    .await
-    {
-        warn(&format!("Failed to delete CFN stack {stack} in {region}"));
-    }
-}
-
 /// 4d. VPC resources, gated on the CAPA ownership tag (krops scope
 /// only): NAT gateways, subnets, IGWs, route tables, security groups
 /// (rules first, then the groups), the VPC itself. The CAPA-tagged EIPs
@@ -1584,6 +1265,325 @@ async fn release_cluster_eips_with(aws: &str, target: &AwsSweepTarget) {
         {
             warn(&format!("Failed to release Elastic IP {eip}"));
         }
+    }
+}
+
+/// 4e. S3 buckets: versioned, so every object version AND delete marker
+/// must be purged before the bucket itself can be deleted.
+pub async fn cleanup_s3_bucket(bucket: &str, region: &str) {
+    let head = run_quiet(
+        "aws",
+        &[
+            "s3api",
+            "head-bucket",
+            "--bucket",
+            bucket,
+            "--region",
+            region,
+        ],
+    )
+    .await;
+    if !head {
+        println!("✓   S3 bucket {bucket} not found");
+        return;
+    }
+    println!(">>>   Emptying S3 bucket: {bucket} (all versions and delete markers)");
+    loop {
+        let batch = capture_lossy(
+            "aws",
+            &[
+                "s3api",
+                "list-object-versions",
+                "--bucket",
+                bucket,
+                "--region",
+                region,
+                "--max-items",
+                "500",
+                "--query",
+                "{Objects: [Versions, DeleteMarkers][][].{Key: Key, VersionId: VersionId}, Quiet: `true`}",
+                "--output",
+                "json",
+            ],
+        ).await;
+        if !batch.contains("\"Key\"") {
+            break;
+        }
+        let ok = run_with_stdin_str(
+            "aws",
+            &[
+                "s3api",
+                "delete-objects",
+                "--bucket",
+                bucket,
+                "--region",
+                region,
+                "--delete",
+                "fileb:///dev/stdin",
+            ],
+            &batch,
+        )
+        .await;
+        if !ok {
+            warn(&format!("Failed to purge objects from {bucket}"));
+            break;
+        }
+    }
+    println!(">>>   Deleting S3 bucket: {bucket}");
+    if !run_quiet(
+        "aws",
+        &[
+            "s3api",
+            "delete-bucket",
+            "--bucket",
+            bucket,
+            "--region",
+            region,
+        ],
+    )
+    .await
+    {
+        warn(&format!("Failed to delete S3 bucket {bucket}"));
+    }
+}
+
+/// 4f (roles). IAM role (detach policies, instance profiles, inline policies,
+/// then the role). Skips silently when the role is absent.
+pub async fn cleanup_iam_role(role: &str) {
+    if !run_quiet("aws", &["iam", "get-role", "--role-name", role]).await {
+        return;
+    }
+    println!(">>>   Deleting IAM role: {role}");
+    let policies = capture_lossy(
+        "aws",
+        &[
+            "iam",
+            "list-attached-role-policies",
+            "--role-name",
+            role,
+            "--query",
+            "AttachedPolicies[].PolicyArn",
+            "--output",
+            "text",
+        ],
+    )
+    .await;
+    for arn in policies.split_whitespace() {
+        println!(">>>     Detaching policy: {arn}");
+        let _ = run_quiet(
+            "aws",
+            &[
+                "iam",
+                "detach-role-policy",
+                "--role-name",
+                role,
+                "--policy-arn",
+                arn,
+            ],
+        )
+        .await;
+    }
+    let profiles = capture_lossy(
+        "aws",
+        &[
+            "iam",
+            "list-instance-profiles-for-role",
+            "--role-name",
+            role,
+            "--query",
+            "InstanceProfiles[].InstanceProfileName",
+            "--output",
+            "text",
+        ],
+    )
+    .await;
+    for profile in profiles.split_whitespace() {
+        println!(">>>     Deleting instance profile: {profile}");
+        let _ = run_quiet(
+            "aws",
+            &[
+                "iam",
+                "remove-role-from-instance-profile",
+                "--instance-profile-name",
+                profile,
+                "--role-name",
+                role,
+            ],
+        )
+        .await;
+        let _ = run_quiet(
+            "aws",
+            &[
+                "iam",
+                "delete-instance-profile",
+                "--instance-profile-name",
+                profile,
+            ],
+        )
+        .await;
+    }
+    let inline = capture_lossy(
+        "aws",
+        &[
+            "iam",
+            "list-role-policies",
+            "--role-name",
+            role,
+            "--query",
+            "PolicyNames[]",
+            "--output",
+            "text",
+        ],
+    )
+    .await;
+    for policy in inline.split_whitespace() {
+        println!(">>>     Deleting inline policy: {policy}");
+        let _ = run_quiet(
+            "aws",
+            &[
+                "iam",
+                "delete-role-policy",
+                "--role-name",
+                role,
+                "--policy-name",
+                policy,
+            ],
+        )
+        .await;
+    }
+    if !run_quiet("aws", &["iam", "delete-role", "--role-name", role]).await {
+        warn(&format!("Failed to delete IAM role {role}"));
+    }
+}
+
+/// CAPA (EKSEnableIAM) auto-creates per-cluster roles not declared in
+/// Git; sweep every role whose name starts with the cluster name.
+pub async fn cleanup_capa_iam_roles(prefix: &str) {
+    // list-roles is paginated at 100 by the CLI without a paginator on
+    // server-side filters; use the query prefix sweep like the script.
+    let roles = capture_lossy(
+        "aws",
+        &[
+            "iam",
+            "list-roles",
+            "--query",
+            &format!("Roles[?starts_with(RoleName, `{prefix}`)].RoleName"),
+            "--output",
+            "text",
+            "--max-items",
+            "1000",
+        ],
+    )
+    .await;
+    for role in roles.split_whitespace() {
+        if role == "None" {
+            continue;
+        }
+        cleanup_iam_role(role).await;
+    }
+}
+
+/// 4f (users). IAM user (login profile, access keys, inline policies, user).
+pub async fn cleanup_iam_user(user: &str) {
+    if !run_quiet("aws", &["iam", "get-user", "--user-name", user]).await {
+        return;
+    }
+    println!(">>>   Deleting IAM user: {user}");
+    let _ = run_quiet("aws", &["iam", "delete-login-profile", "--user-name", user]).await;
+    let keys = capture_lossy(
+        "aws",
+        &[
+            "iam",
+            "list-access-keys",
+            "--user-name",
+            user,
+            "--query",
+            "AccessKeyMetadata[].AccessKeyId",
+            "--output",
+            "text",
+        ],
+    )
+    .await;
+    for key in keys.split_whitespace() {
+        println!(">>>     Deleting access key: {key}");
+        let _ = run_quiet(
+            "aws",
+            &[
+                "iam",
+                "delete-access-key",
+                "--user-name",
+                user,
+                "--access-key-id",
+                key,
+            ],
+        )
+        .await;
+    }
+    let inline = capture_lossy(
+        "aws",
+        &[
+            "iam",
+            "list-user-policies",
+            "--user-name",
+            user,
+            "--query",
+            "PolicyNames[]",
+            "--output",
+            "text",
+        ],
+    )
+    .await;
+    for policy in inline.split_whitespace() {
+        let _ = run_quiet(
+            "aws",
+            &[
+                "iam",
+                "delete-user-policy",
+                "--user-name",
+                user,
+                "--policy-name",
+                policy,
+            ],
+        )
+        .await;
+    }
+    if !run_quiet("aws", &["iam", "delete-user", "--user-name", user]).await {
+        warn(&format!("Failed to delete IAM user {user}"));
+    }
+}
+
+/// 4g. CloudFormation bootstrap stack.
+pub async fn cleanup_cfn_stack(stack: &str, region: &str) {
+    if !run_quiet(
+        "aws",
+        &[
+            "cloudformation",
+            "describe-stacks",
+            "--stack-name",
+            stack,
+            "--region",
+            region,
+        ],
+    )
+    .await
+    {
+        return;
+    }
+    println!(">>>   Deleting CFN stack: {stack} in {region}");
+    if !run_quiet(
+        "aws",
+        &[
+            "cloudformation",
+            "delete-stack",
+            "--stack-name",
+            stack,
+            "--region",
+            region,
+        ],
+    )
+    .await
+    {
+        warn(&format!("Failed to delete CFN stack {stack} in {region}"));
     }
 }
 

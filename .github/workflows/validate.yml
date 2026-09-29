@@ -222,6 +222,9 @@ jobs:
           uv run python tests/test-aws-iam-doc-scope.py
           uv run python tests/test-aws-iam-doc-scope-regressions.py
 
+      - name: AWS account ID literals vs flux-instance.yaml
+        run: python3 tests/test-aws-account-id-consistency.py
+
       - name: AWS run-tag standard (#381)
         run: |
           uv sync --locked

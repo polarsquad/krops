@@ -39,6 +39,7 @@ GIT_BRANCH="${GIT_BRANCH:-main}"
 REGISTRY_NAME="${REGISTRY_NAME:-krops-registry}"
 REGISTRY_PORT="${REGISTRY_PORT:-5001}"
 MGMT_NS="default"
+FLUX_NS="flux-system"
 MGMT_KUBECONFIG="${MGMT_KUBECONFIG:-$HOME/.kube/krops-mgmt.yaml}"
 PIVOT_SKIP_DELETE="${PIVOT_SKIP_DELETE:-0}"
 
@@ -98,8 +99,14 @@ pivot_preflight() {
 }
 
 # ── Phase 0: wait for the management cluster definition ─────────────────────
-# Duration string (40m, 2h, 90s, or bare seconds) to seconds.
+# Single-unit duration (40m, 2h, 90s, or bare seconds) to seconds; compound forms such as 1h30m are rejected.
 duration_to_seconds() {
+  case "${1%[hms]}" in
+    ''|*[!0-9]*)
+      echo "ERROR: invalid duration '$1' (single-unit only: 40m, 2h, 90s, or bare seconds)" >&2
+      return 1
+      ;;
+  esac
   case "$1" in
     *h) echo $(( $(echo "$1" | tr -dc '0-9') * 3600 )) ;;
     *m) echo $(( $(echo "$1" | tr -dc '0-9') * 60 )) ;;
@@ -119,11 +126,13 @@ wait_for_mgmt_cluster_definition() {
   local timeout_s attempts=0
   timeout_s="$(duration_to_seconds "$MGMT_READY_TIMEOUT")"
   local max_attempts=$(( timeout_s / MGMT_POLL_INTERVAL ))
+  [ "$max_attempts" -ge 1 ] || max_attempts=1
+  # max_attempts sleeps, then one final probe at the budget boundary: matches poll_until in bootstrap-rs
   until kubectl get cluster "$MGMT_CLUSTER" -n "$MGMT_NS" >/dev/null 2>&1; do
     attempts=$((attempts + 1))
-    if [ "$attempts" -ge "$max_attempts" ]; then
+    if [ "$attempts" -gt "$max_attempts" ]; then
       echo "ERROR: Cluster '$MGMT_CLUSTER' was not created within ${MGMT_READY_TIMEOUT}." >&2
-      kubectl get kustomizations -n flux-system || true
+      kubectl get kustomizations -n "$FLUX_NS" || true
       echo "       Flux creates the management cluster definition after the bootstrap" >&2
       echo "       handoff; a failed Kustomization above is why the Cluster is missing." >&2
       echo "       Re-run the same command once Flux has reconciled: the chain is rerun-safe." >&2
@@ -145,9 +154,11 @@ wait_for_management_cluster() {
   local timeout_s attempts=0
   timeout_s="$(duration_to_seconds "$MGMT_READY_TIMEOUT")"
   local max_attempts=$(( timeout_s / MGMT_POLL_INTERVAL ))
+  [ "$max_attempts" -ge 1 ] || max_attempts=1
+  # max_attempts sleeps, then one final probe at the budget boundary: matches poll_until in bootstrap-rs
   until kubectl get "secret/${MGMT_CLUSTER}-kubeconfig" -n "$MGMT_NS" >/dev/null 2>&1; do
     attempts=$((attempts + 1))
-    if [ "$attempts" -ge "$max_attempts" ]; then
+    if [ "$attempts" -gt "$max_attempts" ]; then
       echo "ERROR: management cluster kubeconfig not available within ${MGMT_READY_TIMEOUT}" >&2
       kubectl describe cluster "$MGMT_CLUSTER" -n "$MGMT_NS" || true
       exit 1
@@ -315,8 +326,8 @@ suspend_and_move() {
   # pivot, so the suspension is never lifted there.
   echo ">>> Suspending Flux Kustomizations in the bootstrap cluster..."
   local ks
-  for ks in $(kubectl get kustomizations -n flux-system -o name); do
-    kubectl patch "$ks" -n flux-system --type merge -p '{"spec":{"suspend":true}}'
+  for ks in $(kubectl get kustomizations -n "$FLUX_NS" -o name); do
+    kubectl patch "$ks" -n "$FLUX_NS" --type merge -p '{"spec":{"suspend":true}}'
   done
 
   echo ">>> Moving the CAPI inventory to the management cluster..."
@@ -370,8 +381,47 @@ seed_target() {
 
   seed_flux "$MGMT_KUBECONFIG"
 
+  # Copy run-identity ConfigMap from the kind bootstrap cluster to the target.
+  # Never regenerate: the bootstrap or CLI seeded the kind ConfigMap; pivot
+  # copies it verbatim to keep tags consistent across the pivot.
+  local kind_ctx="${BOOTSTRAP_KUBECONTEXT:-kind-mgmt}"
+  if ! kubectl --context "$kind_ctx" get configmap krops-run -n flux-system >/dev/null 2>&1; then
+    echo "ERROR: ConfigMap flux-system/krops-run not found in '${kind_ctx}'; re-run the bootstrap to seed it." >&2
+    exit 1
+  fi
+  local run_id revision expires_at run_kind
+  run_id="$(kubectl --context "$kind_ctx" get configmap krops-run -n flux-system -o "jsonpath={.data.KROPS_RUN_ID}")"
+  revision="$(kubectl --context "$kind_ctx" get configmap krops-run -n flux-system -o "jsonpath={.data.KROPS_REVISION}")"
+  expires_at="$(kubectl --context "$kind_ctx" get configmap krops-run -n flux-system -o "jsonpath={.data.KROPS_EXPIRES_AT}")"
+  run_kind="$(kubectl --context "$kind_ctx" get configmap krops-run -n flux-system -o "jsonpath={.data.KROPS_RUN_KIND}")"
+
+  for _key_name in KROPS_RUN_ID KROPS_REVISION KROPS_EXPIRES_AT KROPS_RUN_KIND; do
+    _key_val=""
+    case "$_key_name" in
+      KROPS_RUN_ID)    _key_val="$run_id" ;;
+      KROPS_REVISION)  _key_val="$revision" ;;
+      KROPS_EXPIRES_AT) _key_val="$expires_at" ;;
+      KROPS_RUN_KIND)  _key_val="$run_kind" ;;
+    esac
+    if [ -z "$_key_val" ]; then
+      echo "ERROR: ${_key_name} missing or empty in flux-system/krops-run on '${kind_ctx}'" >&2
+      exit 1
+    fi
+  done
+
+  kubectl --kubeconfig "$MGMT_KUBECONFIG" create namespace flux-system --dry-run=client -o yaml \
+    | kubectl --kubeconfig "$MGMT_KUBECONFIG" apply -f -
+  kubectl --kubeconfig "$MGMT_KUBECONFIG" create configmap krops-run -n flux-system \
+    --from-literal="KROPS_RUN_ID=${run_id}" \
+    --from-literal="KROPS_REVISION=${revision}" \
+    --from-literal="KROPS_EXPIRES_AT=${expires_at}" \
+    --from-literal="KROPS_RUN_KIND=${run_kind}" \
+    --dry-run=client -o yaml \
+    | kubectl --kubeconfig "$MGMT_KUBECONFIG" apply -f -
+  echo ">>> Run tags seeded from ${kind_ctx}: run-id=${run_id} revision=${revision} expires-at=${expires_at} run-kind=${run_kind}"
+
   echo ">>> Kustomizations on the management cluster:"
-  kubectl --kubeconfig "$MGMT_KUBECONFIG" get kustomizations -n flux-system
+  kubectl --kubeconfig "$MGMT_KUBECONFIG" get kustomizations -n "$FLUX_NS"
 }
 
 # ── Phase 6: delete the bootstrap cluster ─────────────────────────────────────

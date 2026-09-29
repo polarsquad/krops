@@ -38,7 +38,7 @@ jobs:
       - name: Install mise
         uses: jdx/mise-action@v4.3.0
         with:
-          version: 2026.9.12
+          version: 2026.9.16
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
@@ -74,7 +74,7 @@ jobs:
       - name: Install mise
         uses: jdx/mise-action@v4.3.0
         with:
-          version: 2026.9.12
+          version: 2026.9.16
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
@@ -87,8 +87,7 @@ jobs:
       - name: Deploy with external egress blocked
         env:
           SKIP_OFFLINE_CHECK: "1"
-          AIRGAP_VERIFY_REF: ${{ github.ref }}
-          AIRGAP_VERIFY_REPO: ${{ github.repository }}
+          AIRGAP_VERIFY_WORKFLOW_REF: ${{ github.workflow_ref }}
         run: |
           set -uo pipefail
 

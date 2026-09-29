@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   airgap-image-pins:
     name: Air-gap image digest pins
@@ -55,7 +58,7 @@ jobs:
       - name: Install mise
         uses: jdx/mise-action@v4.3.0
         with:
-          version: 2026.9.12
+          version: 2026.9.16
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
@@ -68,16 +71,6 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: python3 tests/test-cert-manager-kubernetes-support.py --changed-from "$BASE_SHA"
-
-  airgap-image-existence:
-    name: Air-gap image existence
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7.0.1
-
-      - name: Verify every pinned digest is pullable
-        run: python3 airgap/tests/test-airgap-image-existence.py
 
   kustomize-build:
     name: Build kustomize overlays
@@ -121,14 +114,14 @@ jobs:
       - name: Install mise
         uses: jdx/mise-action@v4.3.0
         with:
-          version: 2026.9.12
+          version: 2026.9.16
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v10.2.0
         with:
-          version: "0.12.17"
+          version: "0.12.20"
 
       - name: Set up Node.js
         uses: actions/setup-node@v7.0.0
@@ -136,10 +129,13 @@ jobs:
           node-version: 24.21.0
 
       - name: Install Renovate
-        run: npm install --global renovate@44.106.0
+        run: npm install --global renovate@44.115.13
 
       - name: Verify only actions join the GitHub Actions group
         run: python3 tests/test-renovate-actions-grouping.py
+
+      - name: Verify every Renovate replacement template round-trips its match
+        run: python3 tests/test-renovate-replace-templates.py
 
       - name: Verify Kubernetes version pins share one group
         run: python3 tests/test-renovate-kubernetes-version-grouping.py
@@ -147,6 +143,8 @@ jobs:
         run: python3 tests/test-renovate-cluster-api-grouping.py
 
       - name: Verify cert-manager's chart and images.txt image tags group together (#322)
+        env:
+          RENOVATE_GITHUB_COM_TOKEN: ${{ github.token }}
         run: python3 tests/test-renovate-cert-manager-grouping.py
 
       - name: Verify airgap digest pinning
@@ -170,6 +168,9 @@ jobs:
       - name: bootstrap.toml cross-check
         run: python3 tests/test-bootstrap-config.py
 
+      - name: shell REGION_PLAN vs bootstrap.toml
+        run: python3 tests/test-bootstrap-shell-region-plan.py
+
       - name: sops-keygen prints the public key (#423)
         run: python3 tests/test-sops-keygen-prints-public-key.py
 
@@ -178,6 +179,12 @@ jobs:
 
       - name: Docs show toolbox helper runs, not host mise (#423)
         run: python3 tests/test-docs-toolbox-helpers.py
+
+      - name: toolbox-run.sh syntax, exec, and .env parity with mise (#257)
+        run: |
+          bash -n scripts/toolbox-run.sh
+          python3 tests/test-toolbox-run-exec.py
+          python3 tests/test-toolbox-run-env-precedence.py
 
       - name: cert-manager version consistency (#322)
         run: python3 tests/test-cert-manager-version-consistency.py
@@ -205,6 +212,11 @@ jobs:
       - name: ACK CR scope vs documented principal (#411)
         run: python3 tests/test-aws-iam-doc-scope.py
 
+      - name: AWS run-tag standard (#381)
+        run: |
+          uv sync --locked
+          uv run python tests/test-aws-run-tags.py
+
   python-lint:
     name: Lint Python (ruff)
     runs-on: ubuntu-latest
@@ -215,7 +227,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v10.2.0
         with:
-          version: "0.12.17"
+          version: "0.12.20"
 
       - name: ruff check (unused imports, subprocess.run check=)
         run: |

@@ -43,7 +43,7 @@ VERIFY_ARGS=()
 if [ -n "${ZARF_VERIFY_KEY:-}" ]; then
   VERIFY_ARGS+=(--key "$ZARF_VERIFY_KEY")
 else
-  # AIRGAP_VERIFY_WORKFLOW_REF: see docs/airgap.md#empirical-findings.
+  # AIRGAP_VERIFY_WORKFLOW_REF: see docs/airgap.md#empirical-findings-why-the-package-looks-the-way-it-does.
   VERIFY_ARGS+=(
     --certificate-identity
     "https://github.com/${AIRGAP_VERIFY_WORKFLOW_REF:-polarsquad/krops/.github/workflows/air-gapped.yml@refs/heads/main}"

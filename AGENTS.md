@@ -98,7 +98,7 @@ resources. There is no app source code here, only declarative infrastructure.
   - `gcp-base/` (PR 2, issue #72): Config Connector (the same
     pinned operator bundle as the management side; it ships its own webhook
     certs, so no cert-manager) and the GCP resources
-    (PSA range + peering, storage bucket, Cloud SQL with IAM-only auth,
+    (PSA range + peering, storage bucket, Cloud SQL with IAM database auth,
     per-cluster reader GSA). `europe-north1-01/` points at it;
     `tests/test-gcp-identity-chain.py` cross-checks the WIF
     pool/provider/subject couplings against `mgmt/gcp/`.
@@ -111,7 +111,10 @@ resources. There is no app source code here, only declarative infrastructure.
   `images.txt` with the identical tag and digest, guarding against partial
   air-gap updates (issue #228); the CI-only
   `airgap/tests/test-airgap-kubeadm-images.py` checks the k8s component pins in
-  `images.txt` against real `kubeadm config images list` (`--fix` regenerates them). `scripts/` builds,
+  `images.txt` against real `kubeadm config images list` (`--fix` regenerates them).
+  `airgap/tests/test-airgap-image-existence.py` confirms every `images.txt` digest is pullable
+  (live registry calls); it runs only in the path-filtered `airgap-image-existence` workflow, not
+  in `mise run validate`. `scripts/` builds,
   renders, and stages the bundle (`build-*`, `render-*`, `stage-*`,
   `offline-run.sh`); `archives/` and `rendered/` are gitignored outputs.
   Zarf fetches SHA-256-pinned CAAPH release assets and bundles arm64
@@ -161,6 +164,11 @@ resources. There is no app source code here, only declarative infrastructure.
   plus `pivot-manifest-vars` (key/value overrides merged onto the
   flux-system ConfigMap data before `pivot-manifests` substitution; also
   supports `${VAR:=default}` placeholders in those manifests, issue #72).
+  `run_tags.rs` writes and seeds the `krops-run` ConfigMap (four env knobs:
+  `KROPS_RUN_ID`, `KROPS_RUN_TTL`, `KROPS_REVISION`, `KROPS_RUN_KIND`) during
+  bootstrap/pivot for Flux `postBuild` substitution onto tagged AWS resources
+  (#381); the regression gate is `tests/test-aws-run-tags.py`; see
+  `docs/operations.md` for the full tagging standard.
 - `bootstrap.sh` / `pivot.sh` / `teardown.sh`: the shell equivalents of the
   CLI's phases. Kept until the binary completes full parity runs per
   environment, then retired (issues #92/#95/#100). The lifecycle mise tasks
@@ -168,8 +176,9 @@ resources. There is no app source code here, only declarative infrastructure.
   `scripts/toolbox-run.sh` (issue #104); the scripts remain the native path
   for development.
 - `docs/`: detailed documentation (see the table in README.md).
-  `docs/proposals/` holds design proposals under review (not yet decided or
-  implemented); the docs site assembler includes that folder.
+  `docs/proposals/` holds design proposals, under review or accepted (an
+  accepted one points at the `docs/` page that records its decisions); the
+  docs site assembler includes that folder.
 - `mise.toml`: pinned tool versions and all task entrypoints.
   `mise.aws.toml` is the AWS tool layer (aws-cli, clusterawsadm),
   activated with `MISE_ENV=aws`. `mise.azure.toml` (azure-cli) and
@@ -278,14 +287,18 @@ Traps that have bitten this repo (each caught in a live review):
   (`gh api repos/<owner>/<repo>`); three 404 depNames have shipped.
   `github-releases` returns nothing for tag-only repos (golang/go,
   python/cpython); use `github-tags` or `golang-version`.
-- `autoReplaceStringTemplate` only sees the dependency's standard fields
-  (`depName`, `currentValue`, `newValue`, `newDigest`, ...). Custom capture
-  groups (`indent`, `header`, `urlPrefix`, ...) render empty, `registryUrl`
-  is stored as `registryUrls`, and `depName` is the `depNameTemplate`
-  result. Prefer no template: the default replacement swaps every
-  `currentValue`/`currentDigest` inside the match. That swap also hits a
-  pure-numeric tag (`registry:2`) inside its hex digest, so pin full
-  tags (`2.8.3`). Lookbehind is not an escape hatch: Renovate compiles
+- `autoReplaceStringTemplate` only sees Renovate's fixed match fields
+  (`depName`, `currentValue`, `currentDigest`, `datasource`, `versioning`,
+  `indentation`, ...): any other named group (`header`, `indent`,
+  `urlPrefix`) renders empty, `registryUrl` is stored as `registryUrls`,
+  and `depName` is the `depNameTemplate` result, not the captured text.
+  Prefer no template: Renovate's default replaces every `currentValue` and
+  `currentDigest` inside the matched text, keeping the surrounding
+  comment, indentation, and paths. That swap also hits a pure-numeric tag
+  (`registry:2`) inside its hex digest, so pin full tags (`2.8.3`).
+  Capture `currentValue` without a `v` prefix when `extractVersionTemplate`
+  strips it from the looked-up version, or the default replacement drops
+  the `v`. Lookbehind is not an escape hatch: Renovate compiles
   `matchStrings` with RE2, which rejects it (only a Node without RE2
   falls back to JS `RegExp` and hides that).
 
@@ -302,8 +315,12 @@ engine, checking that only action dependencies join the GitHub Actions group.
 Run locally with Renovate on PATH and Node >= 24.11. The offline
 `tests/test-renovate-auto-replace.py` (same CI job) covers the replacement
 path: it runs Renovate's real `doAutoReplace` on every dependency every regex
-manager extracts and fails unless only the version/digest changed. None of
-these cover lookup liveness; only the dry-run does.
+manager extracts and fails unless only the version/digest changed.
+`tests/test-renovate-replace-templates.py` (same CI job) renders every
+regex manager's `autoReplaceStringTemplate` as a no-op update through
+Renovate's own extraction and template compiler, and requires it to
+reproduce the matched text exactly. None of these cover lookup liveness;
+only the dry-run does.
 
 The digest-pinning, coverage, and release-assets tests all run sequentially
 in the same CI job and their fixtures overlap on `airgap/zarf.yaml`'s
@@ -311,6 +328,10 @@ in the same CI job and their fixtures overlap on `airgap/zarf.yaml`'s
 a shared `RENOVATE_CACHE_DIR` (defaulting to a fixed path under the OS temp
 dir): repeat datasource lookups hit Renovate's on-disk cache instead of the
 GitHub API again.
+
+The CI-only `tests/test-mise-zarf-pin.py` (validate.yml `zarf-mise-pin`
+job) installs the zarf pin through mise and checks the reported version,
+catching an `asset_pattern` that matches no release asset.
 
 The offline `airgap/tests/test-airgap-image-digests.py` gate is separate from
 Renovate: it scans air-gap inventories and scripts changed by the PR, requires
@@ -331,7 +352,8 @@ Load these only when the task touches their domain:
 - `docs/extending.md`: adding a workload cluster, adding apps, adding other providers (Azure, Talos, k0smotron).
 - `docs/secrets.md`: SOPS + age setup, credential rotation.
 - `docs/konflate.md`: rendered PR review, CI gate, tokens, write-back.
-- `docs/aws-iam.md`: management-cluster ACK controllers (static SOPS credentials, union scope), reader roles, reader user.
-- `docs/operations.md`: quotas, configuration, bootstrap, verification.
+- `docs/aws-iam.md`: management-cluster ACK controllers (static SOPS credentials, union scope), reader roles, reader user, CI OIDC role, e2e account incident and credential revocation.
+- `docs/operations.md`: e2e AWS account designation and budget, quotas, configuration, bootstrap, verification.
 - `docs/workload-resources.md`: S3/RDS posture, known limitations.
 - `docs/airgap.md`: Zarf offline bundle for the local-host profile.
+- `docs/crossplane.md`: Crossplane as an alternative resource plane (decided, not yet implemented): per-environment selector, one plane per environment, ownership rules, slices #446 to #455.

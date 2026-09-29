@@ -43,6 +43,14 @@ spec:
       value: flux-ack
     - key: cluster
       value: eu-north-1-workload
+    - key: krops.io/run-id
+      value: "${KROPS_RUN_ID:=manual}"
+    - key: krops.io/revision
+      value: "${KROPS_REVISION:=unknown}"
+    - key: krops.io/expires-at
+      value: "${KROPS_EXPIRES_AT:=never}"
+    - key: krops.io/run-kind
+      value: "${KROPS_RUN_KIND:=manual}"
 ---
 apiVersion: rds.services.k8s.aws/v1alpha1
 kind: DBInstance
@@ -71,3 +79,11 @@ spec:
       value: flux-ack
     - key: cluster
       value: eu-west-1-workload
+    - key: krops.io/run-id
+      value: "${KROPS_RUN_ID:=manual}"
+    - key: krops.io/revision
+      value: "${KROPS_REVISION:=unknown}"
+    - key: krops.io/expires-at
+      value: "${KROPS_EXPIRES_AT:=never}"
+    - key: krops.io/run-kind
+      value: "${KROPS_RUN_KIND:=manual}"

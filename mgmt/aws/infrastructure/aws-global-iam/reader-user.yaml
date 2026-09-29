@@ -52,3 +52,11 @@ spec:
   tags:
     - key: managed-by
       value: flux-ack
+    - key: krops.io/run-id
+      value: "${KROPS_RUN_ID:=manual}"
+    - key: krops.io/revision
+      value: "${KROPS_REVISION:=unknown}"
+    - key: krops.io/expires-at
+      value: "${KROPS_EXPIRES_AT:=never}"
+    - key: krops.io/run-kind
+      value: "${KROPS_RUN_KIND:=manual}"

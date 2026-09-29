@@ -229,7 +229,7 @@
   <text x="1168" y="700" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Workload KCC creates cloud infra:</text>
   <text x="1168" y="726" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">VPC + PSA range + peering,</text>
   <text x="1168" y="752" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Storage bucket (versioning, PAP),</text>
-  <text x="1168" y="778" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Cloud SQL (IAM-only auth) + reader GSA.</text>
+  <text x="1168" y="778" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Cloud SQL (IAM auth) + reader GSA.</text>
   <line x1="1122" y1="808" x2="1504" y2="808" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- golden rule -->

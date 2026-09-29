@@ -41,14 +41,15 @@ def main() -> int:
     ]
     if not upload_steps:
         failures.append(f"{AIR_GAPPED_YML}: found no deployment-evidence upload steps")
-    missing = [
-        block.splitlines()[0].strip() for block in upload_steps
-        if DEBUG_FILE not in block or WORKLOAD_DEBUG_FILE not in block
-    ]
-    if missing:
-        failures.append(
-            f"{AIR_GAPPED_YML}: {DEBUG_FILE} missing from upload path in: {missing}"
-        )
+    for path in (DEBUG_FILE, WORKLOAD_DEBUG_FILE):
+        missing = [
+            block.splitlines()[0].strip() for block in upload_steps
+            if path not in block
+        ]
+        if missing:
+            failures.append(
+                f"{AIR_GAPPED_YML}: {path} missing from upload path in: {missing}"
+            )
 
     if failures:
         print("Debug-capture regression check FAILED:", file=sys.stderr)

@@ -31,14 +31,15 @@ Nothing here is decided; the last section lists what needs a decision.
 | U3 | The package deploys but the result is unhealthy (Flux not Ready, workload cluster not Available) | yes |
 | U4 | The update process itself dies mid-way (power loss, killed shell, host reboot) | yes |
 | U5 | A regression is found after the switch and the operator wants the previous version back | yes |
-| U6 | (Third case: to be added, the discussion cut off here) | open |
 
 The issue's acceptance criteria cover U1 and U2. U3 to U5 follow from the goal
 "any failure leaves the previous known-good deployment intact".
 
 ## Architecture A: in-place
 
-Prototyped in `airgap/scripts/update-bundle.sh` (not part of this change).
+Prototyped outside this repository; the prototype work tracked in
+[#369](https://github.com/polarsquad/krops/issues/369) has not been committed
+here.
 
 ```mermaid
 flowchart TD
@@ -80,7 +81,7 @@ U5 cheap.
 |----------|-------------|-----------------|
 | U1 corrupt/unverified package | Rejected at staging; live untouched. Identical in both. | Same. |
 | U2 deploy fails | The live cluster is being modified when it fails. Recovery is a redeploy of the old package over a possibly half-applied release. Works for clean failures; not guaranteed for partial Helm state or CRD changes. | Failure happens in green. Blue never changed. Recovery is "delete green". Strongest guarantee. |
-| U3 deployed but unhealthy | Not detected by the current script (it only checks the deploy exit code). Health gates could be added, but by then the old state is already overwritten and the fix is another redeploy. | Health gates run on green before any switch. Unhealthy green is discarded. |
+| U3 deployed but unhealthy | Not detected by the in-place flow as prototyped (it only checks the deploy exit code). Health gates could be added, but by then the old state is already overwritten and the fix is another redeploy. | Health gates run on green before any switch. Unhealthy green is discarded. |
 | U4 process dies mid-update | Live cluster may be half-updated. Journal detects it; recovery redeploys the last good package. Correct only if the redeploy is clean. | Blue is untouched at any crash point before the switch. After a crash, resume or destroy green. Only the switch step itself needs to be crash-safe (one atomic pointer flip). |
 | U5 regression after switch | `rollback` redeploys the previous package: a second in-place change, with the same caveats as U2, and any cluster state created since is not undone. | Switch back to blue, still running during the soak window. Fast and exact, but only until blue is retired, and state created in green is not carried back. |
 | Cost | One cluster. Minimal host resources and disk. | Two clusters at once. Roughly double Docker memory, CPU, and image storage during an update. May not fit a laptop. |
@@ -125,7 +126,8 @@ What already exists:
 - `offline-run.sh` steps 5 to 9 are already a health gate (registry-sourced
   images, OCIRepository Ready, Flux Ready, workload cluster Available, nodes
   Ready, app Running). They would be extracted and pointed at green.
-- `update-bundle.sh` staging and verification carry over unchanged.
+- The staging and verification flow from A (stage copy plus sha256 sidecar,
+  then verify signature, checksums, and SBOM) carries over unchanged.
 
 What is new:
 - A slot model: names for blue and green (for example `airgap-mgmt-a` and
@@ -149,7 +151,7 @@ pointer flip. Three options:
 
 Both options share stage and verify. The difference is what "apply" drives.
 
-### A: in-place controller (as built)
+### A: in-place controller
 
 State: `current`, `previous`, `journal`. Commands: `apply`, `rollback`,
 `status`. Recommended additions if A is chosen: a post-deploy health gate that
@@ -281,4 +283,3 @@ cannot, keep A and add the health gate.
 1. Can the target host run two clusters at once?
 2. Which switch: S1, S2, or S3? Is workload downtime or state loss acceptable?
 3. How long is the soak window, and who triggers `accept` or `revert`?
-4. The missing use case (U6).

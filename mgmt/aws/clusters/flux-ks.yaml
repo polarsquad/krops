@@ -13,6 +13,11 @@ spec:
     kind: GitRepository
     name: flux-system
   path: ./mgmt/aws/clusters/eu-north-1
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: krops-run
+        optional: true
   dependsOn:
     - name: capa-system
 ---
@@ -31,5 +36,10 @@ spec:
     kind: GitRepository
     name: flux-system
   path: ./mgmt/aws/clusters/eu-west-1
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: krops-run
+        optional: true
   dependsOn:
     - name: capa-system

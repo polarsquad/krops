@@ -2350,7 +2350,7 @@ mod tests {
     ) -> std::path::PathBuf {
         let bin = dir.join("kubectl");
         let script = format!(
-            "#!/usr/bin/env sh\n{body}\necho \"$@\" >> {log}\nexit 0\n",
+            "#!/usr/bin/env sh\n[ -n \"${{STUB_PROBE:-}}\" ] && exit 0\n{body}\necho \"$@\" >> {log}\nexit 0\n",
             body = body,
             log = log.display(),
         );
@@ -2399,6 +2399,7 @@ mod tests {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
+        wait_until_executable(&bin);
         bin
     }
 

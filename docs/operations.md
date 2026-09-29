@@ -85,15 +85,23 @@ TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh bootstrap aws
 
 `KROPS_PROFILE` (or the positional profile argument after the lifecycle
 verb, which reaches `krops-bootstrap`) selects the environment. It loads
-every `.env` assignment with outer quote
-stripping before detecting the engine or resolving a socket for it, so a
+`.env` before detecting the engine or resolving a socket for it, so a
 `.env`-selected `CONTAINER_ENGINE` takes effect from the start (issue #257).
-An already-exported variable is left alone, so process environment wins over
-`.env` for the wrapper. Note the opposite rule for the helper tasks: mise's
-`env_file` loads `/workspace/.env` inside the container and its values
-override the process environment, so a `-e NAME=value` on a helper run
-loses to the same key in `.env` (see [Helper tasks in the
-toolbox](#helper-tasks-in-the-toolbox)). It then passes only this
+It resolves `.env` exactly as mise's `env_file` does, so
+`scripts/toolbox-run.sh` and `mise run bootstrap` hand the container the same
+values:
+
+- `.env` wins over the process environment: a `NAME=value` prefix on the
+  command line (such as `CONTAINER_ENGINE=podman` above) only applies when
+  `.env` does not set `NAME`. The helper tasks follow the same rule inside
+  the container (see [Helper tasks in the toolbox](#helper-tasks-in-the-toolbox)).
+- Line syntax: an optional `export` prefix, whitespace trimmed around keys
+  and values, `"..."` / `'...'` values taken verbatim up to the closing
+  quote, and a `#` after whitespace starting a comment in an unquoted
+  value. Lines without `=` or with an invalid key are skipped.
+
+`tests/test-toolbox-run-env-precedence.py` pins this behavior and, when mise
+is installed, checks it against mise itself. The wrapper then passes only this
 allowlist into the container:
 
 - Engine and lifecycle: `CONTAINER_ENGINE`, `ENGINE_SOCK`, `KROPS_PROFILE`,
@@ -231,6 +239,38 @@ cosign verify-attestation \
   "$IMAGE"
 ```
 
+### E2E AWS account
+
+**Designation:** Account `120392301094` was designated on 2026-09-20 ([#239](https://github.com/polarsquad/krops/issues/239)) as the single account for all krops end-to-end testing (live acceptance [#143](https://github.com/polarsquad/krops/issues/143), scheduled e2e [#185](https://github.com/polarsquad/krops/issues/185)). It is a Control Tower-managed Organizations member account.
+
+**Owner and escalation contact:** joseph.shriner@polarsquad.com
+
+**Shared sandbox warning:** This is a shared account with non-krops resources (training EKS clusters, Terraform VPCs, workshop buckets). Every krops tool filters on `default_*`, `krops-*`, and CAPA ownership tags. Do not run account-wide cleanup commands; use the [teardown](#teardown) path which scopes deletions to krops-owned resources.
+
+**Runbook index:**
+
+| What | Where |
+|---|---|
+| Spend ceiling and alert contact | [E2E account budget](#e2e-account-budget) |
+| Service quotas and first-run errors | [AWS service quotas](#aws-service-quotas-common-first-run-blockers) |
+| CI access (GitHub Actions OIDC) | [CI access in aws-iam.md](./aws-iam.md#ci-access-github-actions-oidc-and-the-krops-ci-e2e-role) |
+| Incident and credential revocation | [E2E account incident and credential revocation in aws-iam.md](./aws-iam.md#e2e-account-incident-and-credential-revocation) |
+| Cluster teardown and leftover cleanup | [Teardown](#teardown) |
+| Orphan reporting | issue [#380](https://github.com/polarsquad/krops/issues/380) |
+| Resource tagging standard | issue [#381](https://github.com/polarsquad/krops/issues/381) |
+
+**When a budget alert fires:**
+
+1. Check for live krops clusters:
+   ```sh
+   aws eks list-clusters --region eu-north-1
+   aws eks list-clusters --region eu-west-1
+   ```
+2. Use the AWS Cost Explorer console (group by service) to distinguish krops spend from other shared-account spend.
+3. If the spend is from leftover krops resources, clean them up through the [teardown](#teardown) path.
+4. If the spend is from non-krops resources, escalate to the account owner (joseph.shriner@polarsquad.com).
+5. To adjust the ceiling, update the budget in the AWS Budgets console and update the budget paragraph in `docs/operations.md` in the same PR.
+
 ### AWS service quotas (common first-run blockers)
 
 | Quota | Code | Needed | Why |
@@ -243,6 +283,10 @@ account stalls mid-run on the second `eu-north-1` cluster. Request the
 increase before the first run with
 `aws service-quotas request-service-quota-increase --service-code ec2 --quota-code <code> --desired-value <n> --region <region>`
 (for VPCs use `--service-code vpc`).
+
+Bootstrap now enforces the EIP quota at runtime during preflight checks before
+any provisioning begins. The credentials used must have `servicequotas:GetServiceQuota`
+and `ec2:DescribeAddresses` permissions.
 
 ### E2E account budget
 
@@ -282,6 +326,88 @@ The report is read-only; no resources are deleted. To clean up orphans, run:
 ```sh
 AWS_ONLY=1 mise run teardown aws
 ```
+
+### E2E resource tagging standard
+
+Every e2e AWS resource created by a bootstrap or pivot run carries four tags
+for lifecycle tracking and cost attribution (#381):
+
+| Tag key | ConfigMap key | Default | Meaning |
+|---|---|---|---|
+| `krops.io/run-id` | `KROPS_RUN_ID` | `{profile}-{timestamp}` (auto-generated) | Bootstrap/pivot invocation identifier (e.g. `gha-123` for GitHub Actions run, or `{profile}-{timestamp}` auto-generated) |
+| `krops.io/revision` | `KROPS_REVISION` | `unknown` | Git branch HEAD SHA; extracted from GitHub API during bootstrap |
+| `krops.io/expires-at` | `KROPS_EXPIRES_AT`[^expires-at-derived] | `{now + 24h}` | Resource expiry target (RFC3339 timestamp or literal `never`) |
+| `krops.io/run-kind` | `KROPS_RUN_KIND` | `manual` | Lifecycle context (`manual`, `scheduled`, `emergency`, etc.) |
+
+[^expires-at-derived]: The `krops.io/expires-at` value is derived from `KROPS_RUN_TTL` (default `24h`); use `KROPS_RUN_TTL=none` for no expiry.
+
+#### Tag application
+
+Tags are written imperatively to the `krops-run` ConfigMap in `flux-system`
+during bootstrap (before Flux instance installation). Flux then uses the
+ConfigMap values via `postBuild.substituteFrom` to apply them to:
+
+- **CAPA control planes** (`AWSManagedControlPlane` spec): VPC, subnets, NAT
+  gateways, Elastic IPs, and node groups inherit the control plane's tags
+  automatically.
+- **ACK-managed resources**: S3 Bucket, RDS DBInstance, IAM Role, and IAM User
+  CRs apply tags directly in their specs.
+
+**Not tagged:**
+- CloudFormation stacks backing CAPA (account-global, persistent); would need
+  stack-level parameters outside the current scope.
+- kind bootstrap cluster (ephemeral, purely local); lifecycle tags are
+  meaningless for a temporary local fixture.
+
+#### Rerun behavior
+
+Three paths handle reruns differently:
+
+**Rust CLI (`krops-bootstrap`)**:
+When `KROPS_RUN_ID` is set and non-empty, and the `krops-run` ConfigMap
+exists in kind's `flux-system`, all four values are reused without change
+(rerun-safe). If the ConfigMap is gone but `KROPS_RUN_ID` was set, a fresh
+ConfigMap is written with `KROPS_RUN_ID` from the environment and expires-at
+recalculated from `KROPS_RUN_TTL`. With `KROPS_RUN_ID` unset or empty, a
+fresh run-id is generated (profile + timestamp) and the ConfigMap is
+overwritten.
+
+**`bootstrap.sh`**:
+Always rewrites the `krops-run` ConfigMap from environment variables. To
+preserve the same identity across reruns, export `KROPS_RUN_ID` (and
+optionally `KROPS_RUN_TTL`) before calling bootstrap.
+
+**Pivot (`pivot.sh` and the CLI's pivot phase)**:
+Never generates tag values. Copies the four data keys from the kind cluster's
+`krops-run` ConfigMap using the `BOOTSTRAP_KUBECONTEXT` (default `kind-mgmt`);
+fails if the ConfigMap is missing.
+
+#### TTL and expiry
+
+- Default: resources tagged with a 24-hour expiry
+  (`krops.io/expires-at={now + 24h}`).
+- Override with `KROPS_RUN_TTL=<duration>`: parses durations like `2h`, `30m`,
+  `3600s`.
+- `KROPS_RUN_TTL=none` tags with `krops.io/expires-at=never` (no auto-expiry).
+
+#### Post-pivot seeding
+
+The `krops-run` ConfigMap created in the kind bootstrap cluster is seeded to
+the management cluster before Flux starts, so tags survive the pivot and
+workload reconciliation reads the same values.
+
+#### Lookup and cleanup
+
+Find resources by run-id:
+```sh
+aws resourcegroupstaggingapi get-resources --region <region> \
+  --tag-filters Key=krops.io/run-id,Values=<run-id>
+aws iam list-role-tags --role-name <name>
+aws s3api get-bucket-tagging --bucket <name>
+```
+
+Group orphaned resources by `krops.io/run-id` and flag any where
+`krops.io/expires-at` is in the past for manual teardown.
 
 ### local-talos prerequisites
 

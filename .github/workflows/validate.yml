@@ -182,7 +182,7 @@ jobs:
       - name: cert-manager version consistency (#322)
         run: python3 tests/test-cert-manager-version-consistency.py
 
-      - name: cert-manager/Kubernetes pairing is empirically validated (non-blocking, #384)
+      - name: "cert-manager/Kubernetes pairing notice (non-blocking, #384)"
         run: python3 tests/test-cert-manager-kubernetes-support.py
 
       # uv run resolves pyyaml from pyproject.toml/uv.lock, the same environment

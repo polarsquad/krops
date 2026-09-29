@@ -308,7 +308,8 @@ orphans aws` to scan:
 - RDS instances
 - VPCs with CAPA ownership tags
 - NAT gateways and Elastic IPs
-- S3 buckets matching cluster name patterns
+- S3 buckets whose names are rendered from the configured
+  `s3-bucket-pattern` (bootstrap.toml)
 
 Resources older than `ORPHAN_MIN_AGE_HOURS` (default 6 hours) are flagged as
 orphans. The `ORPHAN_REPORT_JSON` environment variable is set to capture the

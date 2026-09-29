@@ -289,9 +289,11 @@ Exit code is `0` when a report is produced (whether orphans are found or not);
 nonzero when a query failed or the profile is unsupported.
 
 The report scans EKS clusters and nodegroups, RDS instances, VPCs with CAPA
-ownership tags, NAT gateways, Elastic IPs, and S3 buckets matching cluster name
-patterns. Markdown is printed to stdout and appended to `$GITHUB_STEP_SUMMARY`
-(if set). The report is read-only: see the
+ownership tags, NAT gateways, Elastic IPs, and S3 buckets whose names are
+rendered from the configured `s3-bucket-pattern` (bootstrap.toml). Markdown
+is printed to stdout (and written to the path named by `ORPHAN_REPORT_JSON`
+when set); the `aws-orphan-report` workflow appends the stdout to
+`$GITHUB_STEP_SUMMARY` in a separate step. The report is read-only: see the
 [teardown section](./operations.md#teardown) for cleanup.
 
 IAM roles/users and CloudFormation bootstrap stacks are not scanned (usually

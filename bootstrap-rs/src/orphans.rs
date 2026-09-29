@@ -9,7 +9,7 @@
 use anyhow::{bail, Context, Result};
 use std::process::Command;
 
-use crate::teardown::AwsSweepTarget;
+use crate::teardown::{s3_bucket_name, AwsSweepTarget};
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -238,8 +238,15 @@ pub struct DiscoveryReport {
     pub scanned_at: i64,
 }
 
-/// Discover orphaned resources for all sweep targets.
-pub fn discover_with(aws: &str, targets: &[AwsSweepTarget], min_age_hours: u64) -> DiscoveryReport {
+/// Discover orphaned resources for all sweep targets. `s3_bucket_pattern` is
+/// the configured `s3-bucket-pattern` (rendered per target + account into the
+/// expected bucket name); `None` skips the S3 bucket scan.
+pub fn discover_with(
+    aws: &str,
+    targets: &[AwsSweepTarget],
+    min_age_hours: u64,
+    s3_bucket_pattern: Option<&str>,
+) -> DiscoveryReport {
     let mut report = DiscoveryReport {
         account_id: String::new(),
         findings: Vec::new(),
@@ -288,10 +295,12 @@ pub fn discover_with(aws: &str, targets: &[AwsSweepTarget], min_age_hours: u64) 
         discover_eks_nodegroups(&mut report, aws, target, scanned_at, min_age_hours);
         discover_rds_instance(&mut report, aws, target, scanned_at, min_age_hours);
         discover_vpc_resources(&mut report, aws, target, scanned_at, min_age_hours);
+        discover_eips(&mut report, aws, target);
         discover_s3_buckets(
             &mut report,
             aws,
             target,
+            s3_bucket_pattern,
             &account_id,
             scanned_at,
             min_age_hours,
@@ -660,27 +669,94 @@ fn discover_vpc_resources(
     }
 }
 
+fn discover_eips(report: &mut DiscoveryReport, aws: &str, target: &AwsSweepTarget) {
+    // Read-only query mirroring the teardown EIP sweep: describe-addresses
+    // filtered on the CAPA ownership tag. describe-addresses returns no
+    // creation time for allocations, so any matching EIP is flagged as an
+    // orphan (the teardown sweep should have released it).
+    let tag_key = target.capa_tag_key();
+    match aws_probe(
+        aws,
+        &[
+            "ec2",
+            "describe-addresses",
+            "--region",
+            &target.region,
+            "--filters",
+            &format!("Name=tag-key,Values={tag_key}"),
+            "--query",
+            "Addresses[].AllocationId",
+            "--output",
+            "text",
+        ],
+        &[],
+    ) {
+        ProbeResult::Present(output) => {
+            let allocation_ids: Vec<&str> = output
+                .split_whitespace()
+                .filter(|id| !id.is_empty())
+                .collect();
+            for allocation_id in allocation_ids {
+                report.findings.push(OrphanFinding {
+                    kind: "Elastic IP".to_string(),
+                    region: target.region.clone(),
+                    id: allocation_id.to_string(),
+                    cluster: target.cluster_name.clone(),
+                    created_at: None,
+                    is_orphan: true,
+                });
+            }
+        }
+        ProbeResult::Absent => {}
+        ProbeResult::Error(err) => {
+            report.errors.push(format!(
+                "EIP discovery for cluster {}: {err}",
+                target.cluster_name
+            ));
+        }
+    }
+}
+
+/// The expected S3 bucket name for a target, rendered from the configured
+/// `s3-bucket-pattern` (bootstrap.toml) with the account ID and cluster
+/// name substituted. `None` when the pattern is unset or the account ID is
+/// unknown (the scan is skipped then, not guessed).
+fn expected_bucket_name(
+    pattern: Option<&str>,
+    account_id: &str,
+    cluster_name: &str,
+) -> Option<String> {
+    let pattern = pattern?;
+    if account_id.is_empty() {
+        return None;
+    }
+    Some(s3_bucket_name(pattern, account_id, cluster_name))
+}
+
 fn discover_s3_buckets(
     report: &mut DiscoveryReport,
     aws: &str,
     target: &AwsSweepTarget,
+    s3_bucket_pattern: Option<&str>,
     account_id: &str,
     scanned_at: i64,
     min_age_hours: u64,
 ) {
-    if account_id.is_empty() {
-        return; // Cannot match bucket names without account ID.
-    }
-    // List all buckets and match pattern.
+    // That is exactly the name teardown's sweep unit deletes; loose
+    // cluster-name prefixes would miss it entirely (and could over-match
+    // other accounts' buckets in a multi-account scan).
+    let Some(expected) = expected_bucket_name(s3_bucket_pattern, account_id, &target.cluster_name)
+    else {
+        return;
+    };
+    // List all buckets and match the expected name exactly.
     match aws_probe(aws, &["s3api", "list-buckets", "--output", "json"], &[]) {
         ProbeResult::Present(output) => {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&output) {
                 if let Some(buckets) = json.get("Buckets").and_then(|b| b.as_array()) {
                     for bucket in buckets {
                         if let Some(name) = bucket.get("Name").and_then(|n| n.as_str()) {
-                            // Match pattern: <cluster-name>-* or krops-<cluster-name>-*
-                            let matches = name.starts_with(&format!("{}-", target.cluster_name))
-                                || name.starts_with(&format!("krops-{}-", target.cluster_name));
+                            let matches = name == expected;
                             if matches {
                                 let created_at_str =
                                     bucket.get("CreationDate").and_then(|v| v.as_str());
@@ -917,7 +993,12 @@ pub async fn run_orphans(cfg: &crate::Config, ocfg: OrphansConfig) -> Result<()>
     let targets = crate::teardown::aws_sweep_targets(&cfg.environment, &cfg.environment.teardown);
 
     // Discover orphans.
-    let report = discover_with("aws", &targets, ocfg.min_age_hours);
+    let report = discover_with(
+        "aws",
+        &targets,
+        ocfg.min_age_hours,
+        cfg.repo.teardown.s3_bucket_pattern.as_deref(),
+    );
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -972,5 +1053,64 @@ mod tests {
     fn test_iso8601_parser_invalid() {
         let ts = parse_iso8601("not-a-timestamp");
         assert!(ts.is_none());
+    }
+
+    #[test]
+    fn expected_bucket_name_renders_the_config_pattern() {
+        // The repo's s3-bucket-pattern (bootstrap.toml) renders real buckets
+        // like krops-<account>-<cluster>-data.
+        assert_eq!(
+            expected_bucket_name(
+                Some("krops-{account_id}-{cluster_name}-data"),
+                "123456789012",
+                "eu-north-1-workload"
+            ),
+            Some("krops-123456789012-eu-north-1-workload-data".to_string())
+        );
+    }
+
+    #[test]
+    fn expected_bucket_name_skips_without_pattern_or_account() {
+        assert_eq!(
+            expected_bucket_name(None, "123456789012", "eu-north-1-workload"),
+            None
+        );
+        assert_eq!(
+            expected_bucket_name(
+                Some("krops-{account_id}-{cluster_name}-data"),
+                "",
+                "eu-north-1-workload"
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn old_prefix_scan_misses_real_bucket_names() {
+        // Regression: the old prefix test ({cluster}- and krops-{cluster}-)
+        // matched neither this repo's real bucket naming nor anything the
+        // pattern renders. The exact derived name is the only match.
+        let cluster = "eu-north-1-workload";
+        let real = "krops-123456789012-eu-north-1-workload-data";
+        assert!(!real.starts_with(&format!("{cluster}-")));
+        assert!(!real.starts_with(&format!("krops-{cluster}-")));
+        assert_eq!(
+            expected_bucket_name(
+                Some("krops-{account_id}-{cluster_name}-data"),
+                "123456789012",
+                cluster
+            ),
+            Some(real.to_string())
+        );
+        // And the derived name does not over-match a different account's
+        // bucket for the same cluster.
+        assert_ne!(
+            expected_bucket_name(
+                Some("krops-{account_id}-{cluster_name}-data"),
+                "999999999999",
+                cluster
+            ),
+            Some(real.to_string())
+        );
     }
 }

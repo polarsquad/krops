@@ -3,16 +3,12 @@
 
 import argparse
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-LOCAL_EXCEPTIONS = {
-    "localhost:5001/krops-airgap:latest": (
-        "built immediately before packaging; not published to a remote registry"
-    ),
-}
 IMAGE_REF = re.compile(
     r"(?P<name>(?:[a-z0-9][a-z0-9.-]*(?::[0-9]+)?/)?(?:[a-z0-9][a-z0-9._-]*/)*"
     r"[a-z0-9][a-z0-9._-]*)"
@@ -25,7 +21,7 @@ def inventory_refs(inventory_path: Path):
     """Yield (line number, name, tag, digest) for each pinned inventory entry."""
     for number, line in enumerate(inventory_path.read_text().splitlines(), 1):
         code = line.strip()
-        if not code or code.startswith("#") or code in LOCAL_EXCEPTIONS:
+        if not code or code.startswith("#"):
             continue
         match = IMAGE_REF.fullmatch(code)
         if match is None:
@@ -41,6 +37,13 @@ def main() -> int:
         help="repository root containing airgap/images.txt (default: this repository)",
     )
     args = parser.parse_args()
+    if shutil.which("docker") is None:
+        print(
+            "Air-gap image existence check FAILED: docker not found on PATH "
+            "(needs docker with the buildx plugin)",
+            file=sys.stderr,
+        )
+        return 1
     inventory_path = Path(args.root) / "airgap" / "images.txt"
 
     refs = list(inventory_refs(inventory_path))

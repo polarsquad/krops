@@ -162,6 +162,15 @@ and the workload copies must stay byte-identical).
 
 ## Known limitations
 
+- Cloud SQL creates the built-in `postgres` user with no password; it cannot
+  log in, and `cloudsql.iam_authentication` does not remove it. No `rootPassword`
+  is committed; a SOPS-backed one is deliberately skipped because workload
+  clusters have no SOPS decryption, and wiring it would undermine the WIF
+  "no credentials at rest" posture (follow-up if needed). If an operator needs
+  superuser access: `gcloud sql users set-password postgres --instance=krops-<cluster>-db --prompt-for-password`
+  -- never put it in Git or a cluster Secret. Limit who holds
+  `cloudsql.users.update` (roles/cloudsql.admin, roles/editor) as that
+  permission can enable the user.
 - No live acceptance run has been performed yet (no project at
   implementation time); the project number is a placeholder until
   `gcp-bootstrap` runs.

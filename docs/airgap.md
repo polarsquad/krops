@@ -53,8 +53,10 @@ covers that: it queries each shape-valid pin's registry with `docker buildx
 imagetools inspect` to confirm the manifest is real and pullable, catching a
 well-formed but wrong digest. It only runs against pins that already parse as
 shape-valid (a malformed digest is never queried), and needs registry
-network access, so it runs as its own CI job rather than in `mise run
-validate`.
+network access, so it runs in its own `airgap-image-existence` workflow rather
+than in `mise run validate`. That workflow triggers only when `airgap/images.txt`,
+the script, or the workflow file changes, keeping anonymous Docker Hub pulls
+well under the rate limit.
 
 ### Image pin ownership
 
@@ -336,16 +338,26 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
    - The seeded podinfo chart version is read from
      `workload/local-host/podinfo/helm.yaml`, so the chart in the gap registry
      cannot drift from the tag the workload OCIRepository requests.
-   - Zarf deploy and Flux waits fail after 1m, so a pull failure surfaces
-     quickly; the workload cluster gets 20m to become Available. A healthy
-     deploy job takes about 10 minutes and the whole workflow about 14, so the
-     deploy job limit is 30 minutes.
+   - `zarf init` and the FluxInstance wait fail after 1m.
+   - `zarf package deploy` uses `--timeout 5m` because that single flag limits
+     both Helm `--wait` and each component's healthChecks. Zarf health checks
+     have no per-entry `maxTotalSeconds`, so cert-manager's three Deployments
+     share that deploy timeout.
+   - The workload cluster gets 20m to become Available. A healthy deploy job
+     takes about 10 minutes and the whole workflow about 14, so the deploy job
+     limit is 30 minutes.
    - When the workload cluster or its Flux does not come up, `offline-run.sh`
      writes cluster, machine, controller-log, container and event state to
      `/tmp/airgap-workload-debug.txt`, which the workflow uploads.
-   - The signature check derives the expected signer from `github.repository`
-     (`AIRGAP_VERIFY_REPO`, default `polarsquad/krops`), so a fork verifies the
-     bundle it signed itself.
+   - The signature check derives the expected signer from
+     `AIRGAP_VERIFY_WORKFLOW_REF: ${{ github.workflow_ref }}`, which GitHub
+     already populates as `owner/repo/.github/workflows/<file>@<ref>` for
+     every workflow and trigger, the same string keyless signing embeds in
+     the certificate SAN. Any workflow that reuses `offline-run.sh` verifies
+     correctly by setting that one variable, whether it's `air-gapped.yml`
+     on a schedule, a fork, or a differently-named workflow entirely
+     (`prototype-k3s-mgmt.yml`, issue #333) — no workflow name, repo, or ref
+     needs hardcoding, and none of it breaks if a workflow file is renamed.
    - Each kind/CAPD "node" is a container running a full nested systemd, and
      a job with a management cluster plus a CAPD workload cluster runs four
      of them at once. Default host inotify limits are sized for one, so

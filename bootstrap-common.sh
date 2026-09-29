@@ -64,6 +64,113 @@ require_flux_env() {
   fi
 }
 
+# ── Preflight: AWS service quotas ─────────────────────────────────────────────
+# Checks that the EC2-VPC Elastic IP quota is sufficient in every region the
+# default AWS run touches before provisioning begins. Requires aws CLI in PATH.
+preflight_aws_quotas() {
+  command -v aws >/dev/null 2>&1 \
+    || { echo "ERROR: aws CLI not found in PATH (required for EIP quota preflight)" >&2; exit 1; }
+
+  # KEEP IN SYNC with bootstrap.toml [environments.aws]:
+  #   - mgmt-cluster = "eu-north-1-management"  (region = name minus "-management")
+  #   - every [[environments.aws.teardown.aws-workloads]] region / cluster-name pair
+  # and with docs/operations.md.
+  # Any additive change to bootstrap.toml -- a new region OR a new workload cluster
+  # in an existing region -- changes the required count and requires updating this list.
+  # The Rust binary (bootstrap-rs) derives this list dynamically from bootstrap.toml
+  # via derive_eip_requirements(); this shell list is hardcoded, so a new region or
+  # a new workload cluster in an existing region added to bootstrap.toml will be
+  # silently skipped here until this list is updated.
+  # eu-north-1: management + workload cluster = 6 EIPs (3 AZs x 2 clusters)
+  # eu-west-1:  workload cluster              = 3 EIPs (3 AZs x 1 cluster)
+  local REGION_PLAN="eu-north-1:6:eu-north-1-workload,eu-north-1-management eu-west-1:3:eu-west-1-workload"
+  local all_ok=1
+  local entry
+
+  for entry in $REGION_PLAN; do
+    local region="${entry%%:*}"
+    local rest="${entry#*:}"
+    local required="${rest%%:*}"
+    local clusters="${rest#*:}"
+
+    local limit_raw limit allocated owned count cluster foreign available shortfall
+    if ! limit_raw=$(aws service-quotas get-service-quota \
+      --service-code ec2 \
+      --quota-code L-0263D0A3 \
+      --region "$region" \
+      --query 'Quota.Value' \
+      --output text); then
+      echo "ERROR: Failed to query EC2 EIP quota in ${region}" >&2
+      echo "       Check AWS credentials and service-quotas:GetServiceQuota permission" >&2
+      exit 1
+    fi
+    # Validate that the quota value is numeric before rounding
+    case "${limit_raw:-}" in
+      ''|*[!0-9.]*)
+        echo "ERROR: Unexpected non-numeric quota value '${limit_raw}' from EC2 in ${region}" >&2
+        exit 1 ;;
+    esac
+    # Quota values come back as floats (e.g. "5.0"); round to an integer.
+    limit=$(printf '%.0f' "${limit_raw:-0}" 2>/dev/null) || limit=0
+
+    if ! allocated=$(aws ec2 describe-addresses \
+      --region "$region" \
+      --filters "Name=domain,Values=vpc" \
+      --query 'length(Addresses)' \
+      --output text); then
+      echo "ERROR: Failed to list EC2 EIPs in ${region}" >&2
+      echo "       Check AWS credentials and ec2:DescribeAddresses permission" >&2
+      exit 1
+    fi
+    # Validate that the allocation count is numeric before rounding
+    case "${allocated:-}" in
+      ''|*[!0-9.]*)
+        echo "ERROR: Unexpected non-numeric EIP allocation count '${allocated}' from EC2 in ${region}" >&2
+        exit 1 ;;
+    esac
+    # length() returns an integer; printf is defensive against unexpected decimal output.
+    allocated=$(printf '%.0f' "${allocated:-0}" 2>/dev/null) || allocated=0
+
+    owned=0
+    for cluster in ${clusters//,/ }; do
+      if ! count=$(aws ec2 describe-addresses \
+        --region "$region" \
+        --filters "Name=tag:sigs.k8s.io/cluster-api-provider-aws/cluster/${cluster},Values=owned" \
+        --query 'length(Addresses)' \
+        --output text); then
+        echo "ERROR: Failed to list EC2 EIPs owned by ${cluster} in ${region}" >&2
+        echo "       Check AWS credentials and ec2:DescribeAddresses permission" >&2
+        exit 1
+      fi
+      # Validate that the owned count is numeric before rounding
+      case "${count:-}" in
+        ''|*[!0-9.]*)
+          echo "ERROR: Unexpected non-numeric EIP owned count '${count}' for ${cluster} in ${region}" >&2
+          exit 1 ;;
+      esac
+      count=$(printf '%.0f' "${count:-0}" 2>/dev/null) || count=0
+      owned=$(( owned + count ))
+    done
+
+    foreign=$(( allocated > owned ? allocated - owned : 0 ))
+    available=$(( limit > foreign ? limit - foreign : 0 ))
+
+    if [ "$available" -lt "$required" ]; then
+      shortfall=$(( required - available ))
+      echo "ERROR: Insufficient EC2 Elastic IP quota in ${region}: ${available} available to krops, ${required} needed (${shortfall} short; limit ${limit}, ${allocated} allocated, ${owned} owned by krops)" >&2
+      echo "       Request an increase:" >&2
+      printf "         aws service-quotas request-service-quota-increase \\\\\n" >&2
+      printf "           --service-code ec2 --quota-code L-0263D0A3 \\\\\n" >&2
+      printf "           --desired-value %d --region %s\n" "$(( foreign + required ))" "$region" >&2
+      all_ok=0
+    else
+      echo ">>> EIP quota in ${region}: ${available} available to krops (need ${required}, ${owned} already owned) - OK"
+    fi
+  done
+
+  [ "$all_ok" -eq 1 ] || exit 1
+}
+
 # ── Preflight: container engine ───────────────────────────────────────────────
 # Detects and selects a running container engine. Sets: CONTAINER_ENGINE,
 # ENGINE_SOCK (and exports KIND_EXPERIMENTAL_PROVIDER for podman).

@@ -28,6 +28,15 @@ Renovate discovers and updates versions in:
   pin, its `pivot.sh`/HelmRelease counterparts, its `airgap/zarf.yaml` chart
   pin, and its four `airgap/images.txt`/`airgap/zarf.yaml` image tags all
   share the `platform-charts` group so they can't drift apart (issue #322).
+  The Helm index publishes cert-manager versions as `v1.21.x`. The pins in
+  `bootstrap.toml`, `pivot.sh`, and the HelmReleases are spelled without the
+  leading `v`; `airgap/zarf.yaml` keeps the `v` as a literal in its
+  annotation-driven line (the custom manager regex consumes it and the
+  `autoReplaceStringTemplate` adds it back). The packageRule that resolves
+  `charts.jetstack.io` carries `extractVersion` to strip the `v` from the
+  datasource before Renovate matches and writes back versions; without it,
+  bare pins would receive a spurious leading `v`, and the zarf chart pin
+  would become `vv1.21.x`.
 - `bootstrap-rs/Dockerfile`: digest-pinned build and runtime base images, and
   the mise CLI and Podman remote-client build arguments used by the toolbox.
   The `mise install` layer names tools without versions (`python`, `uv`,
@@ -61,7 +70,13 @@ chart pins with their declarative counterparts, and every pin whose value is a
 literal Kubernetes release version together. Renovate proposes one PR at the
 newest available version for each dependency, rather than parallel major and
 non-major update PRs. Base images in `bootstrap-rs/Dockerfile` and air-gap
-images are digest-pinned while retaining readable tags. Nothing automerges.
+images are digest-pinned while retaining readable tags. Nothing automerges
+except patch and minor bumps of the `renovate` CLI pin in
+`.github/workflows/validate.yml`: that pin only selects the CLI the CI Renovate
+tests run, and the `renovate-digest-pinning` job exercises the new version
+before the merge. A `minimumReleaseAge` of 3 days (npm's unpublish window)
+keeps a freshly published, possibly compromised release from landing on
+`main` unreviewed.
 
 The `kubernetes-version` group (#142) covers `kindest/node` (docker datasource:
 the local-host node image and both Cluster `topology.version` pins),
@@ -221,10 +236,11 @@ verify the pairing during review.
   `appVersion` values, `bootstrap-rs/Cargo.toml`'s package version, and the
   Zarf package `metadata.version` are not dependency pins.
 - The Zarf CLI pin in `mise.toml` keeps `version` unprefixed and adds `v`
-  literally in `asset_pattern` (issue #324): mise's `{{ version }}` template
-  variable has stripped a leading `v` inconsistently across mise releases, so
-  an unprefixed pin sidesteps that. `asset_pattern` also remaps `arch()` to
+  literally in `asset_pattern` (issue #324), so the rendered asset name does
+  not depend on how mise normalizes a `v`-prefixed version. `asset_pattern` also remaps `arch()` to
   `amd64`/`arm64`, since Zarf's release assets don't use mise's default
   `x64`/`arm64` naming. `tests/test-mise-zarf-pin.py` installs the pinned
   release via mise and checks the reported version, since a template mismatch
-  otherwise fails silently until the pin is exercised.
+  otherwise fails silently until the pin is exercised. The Renovate rule for
+  this pin anchors on the `[tools."github:zarf-dev/zarf"]` header; an
+  unanchored `version = "..."` pattern also matches inside `min_version`.

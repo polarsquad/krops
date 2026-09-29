@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: airgap-image-existence
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "airgap/images.txt"
+      - "airgap/tests/test-airgap-image-existence.py"
+      - ".github/workflows/airgap-image-existence.yml"
+  pull_request:
+    paths:
+      - "airgap/images.txt"
+      - "airgap/tests/test-airgap-image-existence.py"
+      - ".github/workflows/airgap-image-existence.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  airgap-image-existence:
+    name: Air-gap image existence
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Verify every pinned digest is pullable
+        run: python3 airgap/tests/test-airgap-image-existence.py

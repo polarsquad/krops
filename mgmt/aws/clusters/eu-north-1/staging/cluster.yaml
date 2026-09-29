@@ -47,6 +47,11 @@ spec:
     - name: kube-proxy
       version: v1.34.6-eksbuild.2
       conflictResolution: overwrite
+  additionalTags:
+    krops.io/run-id: "${KROPS_RUN_ID:=manual}"
+    krops.io/revision: "${KROPS_REVISION:=unknown}"
+    krops.io/expires-at: "${KROPS_EXPIRES_AT:=never}"
+    krops.io/run-kind: "${KROPS_RUN_KIND:=manual}"
 
 ---
 # ══════════════════════════════════════════════════════════════════════════════

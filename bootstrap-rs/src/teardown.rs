@@ -1207,8 +1207,10 @@ pub async fn cleanup_cfn_stack(stack: &str, region: &str) {
 }
 
 /// 4d. VPC resources, gated on the CAPA ownership tag (krops scope
-/// only): NAT gateways + their EIPs, subnets, IGWs, route tables,
-/// security groups (rules first, then the groups), the VPC itself.
+/// only): NAT gateways, subnets, IGWs, route tables, security groups
+/// (rules first, then the groups), the VPC itself. The CAPA-tagged EIPs
+/// are released at target level by `release_cluster_eips`, after the
+/// VPCs (#493).
 pub async fn cleanup_vpc_resources(target: &AwsSweepTarget) {
     let tag = target.capa_tag_key();
     let vpcs = capture_lossy(
@@ -1232,11 +1234,11 @@ pub async fn cleanup_vpc_resources(target: &AwsSweepTarget) {
             ">>>   Cleaning up VPC {vpc} in {} (cluster: {})",
             target.region, target.cluster_name
         );
-        cleanup_vpc(vpc, &target.region, &tag).await;
+        cleanup_vpc(vpc, &target.region).await;
     }
 }
 
-async fn cleanup_vpc(vpc: &str, region: &str, tag: &str) {
+async fn cleanup_vpc(vpc: &str, region: &str) {
     // NAT gateways (before subnets), including the deleting state.
     let nats = capture_lossy(
         "aws",
@@ -1282,38 +1284,6 @@ async fn cleanup_vpc(vpc: &str, region: &str, tag: &str) {
                 region,
                 "--nat-gateway-ids",
                 nat,
-            ],
-        )
-        .await;
-    }
-    // Elastic IPs (tagged, NAT-allocated ones are not released with it).
-    let eips = capture_lossy(
-        "aws",
-        &[
-            "ec2",
-            "describe-addresses",
-            "--region",
-            region,
-            "--filters",
-            &format!("Name=tag:{tag},Values=owned"),
-            "--query",
-            "Addresses[].AllocationId",
-            "--output",
-            "text",
-        ],
-    )
-    .await;
-    for eip in eips.split_whitespace() {
-        println!(">>>     Releasing Elastic IP: {eip}");
-        let _ = run_quiet(
-            "aws",
-            &[
-                "ec2",
-                "release-address",
-                "--region",
-                region,
-                "--allocation-id",
-                eip,
             ],
         )
         .await;
@@ -1558,6 +1528,62 @@ async fn cleanup_vpc(vpc: &str, region: &str, tag: &str) {
     .await
     {
         warn(&format!("Failed to delete VPC {vpc}"));
+    }
+}
+
+/// 4d (target level). CAPA-tagged Elastic IPs, once per sweep target,
+/// after the VPCs: the addresses are NAT-allocated and not released with
+/// the gateway, and releasing an unassociated VPC-domain address is valid
+/// regardless of VPC state, so a target whose CAPA-tagged VPC no longer
+/// exists still loses its orphaned addresses (#493). Scoped to the CAPA
+/// cluster ownership tag; absent/already-released allocations are silent
+/// skips.
+pub async fn release_cluster_eips(target: &AwsSweepTarget) {
+    release_cluster_eips_with("aws", target).await;
+}
+
+/// The sweep unit behind `release_cluster_eips`; the `aws` argument is a
+/// test seam (the `*_with` pattern), so the EIP step can be driven against
+/// a stub without touching the process environment.
+async fn release_cluster_eips_with(aws: &str, target: &AwsSweepTarget) {
+    let tag = target.capa_tag_key();
+    let eips = capture_lossy(
+        aws,
+        &[
+            "ec2",
+            "describe-addresses",
+            "--region",
+            &target.region,
+            "--filters",
+            &format!("Name=tag:{tag},Values=owned"),
+            "--query",
+            "Addresses[].AllocationId",
+            "--output",
+            "text",
+        ],
+    )
+    .await;
+    if eips.trim().is_empty() {
+        println!(">>>     No CAPA-tagged Elastic IPs found");
+        return;
+    }
+    for eip in eips.split_whitespace() {
+        println!(">>>     Releasing Elastic IP: {eip}");
+        if !run_quiet(
+            aws,
+            &[
+                "ec2",
+                "release-address",
+                "--region",
+                &target.region,
+                "--allocation-id",
+                eip,
+            ],
+        )
+        .await
+        {
+            warn(&format!("Failed to release Elastic IP {eip}"));
+        }
     }
 }
 
@@ -2201,9 +2227,13 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
         for target in &targets {
             cleanup_rds_instance(target).await;
         }
-        // 4d: VPC resources (CAPA-tagged).
+        // 4d: VPC resources (CAPA-tagged), then their EIPs at target level
+        // (#493: the addresses outlive the VPC when the build dies mid-run).
         for target in &targets {
             cleanup_vpc_resources(target).await;
+        }
+        for target in &targets {
+            release_cluster_eips(target).await;
         }
         // 4e: S3 buckets.
         let account = capture_lossy(
@@ -2803,6 +2833,123 @@ mod tests {
         assert_eq!(
             t.bucket_name("krops-{account_id}-{cluster_name}-data", "acct"),
             "krops-acct-eu-north-1-management-data"
+        );
+    }
+
+    /// Write an executable `aws` stub into `dir` with `body` (run before the
+    /// record line; the record line is always appended). Returns the binary's
+    /// path so a test can pass it through the sweep's `*_with` seam.
+    fn install_aws_stub(
+        dir: &std::path::Path,
+        log: &std::path::Path,
+        body: &str,
+    ) -> std::path::PathBuf {
+        let bin = dir.join("aws");
+        // Named parts keep the format string free of literal braces: the probe
+        // guard's ${...} is a runtime value, not format syntax. /bin/sh is an
+        // absolute interpreter, so the stub runs regardless of PATH (tests
+        // invoke it by path, never through PATH).
+        let shebang = "#!/bin/sh";
+        let guard = "[ -n \"${STUB_PROBE:-}\" ] && exit 0";
+        let script = format!(
+            "{shebang}\n{guard}\n{body}\necho \"$@\" >> {log}\nexit 0\n",
+            body = body,
+            log = log.display(),
+        );
+        std::fs::write(&bin, script).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        wait_until_executable(&bin);
+        bin
+    }
+
+    #[tokio::test]
+    async fn eips_release_at_target_level_when_no_capa_vpc_exists() {
+        let tmp = tempfile::tempdir().unwrap();
+        let log = tmp.path().join("aws.log");
+        let releases = tmp.path().join("releases.txt");
+        // describe-addresses lists two CAPA-tagged addresses; every
+        // release-address call is recorded.
+        let body = format!(
+            "case \"$*\" in\n\
+             *describe-addresses*) echo eip-aaa eip-bbb ;;\n\
+             *release-address*)\n\
+             case \"$*\" in\n\
+             *eip-aaa*) echo eip-aaa >> {releases} ;;\n\
+             *eip-bbb*) echo eip-bbb >> {releases} ;;\n\
+             esac ;;\n\
+             esac\n",
+            releases = releases.display(),
+        );
+        let bin = install_aws_stub(tmp.path(), &log, &body);
+        let target = AwsSweepTarget::mgmt(
+            "eu-north-1",
+            "eu-north-1-management",
+            "default_eu-north-1-management-control-plane",
+        );
+        // The sweep runs this step after the VPC step and without
+        // consulting any VPC: it must release the addresses even for a
+        // target whose CAPA-tagged VPC is already gone (#493).
+        release_cluster_eips_with(bin.to_str().unwrap(), &target).await;
+
+        let recorded = std::fs::read_to_string(&log).unwrap();
+        assert!(
+            recorded.contains("describe-addresses"),
+            "the target-level step must query the addresses on its own, \
+             got: {recorded}"
+        );
+        assert!(
+            recorded.contains(&capa_tag_key("eu-north-1-management")),
+            "the query must stay scoped to the target's CAPA tag, got: {recorded}"
+        );
+        let released = std::fs::read_to_string(&releases).unwrap();
+        assert!(
+            released.lines().any(|l| l.contains("eip-aaa")),
+            "eip-aaa must be released, got: {released}"
+        );
+        assert!(
+            released.lines().any(|l| l.contains("eip-bbb")),
+            "eip-bbb must be released, got: {released}"
+        );
+    }
+
+    #[tokio::test]
+    async fn absent_eips_are_a_silent_noop() {
+        let tmp = tempfile::tempdir().unwrap();
+        let log = tmp.path().join("aws.log");
+        let releases = tmp.path().join("releases.txt");
+        // No case arm: describe-addresses prints nothing (the
+        // already-released/absent case).
+        let bin = install_aws_stub(tmp.path(), &log, "");
+        let target = AwsSweepTarget {
+            region: "eu-north-1".into(),
+            cluster_name: "eu-north-1-staging".into(),
+            eks_cluster_name: "default_eu-north-1-staging-control-plane".into(),
+            rds_instance: "krops-eu-north-1-staging-db".into(),
+        };
+        release_cluster_eips_with(bin.to_str().unwrap(), &target).await;
+
+        let recorded = std::fs::read_to_string(&log).unwrap();
+        assert!(
+            recorded.contains("describe-addresses"),
+            "the target-level step must run its probe even when the \
+             addresses are gone, got: {recorded}"
+        );
+        assert!(
+            recorded.contains(&capa_tag_key("eu-north-1-staging")),
+            "the query must stay scoped to the target's CAPA tag, got: {recorded}"
+        );
+        assert_eq!(
+            recorded.lines().count(),
+            1,
+            "exactly one address probe: no retry, no release, got: {recorded}"
+        );
+        assert!(
+            !releases.exists(),
+            "an absent allocation must be a silent skip, never a release call"
         );
     }
 }

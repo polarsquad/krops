@@ -406,15 +406,17 @@ _cleanup_vpc_resources() {
     info "  Cleaning up VPC $_vpc_id in $_region (cluster: $_cluster)"
 
     # Deletion order inside VPC:
-    #   1. NAT gateways (must go before subnets), then release their EIPs
+    #   1. NAT gateways (must go before subnets)
     #   2. Subnets (non-default)
     #   3. Internet gateways (detach then delete)
     #   4. Route tables (non-main)
     #   5. Security groups (non-default)
     #   6. VPC
+    # CAPA-tagged EIPs are released at target level after all VPCs are
+    # processed (step 4d in step_aws_cleanup): the NATs are gone by then,
+    # and the addresses still go when no VPC exists at all (#493).
 
     _delete_nat_gateways "$_region" "$_vpc_id"
-    _release_cluster_eips "$_region" "$_cluster_tag_key"
     _delete_subnets "$_region" "$_vpc_id"
     _delete_internet_gateways "$_region" "$_vpc_id"
     _delete_route_tables "$_region" "$_vpc_id"
@@ -454,16 +456,26 @@ _delete_nat_gateways() {
   done
 }
 
+# ── 4d (target level): CAPA-tagged Elastic IPs ───────────────────────────────
 # Elastic IPs allocated by CAPA for the NAT gateways are not deleted with the
 # gateway – they must be released explicitly or they linger (and cost money).
-# Scoped to addresses carrying the CAPA cluster ownership tag.
+# Scoped to addresses carrying the CAPA cluster ownership tag. Runs at the
+# sweep-target level, after all CAPA-tagged VPCs have been cleaned, instead of
+# inside the VPC loop (#493): releasing an unassociated VPC-domain address is
+# valid regardless of VPC state, so a target whose VPC no longer exists still
+# loses its orphaned addresses.
 _release_cluster_eips() {
   _eip_region="$1"; _eip_tag_key="$2"
 
-  for _alloc_id in $(aws ec2 describe-addresses \
+  _allocs=$(aws ec2 describe-addresses \
       --filter "Name=tag:${_eip_tag_key},Values=owned" \
       --query 'Addresses[].AllocationId' --output text \
-      --region "$_eip_region" 2>/dev/null || true); do
+      --region "$_eip_region" 2>/dev/null || true)
+  if [ -z "$_allocs" ]; then
+    info "    No CAPA-tagged Elastic IPs found"
+    return
+  fi
+  for _alloc_id in $_allocs; do
     info "    Releasing Elastic IP: $_alloc_id"
     aws ec2 release-address --allocation-id "$_alloc_id" --region "$_eip_region" \
       2>/dev/null || warn "    Failed to release Elastic IP $_alloc_id"
@@ -778,8 +790,12 @@ fi
 #                                   control plane ENIs block VPC cleanup
 #   4c. RDS instances              – ACK-created DBInstances (orphaned when the
 #                                   workload cluster dies before the CR prunes)
-#   4d. VPC resources              – subnets, IGW, NAT+EIPs, route tables, SGs,
-#                                   VPC – scoped to CAPA-tagged VPCs only
+#   4d. VPC resources              - subnets, IGW, NAT gateways, route tables,
+#                                   SGs, VPC - scoped to CAPA-tagged VPCs only
+#   4d (target level)              - CAPA-tagged Elastic IPs, once per target,
+#                                   after the VPCs: they are NAT-allocated and
+#                                   not released with the gateway, and they
+#                                   must go even when no VPC exists (#493)
 #   4e. S3 buckets                 – ACK-created versioned data buckets
 #   4f. IAM roles + users          – CAPA per-cluster roles (prefix sweep)
 #                                   + ACK-created krops-*-reader roles
@@ -818,6 +834,12 @@ step_aws_cleanup() {
   # ── 4d: VPC resources (CAPA-tagged only – krops scope) ───────────────────
   for _region in $REGIONS; do
     _cleanup_vpc_resources "$_region" "$(_get_cluster_name "$_region")"
+  done
+  # CAPA-tagged EIPs at target level, after the VPCs: the NAT gateways are
+  # deleted by then, and the addresses still go when no CAPA-tagged VPC exists
+  # at all (#493).
+  for _region in $REGIONS; do
+    _release_cluster_eips "$_region" "$(_get_capa_tag_key "$_region")"
   done
 
   # ── 4e: S3 buckets (krops-${ACCOUNT_ID}-${CLUSTER_NAME}-data) ────────────

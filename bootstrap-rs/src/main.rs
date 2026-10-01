@@ -2627,8 +2627,9 @@ async fn pivot_delete_bootstrap_cluster(
     }
 
     println!(">>> Deleting the kind bootstrap cluster...");
-    // The toolbox must leave the kind network first: kind removes the
-    // network with the last node, and an attached toolbox would keep it alive.
+    // The toolbox must leave the kind network first: kind 0.33.0's delete
+    // removes the node containers but not the Docker network, so the leave
+    // is detach hygiene so the toolbox is not attached when the nodes go away.
     engine::toolbox_leave_kind_network(cfg, engine).await;
     run(
         "kind",

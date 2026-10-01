@@ -166,8 +166,9 @@ pub(crate) async fn toolbox_join_kind_network(cfg: &Config, engine: &str) -> Res
     join_network(engine, "kind", &id).await
 }
 
-/// Best-effort detach before `kind delete cluster`: kind removes the
-/// network after the last node, and an attached toolbox would keep it alive.
+/// Best-effort detach before `kind delete cluster`. kind 0.33.0's delete
+/// removes the node containers but not the Docker network, so the leave is
+/// detach hygiene: the toolbox must not be attached when the nodes go away.
 /// A no-op outside the toolbox.
 pub(crate) async fn toolbox_leave_kind_network(cfg: &Config, engine: &str) {
     if !cfg.toolbox {

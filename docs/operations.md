@@ -822,8 +822,14 @@ CAPI controllers are running:
 
 - the `mgmt` kind cluster before pivot
 - the exported self-managed management kubeconfig after pivot
-- no reachable Kubernetes controller host, which falls back to AWS orphan
-  cleanup for the AWS environment
+- no reachable Kubernetes controller host, in which case the AWS environment
+  falls back to the AWS orphan sweep. In the toolbox, discovery first attaches
+  the container to the kind network so the pre-pivot kind endpoint
+  (`mgmt-control-plane:6443`) resolves; a host run already reaches it. When the
+  host is genuinely unreachable and the run was not `AWS_ONLY=1`, the run
+  finishes the sweep but then reports failure (nonzero exit) so automation does
+  not read a skipped k8s side as success. `AWS_ONLY=1` is the explicit exit-0
+  recovery path.
 
 The main controls keep the shell interface:
 

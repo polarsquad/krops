@@ -250,9 +250,14 @@ Teardown checks required tools before mutation:
 | `AWS_ONLY=1` | AWS CLI only |
 
 Teardown discovers where the CAPI controllers run: the pre-pivot kind cluster,
-the post-pivot self-managed management cluster, or no reachable cluster. It
-then preserves the shell implementation's reverse-order and best-effort
-cleanup semantics.
+the post-pivot self-managed management cluster, or no reachable cluster. In
+the toolbox, the `aws` path first joins the kind network so the pre-pivot kind
+endpoint resolves before discovery. When no cluster is reachable and the run
+was not `AWS_ONLY=1`, teardown still runs the AWS orphan sweep (the recovery
+for a host that is already gone) but exits non-zero so automation does not
+read the skipped Kubernetes side as success; `AWS_ONLY=1` is the explicit
+exit-0 recovery. It then preserves the shell implementation's reverse-order
+and best-effort cleanup semantics.
 
 Teardown binds every kubectl call to that discovered target (an explicit
 kind context or the management kubeconfig; never the operator's current

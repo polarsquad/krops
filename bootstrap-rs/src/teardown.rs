@@ -1952,9 +1952,10 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
                 ">>> Deleting kind management cluster '{}'...",
                 cfg.repo.bootstrap.kind_cluster
             );
-            // Toolbox runs must leave the kind network first: kind removes
-            // the network with the last node, and an attached toolbox
-            // container would keep it alive.
+            // Toolbox runs must leave the kind network first: kind 0.33.0's
+            // delete removes the node containers but not the Docker network,
+            // so the leave is detach hygiene so the toolbox container is not
+            // attached when the nodes go away.
             if cfg.toolbox {
                 if let Some(engine) = engine.as_deref() {
                     toolbox_leave_kind_network(cfg, engine).await;
@@ -2118,14 +2119,26 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
     }
 
     // ── aws path ──────────────────────────────────────────────────────
+    // Toolbox runs must be on the kind network before host discovery: the
+    // pre-pivot kind endpoint in the bootstrap kubeconfig
+    // (mgmt-control-plane:6443) only resolves once the toolbox container is
+    // attached to the kind network. The bootstrap aws path
+    // (main.rs ensure_kind_cluster) and the local-host teardown path join the
+    // same way; the aws teardown path was the odd one out (#494).
     let host = if tcfg.aws_only {
+        // AWS-only recovery: no k8s steps and no host discovery, so no kind
+        // network join either.
         ControllerHost::Unreachable
     } else {
+        ensure_kind_network_for_discovery(cfg).await;
         discover_controller_host(cfg).await
     };
     if !tcfg.aws_only && host == ControllerHost::Unreachable {
         eprintln!("!   Cannot reach the management cluster. It may already be gone.");
-        eprintln!("!   Running AWS orphan cleanup only. To skip this warning, set AWS_ONLY=1.");
+        eprintln!("!   The Kubernetes-side teardown (Flux, CAPI, Helm, controller host)");
+        eprintln!("!   cannot run without it. If the host is intentionally gone, re-run with");
+        eprintln!("!   AWS_ONLY=1 to make the AWS-only recovery explicit (that path exits 0);");
+        eprintln!("!   otherwise this run will be reported as a failure.");
         println!();
     }
 
@@ -2282,6 +2295,18 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
                 ControllerHost::Kind => {
                     let name = cfg.repo.bootstrap.kind_cluster.clone();
                     println!(">>> Deleting kind management cluster '{name}'...");
+                    // Mirror the sibling delete sites (local-host teardown,
+                    // pivot, bootstrap --recreate): a toolbox run leaves the
+                    // kind network before the delete. kind 0.33.0's delete
+                    // removes the node containers but not the Docker network,
+                    // so the leave is detach hygiene so the toolbox container
+                    // is not attached when the nodes go away. Best-effort: a
+                    // failed leave must not block the delete.
+                    if cfg.toolbox {
+                        if let Some(engine) = detect_engine(cfg).await {
+                            toolbox_leave_kind_network(cfg, &engine).await;
+                        }
+                    }
                     if run("kind", &["delete", "cluster", "--name", &name])
                         .await
                         .is_ok()
@@ -2303,9 +2328,96 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
         }
     }
 
+    // The k8s side was skipped: the controller host was unreachable and the
+    // operator did not opt into the explicit AWS-only recovery (AWS_ONLY=1).
+    // The AWS sweep above still ran (that is the recovery), but the controller
+    // host was left in place and the Kubernetes-side teardown never happened.
+    // Report failure (nonzero) so automation does not read a teardown that
+    // skipped its k8s side as a success. Placed after the sweep, not before
+    // it, because the Unreachable case's documented intent is "everything goes
+    // via the AWS orphan sweep" and there is no live controller to make a
+    // concurrent sweep unsafe (unlike the mid-deprovision abort above).
+    finish_after_skipped_k8s(tcfg, &host)?;
+
     println!();
     println!("✓ Teardown complete.");
     Ok(())
+}
+
+/// Final exit decision for the aws teardown path (#494). A full `aws`
+/// teardown whose k8s side had to be skipped because the controller host was
+/// unreachable must not report success: bail nonzero so automation sees the
+/// incomplete teardown. `AWS_ONLY=1` is the explicit operator opt-in to an
+/// AWS-only recovery and exits 0 (the documented recovery path); in that mode
+/// the host is never discovered, so this check is a no-op.
+fn finish_after_skipped_k8s(tcfg: &TeardownConfig, host: &ControllerHost) -> Result<()> {
+    if !tcfg.aws_only && *host == ControllerHost::Unreachable {
+        bail!(
+            "teardown incomplete: the controller host was unreachable, so the \
+             Kubernetes-side teardown (Flux, CAPI, Helm, controller host removal) \
+             was skipped and only the AWS orphan sweep ran; the controller host \
+             was left in place. If the host is intentionally gone, re-run with \
+             AWS_ONLY=1 (the documented AWS-only recovery, which exits 0); \
+             otherwise restore access to the management cluster and re-run."
+        );
+    }
+    Ok(())
+}
+
+/// The container engine to use for the pre-discovery kind-network join, or
+/// `None` when no join should be attempted. Mirrors the gating the bootstrap
+/// aws path and the local-host teardown path apply: only a toolbox run (where
+/// the default network cannot resolve the kind endpoint) joins, and only when
+/// a container engine is actually available. `engine` is the result of
+/// `detect_engine` (`None` when no engine is running). The join itself is
+/// best-effort at the call site, never fatal.
+fn should_join_kind_network(cfg: &Config, engine: Option<&str>) -> Option<String> {
+    if cfg.toolbox {
+        engine.map(String::from)
+    } else {
+        None
+    }
+}
+
+/// Join the kind network so `discover_controller_host` can reach the
+/// pre-pivot kind endpoint (`mgmt-control-plane:6443`), mirroring the
+/// bootstrap aws path (`main.rs` `ensure_kind_cluster`) and the local-host
+/// teardown path. The aws teardown path never joined (#494), so a
+/// pre-pivot kind host was always discovered `Unreachable` from the toolbox
+/// and the whole k8s side was silently skipped.
+///
+/// Best-effort, never fatal: a re-run against an already gone cluster must
+/// not abort here and must still be able to run the AWS orphan sweep (the
+/// documented AWS-only recovery). A join failure simply leaves discovery to
+/// report `Unreachable`, which the caller turns into the loud (non-`AWS_ONLY`)
+/// outcome. kind 0.33.0's `delete cluster` removes the node containers but
+/// not the Docker network, so the mirrored Step 9 leave is detach hygiene,
+/// not network cleanup.
+pub(crate) async fn ensure_kind_network_for_discovery(cfg: &Config) {
+    // A host run already resolves the kind endpoint from its default network,
+    // so only a toolbox run needs the join (mirrors the bootstrap aws path and
+    // the local-host teardown path, both of which gate on `cfg.toolbox`).
+    // Short-circuit before probing for an engine so host runs spawn nothing.
+    if !cfg.toolbox {
+        return;
+    }
+    let Some(engine) = detect_engine(cfg).await else {
+        eprintln!(
+            "!   No running container engine; cannot join the kind network; \
+             host discovery may report the management cluster unreachable."
+        );
+        return;
+    };
+    // Route the live join through the pure predicate (also unit-tested) so the
+    // gated decision and the tested decision can never drift apart.
+    let Some(engine) = should_join_kind_network(cfg, Some(&engine)) else {
+        return;
+    };
+    if let Err(err) = toolbox_join_kind_network(cfg, &engine).await {
+        warn(&format!(
+            "could not join the kind network for host discovery ({err}); continuing without it"
+        ));
+    }
 }
 
 /// Detect the container engine, preferring `cfg.container_engine`. None
@@ -2803,6 +2915,116 @@ mod tests {
         assert_eq!(
             t.bucket_name("krops-{account_id}-{cluster_name}-data", "acct"),
             "krops-acct-eu-north-1-management-data"
+        );
+    }
+
+    /// A minimal `Config` for the aws path, built from the repository's
+    /// `bootstrap.toml` (which parses and validates as shipped). Only the
+    /// fields the tested decisions read are set; the rest are inert defaults.
+    fn aws_cfg(toolbox: bool) -> Config {
+        let repo = crate::config::BootstrapConfig::load_from(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../bootstrap.toml"),
+        )
+        .unwrap();
+        let name = "aws".to_string();
+        let environment = repo.environment(&name).unwrap().clone();
+        Config {
+            repo,
+            profile: name,
+            environment,
+            recreate: false,
+            registry_port: 5000,
+            registry_ready_retries: 3,
+            local_reconcile_timeout: "30m".into(),
+            container_engine: None,
+            engine_sock: None,
+            toolbox,
+            git_repo_url: None,
+            github_token: None,
+            github_user: "krops".into(),
+            age_key_file: std::path::PathBuf::from("/nonexistent/age.key"),
+            age_public_key: None,
+            oci_repository: "krops".into(),
+            oci_tag: "latest".into(),
+            bootstrap_pivot: false,
+            pivot_skip_delete: false,
+            mgmt_kubeconfig: std::path::PathBuf::from("/nonexistent/krops-mgmt.yaml"),
+            mgmt_ready_timeout: String::new(),
+            mgmt_poll_interval: 30,
+            bootstrap_kubecontext: String::new(),
+        }
+    }
+
+    /// #494, part 1: the aws teardown path must join the kind network
+    /// before host discovery, but ONLY under `KROPS_TOOLBOX=1` AND only when a
+    /// container engine is available. `should_join_kind_network` is the pure
+    /// gating decision `ensure_kind_network_for_discovery` applies before it
+    /// may call `toolbox_join_kind_network`; assert its contract directly.
+    #[test]
+    fn joins_the_kind_network_only_in_the_toolbox_with_an_engine() {
+        // Toolbox + engine running: the join must be attempted with that engine.
+        assert_eq!(
+            should_join_kind_network(&aws_cfg(true), Some("docker")),
+            Some("docker".to_string())
+        );
+        assert_eq!(
+            should_join_kind_network(&aws_cfg(true), Some("podman")),
+            Some("podman".to_string())
+        );
+        // Toolbox but no running engine: nothing to join with, so no join.
+        assert_eq!(should_join_kind_network(&aws_cfg(true), None), None);
+        // A non-toolbox (host) run already resolves the kind endpoint from its
+        // default network and has no engine socket to join with: never join.
+        assert_eq!(
+            should_join_kind_network(&aws_cfg(false), Some("docker")),
+            None
+        );
+        assert_eq!(should_join_kind_network(&aws_cfg(false), None), None);
+    }
+
+    /// #494, part 2: a full `aws` teardown whose k8s side was skipped
+    /// because the controller host was unreachable must NOT report success,
+    /// unless the operator opted into the explicit AWS-only recovery
+    /// (AWS_ONLY=1). `finish_after_skipped_k8s` is the exact exit decision
+    /// `run_teardown` applies before it may print "Teardown complete.".
+    #[test]
+    fn unreachable_host_is_loud_unless_aws_only() {
+        let tcfg_default = TeardownConfig::from_env(|_| None).unwrap();
+        assert!(!tcfg_default.aws_only);
+
+        // Unreachable host, not AWS_ONLY: the run must report failure.
+        let err = finish_after_skipped_k8s(&tcfg_default, &ControllerHost::Unreachable)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("teardown incomplete"),
+            "an unreachable host without AWS_ONLY must abort, got: {err}"
+        );
+        assert!(
+            err.contains("AWS_ONLY=1"),
+            "the failure must name the documented recovery, got: {err}"
+        );
+
+        // A reachable host (kind or self-managed) is a normal, complete
+        // teardown: no failure regardless of AWS_ONLY.
+        assert!(
+            finish_after_skipped_k8s(&tcfg_default, &ControllerHost::Kind).is_ok(),
+            "a reachable kind host must not be treated as a skipped k8s side"
+        );
+        assert!(
+            finish_after_skipped_k8s(&tcfg_default, &ControllerHost::SelfManaged).is_ok(),
+            "a reachable self-managed host must not be treated as a skipped k8s side"
+        );
+
+        // AWS_ONLY=1: the explicit operator opt-in to the AWS-only recovery
+        // keeps the documented exit-0 (no failure), even if the host is
+        // unreachable.
+        let tcfg_aws_only =
+            TeardownConfig::from_env(|name| (name == "AWS_ONLY").then(|| "1".to_string())).unwrap();
+        assert!(tcfg_aws_only.aws_only);
+        assert!(
+            finish_after_skipped_k8s(&tcfg_aws_only, &ControllerHost::Unreachable).is_ok(),
+            "AWS_ONLY=1 is the documented exit-0 recovery path"
         );
     }
 }

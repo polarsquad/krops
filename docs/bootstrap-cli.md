@@ -160,7 +160,7 @@ The pivot's target node-readiness wait uses a fixed 15m budget (`MGMT_NODE_READY
 
 ### Toolbox runtime contracts
 
-The toolbox runtime adds four contracts:
+The toolbox runtime adds five contracts:
 
 - `KROPS_TOOLBOX=1` enables internal kind networking and disables host-only CAPD
   endpoint rewrites.
@@ -173,6 +173,10 @@ The toolbox runtime adds four contracts:
   socket (`unix:///var/run/docker.sock`) when `KROPS_TOOLBOX=1`. The CLI sets
   it only if unset, before any Podman probe, so an operator-supplied value is
   kept regardless of the eventual `CONTAINER_ENGINE`.
+- `AWS_PAGER` is baked into the image as an empty string so the AWS CLI never
+  pages its output through `less` (the toolbox is non-interactive and ships no
+  pager). An operator-supplied value via `-e AWS_PAGER=...` overrides the
+  default at runtime.
 
 The container reaches the local registry at `krops-registry:5000`. Its
 `/root/.kube` mount makes the management kubeconfig persist on the host as

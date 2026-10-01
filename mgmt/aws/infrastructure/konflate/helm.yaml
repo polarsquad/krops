@@ -70,7 +70,14 @@ spec:
       # KONFLATE_TOKEN + KONFLATE_WRITE_TOKEN, delivered SOPS-encrypted
       # (konflate-token.sops.yaml in this directory).
       existingSecret: konflate-token
-    # Persist the flate source caches and rendered diffs across pod restarts
-    # (kind's default local-path StorageClass).
+    # Persistence is disabled: this tree runs on the self-managed EKS
+    # management cluster after the pivot, which has no EBS CSI driver (the
+    # management cluster's add-ons are vpc-cni, coredns and kube-proxy only)
+    # and no StorageClass, so a PVC would stay Pending and the pod would never
+    # schedule. The in-cluster instance therefore runs with an ephemeral
+    # cache; the CI one-shot konflate (.github/workflows/konflate.yml) is the
+    # authoritative render gate and does not use a PVC. The kind bootstrap
+    # cluster reconciles this manifest before the pivot and loses its cache
+    # on restart too, which is acceptable for a short-lived cluster.
     persistence:
-      enabled: true
+      enabled: false

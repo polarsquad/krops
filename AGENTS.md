@@ -345,5 +345,6 @@ Load these only when the task touches their domain:
 - `docs/aws-iam.md`: management-cluster ACK controllers (static SOPS credentials, union scope), reader roles, reader user, CI OIDC role, e2e account incident and credential revocation.
 - `docs/operations.md`: e2e AWS account designation and budget, quotas, configuration, bootstrap, verification.
 - `docs/workload-resources.md`: S3/RDS posture, known limitations.
+- `docs/troubleshooting-ack.md`: ACK controller failure modes for the CRs krops ships (Terminal after the pivot, non-retrying Terminal, Recoverable backoff).
 - `docs/airgap.md`: Zarf offline bundle for the local-host profile.
 - `docs/crossplane.md`: Crossplane as an alternative resource plane (decided, not yet implemented): per-environment selector, one plane per environment, ownership rules, slices #446 to #455.

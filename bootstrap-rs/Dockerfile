@@ -71,6 +71,7 @@ RUN apt-get update \
 # decision: one image, credentials arrive at runtime).
 ENV MISE_DATA_DIR=/usr/local/share/mise \
     MISE_YES=1 \
+    AWS_PAGER="" \
     PATH=/usr/local/share/mise/shims:/usr/local/bin:/usr/bin:/sbin:/bin
 
 COPY --from=build /usr/local/bin/krops-bootstrap /usr/local/bin/krops-bootstrap

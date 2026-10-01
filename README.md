@@ -389,6 +389,7 @@ teardown controls, toolbox release, and current parity status.
 | [docs/wiremock-e2e-spike-findings-gcp.md](docs/wiremock-e2e-spike-findings-gcp.md) | WireMock e2e Phase 0 spike findings (GCP): REST and gRPC both interceptable via CoreDNS rewrite + SAN certs; HTTPS_PROXY covers REST only; CAPG v1.13.1 `serviceEndpoints` covers REST compute only |
 | [docs/aws-iam.md](docs/aws-iam.md) | Management-cluster ACK controllers (static SOPS credentials, union scope), per-cluster reader roles, the `krops-reader` console user, CI OIDC role, e2e account incident and credential revocation |
 | [docs/workload-resources.md](docs/workload-resources.md) | S3 bucket security posture, RDS instances, known limitations |
+| [docs/troubleshooting-ack.md](docs/troubleshooting-ack.md) | ACK controller failure modes for the CRs krops ships: Terminal after the pivot, non-retrying Terminal, Recoverable backoff |
 | [docs/konflate.md](docs/konflate.md) | Rendered Flux PR review: GitHub Actions gate, in-cluster instance, write-back to PRs, tokens |
 | [docs/secrets.md](docs/secrets.md) | SOPS + age secret management, key setup, credential rotation |
 | [docs/operations.md](docs/operations.md) | Toolbox runtime, prerequisites, e2e AWS account designation and budget, quotas, bootstrap, pivot recovery, teardown, validation |

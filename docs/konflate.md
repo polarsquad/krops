@@ -40,7 +40,7 @@ A single instance runs on the **management cluster**, deployed from
 | `config.prComments` | `true` (post the rendered summary as a PR comment) |
 | `config.statusChecks` | `true` (post the `Konflate` commit status with the render verdict) |
 | Secret | `konflate-token` (SOPS-encrypted, `konflate-token.sops.yaml`) |
-| Persistence | Enabled (kind's default local-path StorageClass) so source caches and rendered diffs survive pod restarts |
+| Persistence | Disabled: the EKS management cluster has no EBS CSI driver or StorageClass, so a PVC would stay Pending. Source caches and rendered diffs are rebuilt after a pod restart |
 
 ## GitHub Actions
 

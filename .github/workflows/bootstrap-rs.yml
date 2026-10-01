@@ -101,6 +101,11 @@ jobs:
           # (MISE_AUTO_INSTALL=0 is what the documented runs pass).
           docker run --rm --entrypoint sh -v "$PWD:/workspace:ro" \
             -w /workspace -e MISE_AUTO_INSTALL=0 krops-toolbox:ci -c '
+            # The image must disable the AWS CLI pager (#496): the toolbox
+            # ships no `less`, so any paged output would fail. An empty value
+            # is set, not unset.
+            [ -z "${AWS_PAGER+x}" ] && { echo "::error::AWS_PAGER is unset in the toolbox image"; exit 1; }
+            [ -n "$AWS_PAGER" ] && { echo "::error::AWS_PAGER is not empty in the toolbox image"; exit 1; }
             for t in kind kubectl helm clusterctl flux sops age age-keygen aws clusterawsadm \
                      az gcloud gke-gcloud-auth-plugin docker xargs git curl mise uv python3 bash; do
               command -v "$t" >/dev/null || { echo "::error::$t missing on PATH"; exit 1; }

@@ -80,6 +80,7 @@ nav:
   - GCP environment: gcp.md
   - AWS authentication and IAM: aws-iam.md
   - Workload resources: workload-resources.md
+  - ACK troubleshooting: troubleshooting-ack.md
   - PR review with konflate: konflate.md
   - Dependencies: dependencies.md
   - Air-gapped krops: airgap.md

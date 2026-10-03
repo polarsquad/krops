@@ -28,6 +28,7 @@ import re
 import ssl
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 
 
@@ -55,12 +56,24 @@ def fetch_unmatched_requests(
 
     cacert is the throwaway CA certificate file; when omitted, verification
     is left to the system trust store (useful only with a real CA).
+
+    Raises SystemExit with a readable message when the admin endpoint is unreachable or returns an HTTP error.
     """
     context = ssl.create_default_context(cafile=cacert)
-    with urllib.request.urlopen(
-        f"{admin_url}/__admin/requests/unmatched", context=context, timeout=30
-    ) as response:
-        journal = json.load(response)
+    url = f"{admin_url}/__admin/requests/unmatched"
+    try:
+        with urllib.request.urlopen(url, context=context, timeout=30) as response:
+            journal = json.load(response)
+    except urllib.error.HTTPError as exc:
+        raise SystemExit(
+            f"WireMock admin endpoint {url} returned HTTP {exc.code}: {exc.reason}"
+        ) from exc
+    except (urllib.error.URLError, TimeoutError) as exc:
+        reason = getattr(exc, "reason", exc)
+        raise SystemExit(
+            f"WireMock admin endpoint unreachable at {url}: {reason}"
+            " (is the kubectl port-forward running?)"
+        ) from exc
     return journal.get("requests", [])
 
 
@@ -110,6 +123,9 @@ def main() -> int:
         print(f"deployment/{args.name} in {args.namespace}: Available")
         return 0
 
+    for entry in args.allow:
+        if ":" not in entry:
+            parser.error(f"--allow value {entry!r} must be METHOD:URL-REGEX")
     allow = [tuple(entry.split(":", 1)) for entry in args.allow]
     remaining = filter_allowed(
         fetch_unmatched_requests(args.admin_url, args.cacert), allow

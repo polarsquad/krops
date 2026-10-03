@@ -55,7 +55,7 @@
         },
         "requiredState": {
           "type": "string",
-          "description": "requiredScenarioState: the step matches only while the scenario is in this state. Omit for the initial state."
+          "description": "requiredScenarioState: the step matches only while the scenario is in this state. Set to 'Started' (or the value of initialState) to restrict this step to the initial state; omit only if the step should match regardless of current scenario state."
         },
         "newState": {
           "type": "string",

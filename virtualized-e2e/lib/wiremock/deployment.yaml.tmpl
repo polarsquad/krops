@@ -74,6 +74,17 @@ spec:
               containerPort: 8443
           # TCP probes: kubelet cannot complete an HTTPS handshake against
           # the throwaway CA, so HTTP(S) probes would never pass.
+          #
+          # Readiness proves only that the port is open, not which stubs
+          # are loaded. WireMock reads /home/wiremock/mappings once, before
+          # it binds 8443, so it serves whatever the stubs ConfigMap held
+          # when the container started. A ConfigMap changed after that (for
+          # example re-applied in a reused cluster) leaves a Ready pod
+          # serving the old stubs: the kubelet refreshes the mounted files
+          # but WireMock does not reload them. Restart the pod (kubectl
+          # rollout restart) or POST /__admin/mappings/reset after any stub
+          # change. A missing ConfigMap keeps the pod in ContainerCreating
+          # rather than starting empty.
           readinessProbe:
             tcpSocket:
               port: https

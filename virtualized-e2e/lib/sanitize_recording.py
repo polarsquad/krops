@@ -23,7 +23,7 @@ Usage:
 
 Without --check each input file is rewritten in place. With --check nothing
 is written and the exit code is 1 when any literal is still present (the CI
-guard shape for Phase 2).
+guard shape for Phase 2). --check scans the raw file text, JSON keys included, so it is intentionally stricter than the rewrite: a literal left in a key keeps failing the check until it is fixed by hand.
 """
 
 import argparse
@@ -66,7 +66,14 @@ def sanitize_json(node, literals: dict[str, str]):
 
 
 def remaining_literals(path: Path, literals: dict[str, str]) -> list[str]:
-    """Literals still present in a file (for --check)."""
+    """Literals still present anywhere in a file's raw text (for --check).
+
+    Deliberately stricter than sanitize_file: the rewrite scrubs only JSON
+    string values, but this check scans the whole text, so a literal in a
+    JSON key still fails the guard. A cloud literal in a key is a leak the
+    engine cannot fix by itself; the recording needs a hand edit before it
+    is committed.
+    """
     text = path.read_text(encoding="utf-8")
     return [literal for literal in literals if literal in text]
 
@@ -107,6 +114,12 @@ def main() -> int:
         }
         for path, hits in sorted(dirty.items()):
             print(f"{path}: {len(hits)} unsanitized literal(s)", file=sys.stderr)
+        if dirty:
+            print(
+                "note: --check scans raw text including JSON keys, which the "
+                "rewrite does not scrub; fix literals in keys by hand",
+                file=sys.stderr,
+            )
         return 1 if dirty else 0
 
     for path in args.files:

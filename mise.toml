@@ -128,6 +128,11 @@ if ! python3 tests/test-cert-manager-version-consistency.py; then
   echo "    FAILED: cert-manager version consistency" >&2
   fail=1
 fi
+echo "==> cert-manager/Kubernetes pairing (non-blocking warning)"
+if ! python3 tests/test-cert-manager-kubernetes-support.py; then
+  echo "    FAILED: cert-manager/Kubernetes pairing (pin parse error)" >&2
+  fail=1
+fi
 echo "==> azure identity chain"
 if ! uv run python tests/test-azure-identity-chain.py; then
   echo "    FAILED: azure identity chain" >&2

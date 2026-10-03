@@ -380,6 +380,35 @@ aws s3api get-bucket-tagging --bucket <name>
 Group orphaned resources by `krops.io/run-id` and flag any where
 `krops.io/expires-at` is in the past for manual teardown.
 
+### E2E account orphan report
+
+Daily at 05:41 UTC (or manual dispatch) the `aws-orphan-report` workflow
+discovers unowned AWS resources. The `discover` job runs `krops-bootstrap
+orphans aws` to scan:
+
+- EKS clusters and nodegroups
+- RDS instances
+- VPCs with CAPA ownership tags
+- NAT gateways and Elastic IPs
+- S3 buckets matching cluster name patterns
+
+Resources older than `ORPHAN_MIN_AGE_HOURS` (default 6 hours) are flagged as
+orphans. The `ORPHAN_REPORT_JSON` environment variable is set to capture the
+report as JSON, and the markdown report is posted to the job summary.
+
+**Not scanned**: IAM roles/users (usually free) and CloudFormation bootstrap
+stacks (also free). See the teardown section below for cleanup.
+
+When orphans are found or the discovery fails, the `report-status` job opens
+or comments on the tracking issue `aws-e2e: orphaned resources detected in the
+e2e account`. The issue is closed when the next run finds no orphans.
+
+The report is read-only; no resources are deleted. To clean up orphans, run:
+
+```sh
+AWS_ONLY=1 mise run teardown aws
+```
+
 ### local-talos prerequisites
 
 In addition to the PAT and age key shared with the AWS environment
@@ -829,7 +858,8 @@ CAPI controllers are running:
   host is genuinely unreachable and the run was not `AWS_ONLY=1`, the run
   finishes the sweep but then reports failure (nonzero exit) so automation does
   not read a skipped k8s side as success. `AWS_ONLY=1` is the explicit exit-0
-  recovery path.
+  recovery path (see [orphan report](#e2e-account-orphan-report) above for
+  daily read-only discovery)
 
 The main controls keep the shell interface:
 

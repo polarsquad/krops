@@ -252,6 +252,12 @@ Redacted ARM sample (`/__admin/requests`):
 }
 ```
 
+The Go runtime in this user-agent (`go1.26.7`) differs from ASO's
+(`go1.26.2`, see ASO evidence above). That is expected: CAPZ and ASO are
+separately compiled binaries built from different upstream repositories. The
+azcore/azidentity pins in the version table come from each project's go.mod
+and are unaffected.
+
 The absoluteUrl shows the real ARM hostname while TLS terminated at
 WireMock, which is exactly the intended rewrite posture. After stubbing the
 skus list with `{"value": []}`, the reconcile walked deeper and its
@@ -322,6 +328,10 @@ needed.
   play), `/common/.well-known/openid-configuration`,
   `/<tenant>/v2.0/.well-known/openid-configuration`,
   `/<tenant>/oauth2/v2.0/token` (a dummy unsigned-JWT token is accepted).
+  Because both vendored azidentity versions accept an unsigned JWT-shaped
+  string (see "Caveat: static auth stubs are a Phase 1 prerequisite"
+  above), this pattern proves endpoint routing only: no token signature or
+  real AAD auth validation is exercised by the harness.
 - The krops Azure environment's real clusters are `AzureASOManaged*`
   (ASO-API) with workload identity; the virtualized harness substitutes
   dummy service-principal credentials for the FIC chain, mirroring the

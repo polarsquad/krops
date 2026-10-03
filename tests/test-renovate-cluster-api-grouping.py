@@ -32,6 +32,9 @@ class ClusterApiGroupingTest(unittest.TestCase):
             # image outside the cluster-api/cluster-api-helm namespaces
             ("quay.io/jetstack/cert-manager-controller", "docker", False),
             ("registry.k8s.io/kube-apiserver", "docker", False),
+            # must NOT join: sibling provider image namespaces sharing the prefix
+            ("registry.k8s.io/cluster-api-azure/cluster-api-azure-controller", "docker", False),
+            ("gcr.io/k8s-staging-cluster-api-aws/cluster-api-aws-controller", "docker", False),
             ("ghcr.io/fluxcd/source-controller", "docker", False),
         ]
         dependencies = [

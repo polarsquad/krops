@@ -35,6 +35,7 @@ def main() -> int:
         if dep.get("depName") == DEP_NAME and dep.get("currentValue") == OLD_VERSION
     ]
     errors = []
+    # The replacement itself is covered by tests/test-renovate-auto-replace.py.
     if result.returncode:
         errors.append(f"Renovate exited {result.returncode}")
     if len(dependencies) != 2:

@@ -622,9 +622,9 @@
         "kubernetes-sigs/cluster-api-addon-provider-helm",
         "kubernetes-sigs/cluster-api-provider-azure",
         "kubernetes-sigs/cluster-api-provider-gcp",
-        "/^registry\\.k8s\\.io/cluster-api/",
-        "/^registry\\.k8s\\.io/cluster-api-helm/",
-        "/^gcr\\.io/k8s-staging-cluster-api/"
+        "/^registry\\.k8s\\.io/cluster-api//",
+        "/^registry\\.k8s\\.io/cluster-api-helm//",
+        "/^gcr\\.io/k8s-staging-cluster-api//"
       ],
       "groupName": "cluster-api"
     },

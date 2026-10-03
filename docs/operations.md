@@ -276,13 +276,28 @@ cosign verify-attestation \
 | Quota | Code | Needed | Why |
 |---|---|---|---|
 | EC2-VPC Elastic IPs (per region) | `L-0263D0A3` | ≥ 6 free in `eu-north-1`, ≥ 3 free in `eu-west-1` | One EIP per NAT gateway (3 AZs): two clusters in `eu-north-1` (management + workload), one in `eu-west-1` |
-| VPCs per region | `L-F678F1CE` | 8 in `eu-north-1` (raised from the default 5) | One VPC per cluster plus pre-existing non-krops VPCs. e2e account 120392301094: `eu-north-1` quota raised to 8 (5 in use, headroom 3), `eu-west-1` at 3/5 (headroom 2) |
+| VPCs per region | `L-F678F1CE` | ≥ 2 free in `eu-north-1`, ≥ 1 free in `eu-west-1` | One VPC per cluster (two full runs in eu-north-1, one in eu-west-1). e2e account 120392301094, as of 2026-09-20 (#382): eu-north-1 quota raised to 8 (approved; 5 in use, headroom 3), eu-west-1 at default 5 (3 in use, headroom 2). Usage drifts in this shared account; re-check before relying on the headroom (command below). |
 
-The check is per region, and the default regional limit is 5, so a clean
-account stalls mid-run on the second `eu-north-1` cluster. Request the
-increase before the first run with
-`aws service-quotas request-service-quota-increase --service-code ec2 --quota-code <code> --desired-value <n> --region <region>`
-(for VPCs use `--service-code vpc`).
+Both quotas default to 5 per region. The EIP quota stalls the run mid-way through the second `eu-north-1` cluster (6 EIPs needed); a nearly full VPC quota fails the run at VPC creation. Request both increases before the first run.
+
+To increase the Elastic IP quota:
+
+```sh
+aws service-quotas request-service-quota-increase --service-code ec2 --quota-code L-0263D0A3 --desired-value <n> --region <region>
+```
+
+To increase the VPCs-per-region quota (service code is `vpc`, not `ec2`):
+
+```sh
+aws service-quotas request-service-quota-increase --service-code vpc --quota-code L-F678F1CE --desired-value <n> --region <region>
+```
+
+To re-check current quota and usage for VPCs in eu-north-1:
+
+```sh
+aws service-quotas get-service-quota --service-code vpc --quota-code L-F678F1CE --region eu-north-1
+aws ec2 describe-vpcs --region eu-north-1 --query 'length(Vpcs)'
+```
 
 Bootstrap now enforces the EIP quota at runtime during preflight checks before
 any provisioning begins. The credentials used must have `servicequotas:GetServiceQuota`

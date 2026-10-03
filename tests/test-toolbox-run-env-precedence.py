@@ -20,6 +20,24 @@ case "$1" in
   --version) echo "ENGINE_NAME version 1.0.0" ;;
   context) exit 0 ;;
   run)
+    # Simulate container engine: export -e KEY=VALUE args like a real engine
+    # would inject them into the container's environment.
+    shift
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        -e)
+          shift
+          case "$1" in
+            *=*)
+              _k="${1%%=*}"
+              _v="${1#*=}"
+              export "${_k}=${_v}"
+              ;;
+          esac
+          ;;
+      esac
+      shift
+    done
     echo "ENGINE=ENGINE_NAME" > "$STUB_LOG"
     env >> "$STUB_LOG"
     exit 0

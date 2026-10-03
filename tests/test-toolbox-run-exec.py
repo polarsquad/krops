@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 """toolbox-run.sh's exec must not be truncated by a comment inside its
 backslash continuation (#357): the image and CLI args must always reach the
-container engine, and CLOUDSDK_CONFIG must be forwarded twice, repo-local
-value last."""
+container engine, and CLOUDSDK_CONFIG must be forwarded exactly once, fixed
+to the repo-local path (never from PASS_ENV, so an operator value can't
+override it). An operator value for an immutable key must also warn on
+stderr instead of silently doing nothing."""
 import os, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WRAPPER = REPO_ROOT / "scripts/toolbox-run.sh"
 
-def main() -> int:
+
+def run_once(extra_env: dict):
+    """Run the wrapper against a fake docker in an isolated fake repo;
+    returns (argv, stderr)."""
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         # toolbox-run.sh always cds to its own repo root ("$(dirname
@@ -37,31 +42,66 @@ def main() -> int:
             CONTAINER_ENGINE="docker",
             TOOLBOX_IMAGE="krops-toolbox:test",
         )
-        subprocess.run(
+        env.update(extra_env)
+        result = subprocess.run(
             ["bash", str(wrapper), "bootstrap", "local-host"],
-            env=env, cwd=fake_repo, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            check=False,
+            env=env, cwd=fake_repo, stdout=subprocess.DEVNULL, capture_output=False,
+            stderr=subprocess.PIPE, text=True, check=False,
         )
-        if not argv_log.exists():
-            print("docker was never invoked", file=sys.stderr); return 1
-        argv = argv_log.read_text().splitlines()
+        argv = argv_log.read_text().splitlines() if argv_log.exists() else []
+        return argv, result.stderr
 
+
+def test_image_and_cli_args_reach_docker() -> None:
+    argv, _ = run_once({})
     if "krops-toolbox:test" not in argv:
-        print(f"image argument dropped from the exec: {argv}", file=sys.stderr); return 1
+        raise AssertionError(f"image argument dropped from the exec: {argv}")
     if "local-host" not in argv:
-        print(f"CLI args dropped from the exec: {argv}", file=sys.stderr); return 1
+        raise AssertionError(f"CLI args dropped from the exec: {argv}")
     cloudsdk = [a for a in argv if a.startswith("CLOUDSDK_CONFIG")]
-    if cloudsdk != ["CLOUDSDK_CONFIG", "CLOUDSDK_CONFIG=/workspace/.gcloud"]:
-        print(f"CLOUDSDK_CONFIG must be forwarded twice, repo-local value last: {argv}", file=sys.stderr); return 1
+    if cloudsdk != ["CLOUDSDK_CONFIG=/workspace/.gcloud"]:
+        raise AssertionError(
+            f"CLOUDSDK_CONFIG must be forwarded exactly once, fixed to the repo-local path: {argv}"
+        )
     # The image must come after the last -e (so it's not swallowed as a flag
     # value) and the CLI args must come after the image.
     image_idx = argv.index("krops-toolbox:test")
     cli_idx = argv.index("local-host")
     if not (image_idx < cli_idx):
-        print(f"argument order wrong: {argv}", file=sys.stderr); return 1
+        raise AssertionError(f"argument order wrong: {argv}")
 
-    print("toolbox-run.sh exec OK: image and CLI args reach docker")
+
+def test_operator_override_of_immutable_key_warns_and_is_ignored() -> None:
+    argv, stderr = run_once({"CLOUDSDK_CONFIG": "/home/operator/.gcloud"})
+    cloudsdk = [a for a in argv if a.startswith("CLOUDSDK_CONFIG")]
+    if cloudsdk != ["CLOUDSDK_CONFIG=/workspace/.gcloud"]:
+        raise AssertionError(
+            f"an operator-set CLOUDSDK_CONFIG must still be overridden by the fixed value: {argv}"
+        )
+    if "CLOUDSDK_CONFIG" not in stderr or "/home/operator/.gcloud" not in stderr:
+        raise AssertionError(
+            f"overriding an immutable key must warn on stderr instead of silently doing nothing: {stderr!r}"
+        )
+
+
+def main() -> int:
+    tests = [
+        test_image_and_cli_args_reach_docker,
+        test_operator_override_of_immutable_key_warns_and_is_ignored,
+    ]
+    failed = 0
+    for test in tests:
+        try:
+            test()
+            print(f"ok - {test.__name__}")
+        except AssertionError as exc:
+            print(f"FAILED: {test.__name__}: {exc}", file=sys.stderr)
+            failed += 1
+    if failed:
+        return 1
+    print("toolbox-run.sh exec OK")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

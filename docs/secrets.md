@@ -15,8 +15,6 @@ with `spec.decryption.provider: sops`):
 
 | File | Consumed by | Purpose |
 |---|---|---|
-| `mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml` | `capa-system` | CAPA controller AWS credentials |
-| `mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml` | `ack-controllers` | ACK IAM/EKS controller AWS credentials (shared-credentials-file format) |
 | `mgmt/aws/addons/flux-apps/flux-pull-secret.sops.yaml` | `flux-apps` | GitHub PAT pull secret (basic auth), delivered to each workload cluster via ClusterResourceSet so its Flux can clone this (private) repo |
 | `mgmt/aws/infrastructure/konflate/konflate-token.sops.yaml` | `konflate` | `KONFLATE_TOKEN` (read-only GitHub PAT so konflate can list PRs and clone this private repo) and `KONFLATE_WRITE_TOKEN` (write-back credential konflate uses to post the PR summary comment and the `Konflate` commit status) |
 
@@ -57,25 +55,25 @@ krops_mise run sops-updatekeys
 
 ## Setting / rotating AWS credentials
 
-```sh
-# CAPA: generate the base64 profile. clusterawsadm reads AWS_ACCESS_KEY_ID /
-# AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN / AWS_REGION from .env first
-# (mise env_file), then from the process environment:
-krops_mise -E aws run aws-credentials
-# Put the value into stringData.AWS_B64ENCODED_CREDENTIALS, then encrypt:
-$EDITOR mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml
-krops_mise run sops-encrypt mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml
+AWS credentials are **not** stored in Git (issue #379): the CAPA and ACK
+controller secrets are created imperatively from ambient credentials
+(`AWS_B64ENCODED_CREDENTIALS`) at bootstrap/pivot time. This mirrors the Azure
+and GCP posture ("none at rest").
 
-# ACK: standard AWS shared-credentials-file format under stringData.credentials:
-$EDITOR mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml
-krops_mise run sops-encrypt mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml
-```
-
-View a decrypted secret without changing it:
+To set or rotate credentials, update the AWS access key ID and secret in `.env`:
 
 ```sh
-krops_mise run sops-decrypt <file>.sops.yaml
+# Update .env with the new access key:
+# AWS_ACCESS_KEY_ID=AKIA...
+# AWS_SECRET_ACCESS_KEY=...
+# (and optionally AWS_SESSION_TOKEN for temporary credentials)
+
+# Re-run bootstrap/pivot to seed the new credentials:
+./bootstrap.sh aws  # or ./pivot.sh if already bootstrapped
 ```
+
+No SOPS encryption or re-encryption is needed: credentials are derived from
+`.env` on demand by the bootstrap/pivot phases.
 
 ## Azure credentials
 

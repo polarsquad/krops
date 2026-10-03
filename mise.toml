@@ -163,6 +163,11 @@ if ! python3 tests/test-aws-iam-doc-scope.py; then
   echo "    FAILED: ACK CR scope vs docs/aws-iam.md" >&2
   fail=1
 fi
+echo "==> AWS credentials: none at rest (#379)"
+if ! python3 tests/test-aws-no-static-credentials.py; then
+  echo "    FAILED: AWS credentials are static" >&2
+  fail=1
+fi
 echo "==> Python lint (ruff: unused imports, subprocess.run check=)"
 if ! uv run ruff check .; then
   echo "    FAILED: Python lint" >&2

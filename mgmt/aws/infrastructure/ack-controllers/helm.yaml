@@ -8,14 +8,15 @@
 # DBInstance, reader Role CRs) are declared under
 # mgmt/aws/infrastructure/workload-resources/.
 #
-# These controllers authenticate with the same SOPS-encrypted credential
-# pattern used by capa-system (aws-credentials.sops.yaml). The principal
-# behind those static credentials needs the union of the former per-controller
-# pod-identity role policies (s3, rds, iam, secretsmanager, kms:CreateGrant) —
-# see docs/aws-iam.md for the exact actions and the least-privilege trade-off.
+# These controllers authenticate with the `aws-credentials` Secret created
+# imperatively by bootstrap/pivot from ambient AWS credentials
+# (AWS_B64ENCODED_CREDENTIALS). The principal behind those credentials needs
+# the union of the former per-controller pod-identity role policies (s3, rds,
+# iam, secretsmanager, kms:CreateGrant) — see docs/aws-iam.md for the exact
+# actions and the least-privilege trade-off.
 #
 # The kind management cluster runs on kind (not EKS), so IRSA/Pod Identity is
-# not available here; static credentials via SOPS is the established pattern.
+# not available here; credentials are seeded imperatively at bootstrap/pivot time.
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository

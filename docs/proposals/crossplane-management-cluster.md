@@ -34,7 +34,7 @@ First version: the choice is made when an environment is set up. Switching a run
 ## What Crossplane on the management cluster consists of
 
 - Core: `crossplane-system`, HelmRelease `install.crds: CreateReplace`, one or more composition functions (`Function` packages).
-- Cloud provider packages (`Provider`) per cloud, with credentials that follow each environment's existing model: AWS static SOPS credentials on the management cluster (as `ack-controllers/aws-credentials.sops.yaml` does today), GCP Workload Identity Federation (as `kcc-wif-credentials`), Azure workload identity (as `aso-workload-identity`). No new secret-at-rest model.
+- Cloud provider packages (`Provider`) per cloud, with credentials that follow each environment's existing model: AWS credentials seeded imperatively from ambient credentials at bootstrap/pivot time (issue #379; no SOPS file at rest), GCP Workload Identity Federation (as `kcc-wif-credentials`), Azure workload identity (as `aso-workload-identity`). No new secret-at-rest model.
 - A platform API layer: XRD, Composition and XRs that reproduce what `mgmt/aws/infrastructure/workload-resources/` creates today (bucket, DB instance, IAM role), so the two planes are functionally equivalent for the same inputs, including the `managed-by` tag lineage and per-cluster naming.
 - Ownership rule (same as #224): Flux applies and prunes only what is in Git (Crossplane, functions, providers, XRDs, Compositions, XRs); Crossplane creates and deletes only composed resources; Flux never applies a composed resource.
 

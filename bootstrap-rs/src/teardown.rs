@@ -1752,12 +1752,12 @@ pub async fn uninstall_helm_and_secrets(cfg: &Config, target: &K8sTarget) {
     let ns = &cfg.repo.bootstrap.flux_namespace;
     let pat = &cfg.repo.bootstrap.github_pat_secret;
     let age = &cfg.repo.bootstrap.sops_age_secret;
-    for secret in [pat.as_str(), age.as_str(), "aws-credentials"] {
-        let namespace = if secret == "aws-credentials" {
-            "capa-system"
-        } else {
-            ns
-        };
+    for (secret, namespace) in [
+        (pat.as_str(), ns.as_str()),
+        (age.as_str(), ns.as_str()),
+        ("aws-credentials", "capa-system"),
+        ("aws-credentials", "ack-system"),
+    ] {
         let args = kubectl_args(
             target,
             &[

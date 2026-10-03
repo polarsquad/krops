@@ -57,36 +57,37 @@ offered 2 vCPU / 4 GiB shape for the region. The management cluster lives in
 ## Credentials
 
 There are two credential surfaces, and neither is a credential on a workload
-cluster.
+cluster. **No static credentials are stored in Git** (issue #379): both CAPA
+and ACK credentials are created imperatively from ambient AWS credentials at
+bootstrap/pivot time. This mirrors the Azure and GCP posture ("none at rest").
 
-- **CAPA (management cluster).** The EKS control planes and node pools are
-  provisioned by CAPA from a single SOPS-encrypted profile in Git at
-  `mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml` (the
-  `configSecret` on the `aws` infrastructure provider). To set or rotate it:
+To set or rotate credentials, update the AWS access key ID and secret in `.env`:
 
-  ```sh
-  krops_mise() {   # from docs/secrets.md
-    docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/tmp \
-      -v "$PWD:/workspace" -w /workspace \
-      -e MISE_AUTO_INSTALL=0 -e SOPS_AGE_KEY_FILE=/workspace/age.agekey \
-      --entrypoint mise "$TOOLBOX_IMAGE" "$@"
-  }
-  krops_mise -E aws run aws-credentials     # clusterawsadm bootstrap credentials encode-as-profile
-  # paste the printed profile into
-  #   mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml
-  #   as AWS_B64ENCODED_CREDENTIALS
-  krops_mise run sops-encrypt mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml
-  ```
+```sh
+# Update .env with your AWS credentials (sourced from aws-cli or environment):
+# AWS_ACCESS_KEY_ID=AKIA...
+# AWS_SECRET_ACCESS_KEY=...
+# (and optionally AWS_SESSION_TOKEN for temporary credentials)
 
-  (The CloudFormation stack from Prerequisites must already exist.)
+# Run bootstrap to seed CAPA and ACK credentials from ambient credentials:
+./bootstrap.sh aws
+```
 
-- **ACK controllers (management cluster).** Same static SOPS credential
-  pattern (`mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml`).
-  Since issue #346 the S3, RDS, and IAM controllers all run on the management
-  cluster and reconcile the per-workload-cluster `Bucket`, `DBInstance`, and
-  reader `Role` CRs declared in `mgmt/aws/infrastructure/workload-resources/`.
-  Workload clusters run no controllers and hold no credentials. The static
-  principal's policy must cover the union of the former per-controller
+See [Secrets management](./secrets.md#setting-rotating-aws-credentials) for
+the full credential rotation flow.
+
+- **CAPA (management cluster).** Provisions EKS control planes and node pools.
+  Credentials are seeded into the `capa-system/aws-credentials` secret
+  imperatively during bootstrap/pivot, from the ambient
+  `AWS_B64ENCODED_CREDENTIALS` profile.
+
+- **ACK controllers (management cluster).** Since issue #346 the S3, RDS, and
+  IAM controllers all run on the management cluster and reconcile the
+  per-workload-cluster `Bucket`, `DBInstance`, and reader `Role` CRs
+  declared in `mgmt/aws/infrastructure/workload-resources/`. Workload clusters
+  run no controllers and hold no credentials. The credentials are seeded into
+  the `ack-system/aws-credentials` secret imperatively during bootstrap/pivot.
+  The static principal's policy must cover the union of the former per-controller
   pod-identity roles; see [AWS authentication & IAM](./aws-iam.md) for the
   full action list and the least-privilege trade-off.
 

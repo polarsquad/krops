@@ -142,6 +142,23 @@ cleanup_bootstrap() {
 trap cleanup_bootstrap EXIT
 seed_flux
 
+# ── Step 3.5: AWS credentials (AWS profile only) ──────────────────────────────
+if [ "$PROFILE" = aws ]; then
+  echo ">>> Ensuring capa-system and ack-system namespaces exist..."
+  kubectl create namespace capa-system --dry-run=client -o yaml | kubectl apply -f -
+  kubectl create namespace ack-system --dry-run=client -o yaml | kubectl apply -f -
+  echo ">>> Creating AWS credential secrets..."
+  aws_b64_credentials="$(mise -E aws run aws-credentials)"
+  kubectl create secret generic aws-credentials \
+    --namespace capa-system \
+    --from-literal="AWS_B64ENCODED_CREDENTIALS=${aws_b64_credentials}" \
+    --dry-run=client -o yaml | kubectl apply -f -
+  kubectl create secret generic aws-credentials \
+    --namespace ack-system \
+    --from-literal="credentials=$(echo "${aws_b64_credentials}" | base64 --decode)" \
+    --dry-run=client -o yaml | kubectl apply -f -
+fi
+
 # Write run-identity ConfigMap for Flux tag substitution (#381)
 _KROPS_RUN_KIND="${KROPS_RUN_KIND:-manual}"
 _KROPS_RUN_ID="${KROPS_RUN_ID:-${PROFILE:-unknown}-$(date -u +%Y%m%dT%H%M%SZ)}"

@@ -261,8 +261,9 @@ install_capi_in_target() {
     --kubeconfig "$MGMT_KUBECONFIG"
 
   echo ">>> Applying provider CRs in the target..."
-  # Apply the plain manifests verbatim (NOT the kustomization dirs: capa-system
-  # contains the SOPS-encrypted aws-credentials which only Flux can decrypt).
+  # Apply the plain manifests verbatim (NOT the kustomization dirs: the
+  # kustomization directories reference resources not yet present in the
+  # target cluster, so they are applied directly as individual manifests).
   local infra_ns infra_name
   if [ "$PROFILE" = aws ]; then
     infra_ns="capa-system"; infra_name="aws"
@@ -273,19 +274,25 @@ install_capi_in_target() {
     kubectl --kubeconfig "$MGMT_KUBECONFIG" apply -f mgmt/aws/capi-providers/caaph-system/namespace.yaml
     kubectl --kubeconfig "$MGMT_KUBECONFIG" apply -f mgmt/aws/capi-providers/caaph-system/addon-provider.yaml
 
-    # CAPA credentials: the InfrastructureProvider above references the
-    # aws-credentials secret (configSecret.name). On the bootstrap cluster
-    # Flux decrypts aws-credentials.sops.yaml; here it is created directly
-    # with the same shape (stringData.AWS_B64ENCODED_CREDENTIALS).
-    # Do NOT pre-apply mgmt/aws/infrastructure/aws-identity/: the
-    # AWSClusterControllerIdentity carries a move hook and comes over with
+    # AWS credentials: the InfrastructureProvider above references the
+    # aws-credentials secret in capa-system (configSecret.name), and ACK
+    # controllers reference it in ack-system. Both are created imperatively
+    # from ambient credentials. Do NOT pre-apply mgmt/aws/infrastructure/aws-identity/:
+    # the AWSClusterControllerIdentity carries a move hook and comes over with
     # the Phase 4 move.
-    echo ">>> Creating CAPA credentials secret in capa-system..."
+    echo ">>> Ensuring capa-system and ack-system namespaces exist..."
+    kubectl --kubeconfig "$MGMT_KUBECONFIG" create namespace capa-system --dry-run=client -o yaml | kubectl --kubeconfig "$MGMT_KUBECONFIG" apply -f -
+    kubectl --kubeconfig "$MGMT_KUBECONFIG" create namespace ack-system --dry-run=client -o yaml | kubectl --kubeconfig "$MGMT_KUBECONFIG" apply -f -
+    echo ">>> Creating AWS credential secrets..."
     local aws_b64_credentials
     aws_b64_credentials="$(mise -E aws run aws-credentials)"
     kubectl --kubeconfig "$MGMT_KUBECONFIG" create secret generic aws-credentials \
       --namespace capa-system \
       --from-literal="AWS_B64ENCODED_CREDENTIALS=${aws_b64_credentials}" \
+      --dry-run=client -o yaml | kubectl --kubeconfig "$MGMT_KUBECONFIG" apply -f -
+    kubectl --kubeconfig "$MGMT_KUBECONFIG" create secret generic aws-credentials \
+      --namespace ack-system \
+      --from-literal="credentials=$(echo "${aws_b64_credentials}" | base64 --decode)" \
       --dry-run=client -o yaml | kubectl --kubeconfig "$MGMT_KUBECONFIG" apply -f -
   else
     infra_ns="capd-system"; infra_name="docker"

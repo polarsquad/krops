@@ -117,9 +117,9 @@ drift-corrected, with no imperative copy step (slice 7).
 Each plane follows its environment's existing credential model. Crossplane
 adds no new secret-at-rest model:
 
-- **AWS:** static SOPS credentials on the management cluster, as
-  `mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml` provides
-  for ACK today. See [AWS authentication and IAM](aws-iam.md).
+- **AWS:** credentials seeded imperatively from ambient credentials at
+  bootstrap/pivot time (issue #379); no SOPS file at rest. See
+  [AWS authentication and IAM](aws-iam.md).
 - **Azure:** workload identity, as in
   `mgmt/azure/infrastructure/aso-workload-identity/`. See
   [Azure environment](azure.md).

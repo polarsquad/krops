@@ -21,6 +21,7 @@ resources. There is no app source code here, only declarative infrastructure.
   - `clusters/`: EKS cluster definitions per region (`eu-north-1`,
     `eu-west-1`); `eu-north-1` also defines the self-managed management
     cluster (`clusters/management/`).
+  Credentials: none at rest (issue #379); CAPA and ACK credentials are seeded imperatively at bootstrap/pivot time from the ambient `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (optional `AWS_SESSION_TOKEN`, from `.env`), which the `aws-credentials` mise task encodes into `AWS_B64ENCODED_CREDENTIALS`; the bootstrap/pivot code stores that value for `capa-system` and decodes it into an INI shared-credentials file for `ack-system`, matching the Azure/GCP posture.
 - `mgmt/local-host/`: the local-host management variant (kind-based).
   Same layout as `mgmt/aws/` (`clusters/docker`, `capi-providers/`,
   `addons/`, `infrastructure/`) with no cloud dependencies.

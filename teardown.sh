@@ -954,9 +954,9 @@ if [ "${AWS_ONLY:-0}" != "1" ]; then
   info "Deleting GitHub PAT and SOPS age secrets..."
   kubectl delete secret flux-github-pat -n flux-system --ignore-not-found
   kubectl delete secret sops-age -n flux-system --ignore-not-found
-  # The aws-credentials secret is GitOps-managed (decrypted by Flux), but remove
-  # it explicitly in case Flux was uninstalled before it could be pruned.
+  # AWS credentials are created imperatively at bootstrap/pivot time; delete them here.
   kubectl delete secret aws-credentials -n capa-system --ignore-not-found
+  kubectl delete secret aws-credentials -n ack-system --ignore-not-found
   success "Secrets deleted (or were already absent)"
 else
   warn "AWS_ONLY mode – skipping secret deletion"

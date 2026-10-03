@@ -91,3 +91,4 @@ nav:
   - Proposals:
       - Overview: proposals/README.md
       - Crossplane on the management cluster: proposals/crossplane-management-cluster.md
+      - WireMock e2e architecture: proposals/wiremock-e2e-architecture.md

@@ -18,7 +18,7 @@ needed anywhere.
 | cert-manager | v1.21.1 | installed by clusterctl init |
 | cluster-api (core/bootstrap/control-plane) | v1.14.2 | installed by clusterctl init |
 | CAPA | v2.13.0 | repo pin in `mgmt/aws/capi-providers/capa-system/providers.yaml` |
-| ACK S3 controller | chart 1.11.0, image `public.ecr.aws/aws-controllers-k8s/s3-controller:1.11.0` | repo pin in `workload/base/aws-operators/helm.yaml` |
+| ACK S3 controller | chart 1.11.0, image `public.ecr.aws/aws-controllers-k8s/s3-controller:1.11.0` | repo pin in `mgmt/aws/infrastructure/ack-controllers/helm.yaml` |
 | WireMock | `wiremock/wiremock:3.13.2` | docker hub, latest stable at spike time |
 | helm | v4.3.0 | repo mise pin |
 

@@ -52,7 +52,7 @@ outside this repo, same as the CAPA permissions):
   `ListAttachedRolePolicies`/`ListInstanceProfilesForRole`/`TagRole`/
   `UntagRole`/`ListRoleTags`) scoped to `arn:aws:iam::*:role/krops-*`, plus
   the user actions for the `krops-reader` console user
-  (`iam:CreateUser`/`PutUserPolicy`/`GetUser`/`GetUserPolicy`/`TagUser`)
+  (`iam:CreateUser`/`PutUserPolicy`/`GetUser`/`GetUserPolicy`/`TagUser`/`DeleteUser`/`DeleteUserPolicy`)
 
 The trade-off is real: name-scoped `iam:CreateRole` + `iam:PutRolePolicy` is
 still a privilege-escalation surface (any permission can be granted to a

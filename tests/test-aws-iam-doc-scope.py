@@ -60,6 +60,8 @@ REQUIRED_ACTIONS = {
         "iam:GetUser",
         "iam:PutUserPolicy",
         "iam:TagUser",
+        "iam:DeleteUser",
+        "iam:DeleteUserPolicy",
     ],
 }
 

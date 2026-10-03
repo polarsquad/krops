@@ -212,6 +212,9 @@ jobs:
       - name: ACK CR scope vs documented principal (#411)
         run: python3 tests/test-aws-iam-doc-scope.py
 
+      - name: AWS account ID literals vs flux-instance.yaml
+        run: python3 tests/test-aws-account-id-consistency.py
+
       - name: AWS run-tag standard (#381)
         run: |
           uv sync --locked

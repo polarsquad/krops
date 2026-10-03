@@ -53,7 +53,7 @@
     <circle cx="290" cy="276" r="2.2"/>
   </g>
   <text x="308" y="264" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#FFFFFF">CAPI / CAPA</text>
-  <text x="308" y="287" font-family="DejaVu Sans" font-size="14.5" fill="#D4E2DA">controllers</text>
+  <text x="308" y="287" font-family="DejaVu Sans" font-size="14.5" fill="#D4E2DA">+ ACK controllers</text>
   <!-- infra lifecycle sub-panel -->
   <rect x="88" y="340" width="384" height="120" rx="10" fill="#5CE0B4" fill-opacity="0.12" stroke="#5CE0B4" stroke-opacity="0.5" stroke-width="1.2"/>
   <text x="280" y="374" text-anchor="middle" font-family="DejaVu Sans" font-size="16.5" font-weight="bold" fill="#5CE0B4">Manages infrastructure lifecycle</text>
@@ -126,37 +126,12 @@
     <text x="881" y="726" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="16" fill="#68C5EB">workload/eu-west-01/</text>
   </g>
 
-  <!-- pipelines (both clusters) -->
-  <g id="pipe1">
-    <g stroke="#D4E2DA" stroke-width="1.8" fill="none">
-      <circle cx="120" cy="794" r="12"/><circle cx="120" cy="794" r="4.2"/>
-      <line x1="120" y1="777" x2="120" y2="782"/><line x1="120" y1="806" x2="120" y2="811"/>
-      <line x1="103" y1="794" x2="108" y2="794"/><line x1="132" y1="794" x2="137" y2="794"/>
-      <line x1="108" y1="782" x2="111.5" y2="785.5"/><line x1="128.5" y1="802.5" x2="132" y2="806"/>
-      <line x1="108" y1="806" x2="111.5" y2="802.5"/><line x1="128.5" y1="785.5" x2="132" y2="782"/>
-    </g>
-    <line x1="146" y1="794" x2="184" y2="794" stroke="#859D91" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
-    <g stroke="#5CE0B4" stroke-width="1.8" fill="none">
-      <ellipse cx="215" cy="782" rx="13" ry="4.5"/>
-      <path d="M202,782 L206,806 h18 L228,782"/>
-    </g>
-    <line x1="241" y1="794" x2="279" y2="794" stroke="#859D91" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
-    <g stroke="#B0F6C0" stroke-width="1.8" fill="none">
-      <ellipse cx="310" cy="780" rx="13" ry="4.5"/>
-      <path d="M297,780 V806 a13,4.5 0 0 0 26,0 V780"/>
-      <path d="M297,793 a13,4.5 0 0 0 26,0"/>
-    </g>
-    <line x1="336" y1="794" x2="374" y2="794" stroke="#859D91" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
-    <g stroke="#E8A868" stroke-width="1.8" fill="none">
-      <circle cx="405" cy="783" r="6.5"/>
-      <path d="M393,808 a12,12 0 0 1 24,0"/>
-    </g>
-    <text x="130" y="844" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">aws-operators</text>
-    <text x="215" y="870" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">s3-buckets</text>
-    <text x="310" y="844" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">rds-instances</text>
-    <text x="405" y="870" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">iam-roles</text>
+  <!-- workload payload: empty since issue #346 -->
+  <g id="wlempty">
+    <text x="279" y="800" text-anchor="middle" font-family="DejaVu Sans" font-size="15" fill="#859D91">nothing reconciled today (issue #346)</text>
+    <text x="279" y="826" text-anchor="middle" font-family="DejaVu Sans" font-size="15" fill="#859D91">ready for an application workload</text>
   </g>
-  <use href="#pipe1" x="536" y="0"/>
+  <use href="#wlempty" x="536" y="0"/>
 
   <!-- lifecycle strips -->
   <rect x="88" y="884" width="382" height="42" rx="8" fill="#68C5EB" fill-opacity="0.14"/>
@@ -221,13 +196,13 @@
   <line x1="1122" y1="580" x2="1504" y2="580" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- step 3 -->
-  <circle cx="1140" cy="628" r="15" fill="#68C5EB"/>
+  <circle cx="1140" cy="628" r="15" fill="#5CE0B4"/>
   <text x="1140" y="634" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">3</text>
-  <text x="1168" y="624" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Workload Flux reconciles locally:</text>
-  <text x="1168" y="660" font-family="DejaVu Sans Mono" font-size="18" fill="#D4E2DA">1. <tspan fill="#FFFFFF">aws-operators</tspan> <tspan font-family="DejaVu Sans" fill="#859D91">(ACK)</tspan></text>
-  <text x="1168" y="692" font-family="DejaVu Sans Mono" font-size="18" fill="#D4E2DA">2. <tspan fill="#FFFFFF">s3-buckets &#183; rds-instances</tspan></text>
-  <text x="1200" y="724" font-family="DejaVu Sans Mono" font-size="18" fill="#FFFFFF">&#183; iam-roles <tspan font-family="DejaVu Sans" fill="#D4E2DA">in parallel</tspan></text>
-  <text x="1168" y="754" font-family="DejaVu Sans Mono" font-size="14.5" fill="#859D91">(each dependsOn: aws-operators)</text>
+  <text x="1168" y="624" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Management Flux also reconciles:</text>
+  <text x="1168" y="660" font-family="DejaVu Sans Mono" font-size="18" fill="#D4E2DA">1. <tspan fill="#FFFFFF">ack-controllers</tspan> <tspan font-family="DejaVu Sans" fill="#859D91">(ACK)</tspan></text>
+  <text x="1168" y="692" font-family="DejaVu Sans Mono" font-size="18" fill="#D4E2DA">2. <tspan fill="#FFFFFF">workload-resources</tspan></text>
+  <text x="1200" y="724" font-family="DejaVu Sans Mono" font-size="18" fill="#FFFFFF">&#183; aws-global-iam <tspan font-family="DejaVu Sans" fill="#D4E2DA">in parallel</tspan></text>
+  <text x="1168" y="754" font-family="DejaVu Sans Mono" font-size="14.5" fill="#859D91">(each dependsOn: ack-controllers)</text>
   <line x1="1122" y1="788" x2="1504" y2="788" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- golden rule -->

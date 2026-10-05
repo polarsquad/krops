@@ -6,7 +6,7 @@ metadata:
   name: aws
   namespace: capa-system
 spec:
-  version: "v2.13.0"
+  version: "v2.13.1"
   configSecret:
     name: aws-credentials
   deployment:

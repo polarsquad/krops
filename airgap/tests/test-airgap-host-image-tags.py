@@ -89,11 +89,11 @@ def check_artifact_stripping() -> None:
             os.unlink(f.name + ".bak")
             return Path(f.name).read_text()
 
-    node = f"  customImage: kindest/node:v1.37.0@{DIGEST}\n"
+    node = f"  customImage: kindest/node:v1.36.4@{DIGEST}\n"
     preload = f"    - docker.io/kindest/kindnetd:v1@{DIGEST}\n"
     other = f"  note: keep @{DIGEST}\n"
     result = strip(class_expr, node + preload + other)
-    if "customImage: kindest/node:v1.37.0\n" not in result or "kindnetd:v1\n" not in result:
+    if "customImage: kindest/node:v1.36.4\n" not in result or "kindnetd:v1\n" not in result:
         sys.exit(f"cluster-class digests were not stripped: {result!r}")
     if other not in result:
         sys.exit("cluster-class stripping touched an unrelated line")

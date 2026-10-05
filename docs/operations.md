@@ -625,7 +625,7 @@ docker run --rm -it --network kind -p 9898:9898 \
   port-forward --namespace podinfo --address 0.0.0.0 service/podinfo 9898:9898
 ```
 
-The workload uses Kubernetes v1.37.0. A CAPI ClusterResourceSet installs a
+The workload uses Kubernetes v1.36.4. A CAPI ClusterResourceSet installs a
 pinned Kindnet daemon as its CNI before the Flux addons are delivered.
 The management cluster needs access to the container-engine socket, which
 the bootstrap mounts automatically.

@@ -111,7 +111,9 @@ flux push artifact "oci://localhost:${REGISTRY_PORT}/krops:latest" \
   --revision="airgap@sha1:$(git -C "$AIRGAP_DIR" rev-parse HEAD 2>/dev/null || echo unknown)" \
   --insecure-registry \
   --reproducible
-helm push "$ARCHIVES/charts/flux-operator-0.58.0.tgz" "oci://localhost:${REGISTRY_PORT}/charts" --plain-http
+flux_chart_version=$(sed -nE 's/^flux-operator = "(.*)"/\1/p' bootstrap.toml | head -1)
+  [ -n "$flux_chart_version" ] || { echo "ERROR: no flux-operator chart version in bootstrap.toml [charts]" >&2; exit 1; }
+helm push "$ARCHIVES/charts/flux-operator-${flux_chart_version}.tgz" "oci://localhost:${REGISTRY_PORT}/charts" --plain-http
 helm push "$ARCHIVES"/charts/podinfo-*.tgz "oci://localhost:${REGISTRY_PORT}/stefanprodan/charts" --plain-http
 
 echo ">>> Staged. Next:"

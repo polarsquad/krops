@@ -132,7 +132,9 @@ echo "    saved airgap/archives/workload-pod-images.tar"
 # by the stage script): the per-cluster flux-operator chart (HelmChartProxy)
 # and the podinfo chart (workload HelmRelease).
 mkdir -p airgap/archives/charts
-helm pull oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator --version 0.58.0 -d airgap/archives/charts
+flux_chart_version=$(sed -nE 's/^flux-operator = "(.*)"/\1/p' bootstrap.toml | head -1)
+  [ -n "$flux_chart_version" ] || { echo "ERROR: no flux-operator chart version in bootstrap.toml [charts]" >&2; exit 1; }
+helm pull oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator --version "$flux_chart_version" -d airgap/archives/charts
 podinfo_chart_version=$(sed -nE 's/^ *tag: "?([0-9][^"]*)"?.*/\1/p' workload/local-host/podinfo/helm.yaml | head -1)
 [ -n "$podinfo_chart_version" ] || { echo "ERROR: no podinfo chart tag in workload/local-host/podinfo/helm.yaml" >&2; exit 1; }
 helm pull oci://ghcr.io/stefanprodan/charts/podinfo --version "$podinfo_chart_version" -d airgap/archives/charts

@@ -11,7 +11,7 @@ dependencies = [
 [dependency-groups]
 dev = [
   "pytest==9.1.1",
-  "ruff==0.16.9",
+  "ruff==0.16.10",
 ]
 
 [tool.uv]

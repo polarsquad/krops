@@ -135,8 +135,8 @@ The verification linchpin is the agent's **image rewrite** plus a Ready
 | `archives/zarf-init-arm64.tar.zst` | `zarf init` (registry + agent); built by `zarf tools download-init` from the zarf CLI pinned in `mise.toml` and renamed at build time, so `mise.toml` stays the sole version declaration |
 | bundled `clusterctl` CLI binaries | render CAAPH's staged provider template at deploy time on macOS or Linux arm64 |
 | `zarf-package-krops-airgap-arm64-0.1.0.tar.zst` | signed package, including per-component Syft JSON/HTML SBOMs and the Sigstore signature bundle |
-| `archives/kindest_node_v1.37.0_mgmt.tar` | mgmt kind node (host daemon) |
-| `archives/kindest_node_v1.37.0.tar` | CAPD workload and management nodes (host daemon) |
+| `archives/kindest_node_v1.36.4_mgmt.tar` | mgmt kind node (host daemon) |
+| `archives/kindest_node_v1.36.4.tar` | CAPD workload and management nodes (host daemon) |
 | `archives/kindest_haproxy_*.tar` | CAPD load balancer |
 | `archives/docker.io_library_registry_2.tar` | krops-registry container |
 | `archives/workload-pod-images.tar` | flux controllers + podinfo for `preLoadImages` |
@@ -323,7 +323,7 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
    digest guarantee holds because the alias points at the image pulled by
    digest.
 10. **The `kindest/node` image does not bake the pause image kubeadm expects.**
-   v1.37.0 bakes `registry.k8s.io/pause:3.10`, while its kubeadm lists
+   v1.36.4 bakes `registry.k8s.io/pause:3.10`, while its kubeadm lists
    `pause:3.10.2`, so `kubeadm init` on a CAPD node tries to pull it and hangs
    until the bootstrap deadline (the run's step 8 failure, found from the
    workload-cluster debug capture in `/tmp/airgap-workload-debug.txt`).

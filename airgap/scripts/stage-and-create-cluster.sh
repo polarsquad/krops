@@ -3,7 +3,7 @@
 #
 # 1. docker-loads every image archive from airgap/archives/ into the host
 #    Docker daemon:
-#      - kindest/node v1.37.0 (mgmt kind node and CAPD workload/management
+#      - kindest/node v1.36.4 (mgmt kind node and CAPD workload/management
 #        nodes) — kind and CAPD `docker run` these directly from the host
 #        daemon, outside kubelet, so the Zarf agent cannot rewrite them.
 #      - kindest/haproxy (CAPD load balancer) and registry:2 (krops-registry,
@@ -23,7 +23,7 @@ AIRGAP_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 ARCHIVES="$AIRGAP_DIR/archives"
 
 CLUSTER_NAME="${CLUSTER_NAME:-mgmt}"
-KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5}"
+KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed}"
 DOCKER_SOCKET_PATH="${DOCKER_SOCKET_PATH:-/var/run/docker.sock}"
 
 if [ ! -S "$DOCKER_SOCKET_PATH" ]; then

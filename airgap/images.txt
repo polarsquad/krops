@@ -30,36 +30,36 @@ registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.14.2@sha256:31adb8a7
 registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.14.2@sha256:fb991a63cbe3e534f3bbec993009abf45c6d076e9b36366d073155aec3adade3
 registry.k8s.io/cluster-api-helm/cluster-api-helm-controller:v0.6.4@sha256:97d2a86f8e35d23bb4656b26f4564b35f109e47a0dc4860b71089e52eb6e6a24
 gcr.io/k8s-staging-cluster-api/capd-manager:v1.14.2@sha256:ba1cb33f80ef97e222922023797672efb1c1a4ebe3920ee28e042cd48103bc98
-registry.k8s.io/coredns/coredns:v1.14.6@sha256:900f9c109f7a33545d3c811516e8376df9019147b750f5ce3e254468769176ea
-registry.k8s.io/kube-apiserver:v1.37.0@sha256:d1045e5c6d2f016797d22143eba7502e1bb712a4681836a7c35763a9c192dd70
-registry.k8s.io/kube-controller-manager:v1.37.0@sha256:997c997924eb8574f63f204a0b0af133aaf33c10df84009c32d34037f4e0e077
-registry.k8s.io/kube-proxy:v1.37.0@sha256:77bf2b08ff8ac1a4a446cffaa85e79e87379c8cb54fcf60f2cb6c62c966829c8
-registry.k8s.io/etcd:3.7.0-0@sha256:6ecefbe2510c4a30573a62a4d6dd175acf881ca67003fcd91849a16df7a724d5
-registry.k8s.io/kube-scheduler:v1.37.0@sha256:a27622f132aa09cf2461ba077894a070c0186ec607366d14e805912d4804d11f
+registry.k8s.io/coredns/coredns:v1.14.2@sha256:e7e6440cfd1e919280958f5b5a6ab2b184d385bba774c12ad2a9e1e4183f90d9
+registry.k8s.io/kube-apiserver:v1.36.4@sha256:cfcdb01653308b975d589b528bfafe54011dfae925d85059177d95963a622748
+registry.k8s.io/kube-controller-manager:v1.36.4@sha256:232878d552ad5395562c8a9091a6c963f897ffbcf08f39be8f57ba8776bb3821
+registry.k8s.io/kube-proxy:v1.36.4@sha256:b33fcdd8319290736e566f5fc2225ca07d3c2dfc025fb006342791aa31be4603
+registry.k8s.io/etcd:3.6.8-0@sha256:397189418d1a00e500c0605ad18d1baf3b541a1004d768448c367e48071622e5
+registry.k8s.io/kube-scheduler:v1.36.4@sha256:7d84d58f091f16399673c87ccf579de50ac6ede39a2d6b82946c2dd5d7838ffc
 registry.k8s.io/pause:3.10.2@sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4
 docker.io/kindest/kindnetd:v20260528-9350166c@sha256:92f49a1b2c9242058481fc3e13412c19a62cfeb090717dad4598719d32351f1f
 docker.io/kindest/local-path-provisioner:v20260521-9fb22683@sha256:b1de813bcdde9737a283ff1961725d66c412b235fe08f2a3dc707fece91674b8
 docker.io/kindest/local-path-helper:v20260131-7181c60a@sha256:ac7c7f08e86f7bef7d2ad6dee944ed89d3d2e7de0ebc00490d7ddf6c26628a06
 
 # ── Host Docker daemon images [H] (kind nodes + CAPD containers) ─────────────
-kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
-kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
+kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
 kindest/haproxy:v20230606-42a2262b@sha256:001a06433666046dea44567c7d7c6adfc2ac0edb556576f6da507ff0b0f063d3
 docker.io/library/registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
 
-# ── Workload node containerd store [W] (v1.37.0 generation) ──────────────────
+# ── Workload node containerd store [W] (v1.36.4 generation) ──────────────────
 # Pulled by the workload node's OWN containerd; must be pre-seeded or reachable
 # from a registry the workload node can reach over the kind docker network.
 docker.io/kindest/kindnetd:v20260820-69b56db7@sha256:526969f0a1a7a788a7a96f53a4ad3b51607bde7bb2841edf52a02916e8d52650
 docker.io/kindest/kindnetd:v20260528-9350166c@sha256:92f49a1b2c9242058481fc3e13412c19a62cfeb090717dad4598719d32351f1f
 docker.io/kindest/local-path-provisioner:v20260820-69b56db7@sha256:fdb5360219dcca6acc7967326f9e04c89b038e2c1e924463b2a41cad2dc752ab
 docker.io/kindest/local-path-helper:v20260131-7181c60a@sha256:ac7c7f08e86f7bef7d2ad6dee944ed89d3d2e7de0ebc00490d7ddf6c26628a06
-registry.k8s.io/coredns/coredns:v1.14.6@sha256:900f9c109f7a33545d3c811516e8376df9019147b750f5ce3e254468769176ea
-registry.k8s.io/kube-apiserver:v1.37.0@sha256:d1045e5c6d2f016797d22143eba7502e1bb712a4681836a7c35763a9c192dd70
-registry.k8s.io/kube-controller-manager:v1.37.0@sha256:997c997924eb8574f63f204a0b0af133aaf33c10df84009c32d34037f4e0e077
-registry.k8s.io/kube-proxy:v1.37.0@sha256:77bf2b08ff8ac1a4a446cffaa85e79e87379c8cb54fcf60f2cb6c62c966829c8
-registry.k8s.io/etcd:3.7.0-0@sha256:6ecefbe2510c4a30573a62a4d6dd175acf881ca67003fcd91849a16df7a724d5
-registry.k8s.io/kube-scheduler:v1.37.0@sha256:a27622f132aa09cf2461ba077894a070c0186ec607366d14e805912d4804d11f
+registry.k8s.io/coredns/coredns:v1.14.2@sha256:e7e6440cfd1e919280958f5b5a6ab2b184d385bba774c12ad2a9e1e4183f90d9
+registry.k8s.io/kube-apiserver:v1.36.4@sha256:cfcdb01653308b975d589b528bfafe54011dfae925d85059177d95963a622748
+registry.k8s.io/kube-controller-manager:v1.36.4@sha256:232878d552ad5395562c8a9091a6c963f897ffbcf08f39be8f57ba8776bb3821
+registry.k8s.io/kube-proxy:v1.36.4@sha256:b33fcdd8319290736e566f5fc2225ca07d3c2dfc025fb006342791aa31be4603
+registry.k8s.io/etcd:3.6.8-0@sha256:397189418d1a00e500c0605ad18d1baf3b541a1004d768448c367e48071622e5
+registry.k8s.io/kube-scheduler:v1.36.4@sha256:7d84d58f091f16399673c87ccf579de50ac6ede39a2d6b82946c2dd5d7838ffc
 registry.k8s.io/pause:3.10.2@sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4
 # workload cluster runs its own Flux (synced from krops-registry:5000)
 ghcr.io/controlplaneio-fluxcd/flux-operator:v0.58.0@sha256:1c919ce1e28716f817ded65c06df0b7a8269542387d5a2ce50212450473c6209

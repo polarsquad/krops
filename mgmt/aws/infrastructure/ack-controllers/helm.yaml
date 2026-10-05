@@ -37,7 +37,7 @@ spec:
   interval: 1h
   url: oci://public.ecr.aws/aws-controllers-k8s/rds-chart
   ref:
-    tag: "1.12.1"
+    tag: "1.12.2"
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository

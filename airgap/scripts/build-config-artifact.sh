@@ -192,7 +192,7 @@ preload = """          preLoadImages:
             - ghcr.io/fluxcd/notification-controller:v1.9.3@sha256:071c351a0fb163eeb6a2bb82f1e894f51b6b0734216d2e97d3d99c9ab9d710b9
             - ghcr.io/stefanprodan/podinfo:6.15.0@sha256:ec73780a8425f59ea49f5bc8cdff0d598805a224fbaa1f86c67a244f250fa9da
 """
-anchor = "          customImage: kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed\n"
+anchor = "          customImage: kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5\n"
 count = txt.count(anchor)
 if count != 2:
     sys.exit(f"ERROR: expected 2 DevMachineTemplate customImage anchors, found {count}")

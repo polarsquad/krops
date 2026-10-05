@@ -3479,7 +3479,7 @@ spec:
         env:
         - name: GOMEMLIMIT
           value: 900MiB
-        image: gcr.io/gke-release/cnrm/operator:1.157.0
+        image: gcr.io/gke-release/cnrm/operator:1.158.0
         imagePullPolicy: Always
         name: manager
         resources:

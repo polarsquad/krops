@@ -15,7 +15,7 @@ spec:
       fluxcd: enabled
   repoURL: oci://ghcr.io/controlplaneio-fluxcd/charts
   chartName: flux-operator
-  version: "0.58.0"
+  version: "0.61.0"
   # Pin the Helm release name. Without it CAAPH generates
   # "flux-operator-<epoch>" per HelmReleaseProxy, and the chart's
   # keep-policy CRDs/ClusterRoles on a recreated workload cluster carry

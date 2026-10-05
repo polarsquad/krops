@@ -49,7 +49,7 @@ PIVOT_SKIP_DELETE="${PIVOT_SKIP_DELETE:-0}"
 # so Flux adopts these installs without drift. Renovate updates these pins
 # together with the manifest chart versions (platform-charts group).
 CERT_MANAGER_VERSION="1.21.2"
-CAPI_OPERATOR_VERSION="0.28.0"
+CAPI_OPERATOR_VERSION="0.29.0"
 
 # Phase 2 node readiness budget (the previous bare kubectl-wait --timeout=15m).
 MGMT_NODE_READY_TIMEOUT="15m"

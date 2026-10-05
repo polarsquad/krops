@@ -12,6 +12,6 @@ spec:
         kind: HelmRepository
         name: capi-operator
       # renovate: datasource=helm registryUrl=https://kubernetes-sigs.github.io/cluster-api-operator depName=cluster-api-operator
-      version: "0.28.0"
+      version: "0.29.0"
   values:
     manager: {}

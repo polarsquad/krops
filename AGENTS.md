@@ -182,7 +182,11 @@ resources. There is no app source code here, only declarative infrastructure.
   CLI's phases. Kept until the binary completes full parity runs per
   environment, then retired (issues #92/#95/#100). The lifecycle mise tasks
   (`bootstrap`/`pivot`/`teardown`) run the krops-toolbox container via
-  `scripts/toolbox-run.sh` (issue #104); the scripts remain the native path
+  `scripts/toolbox-run.sh` (issue #104); host Git metadata is forwarded as
+  `KROPS_OCI_GIT_SHA`, `KROPS_OCI_GIT_REF`, and `KROPS_OCI_SOURCE_URL` for
+  linked-worktree OCI publication (#426). Do not put these reserved values
+  in `.env`; mise reloads it inside the container. The regression gate
+  `tests/test-oci-push-worktree.py` runs in validate and CI; the scripts remain the native path
   for development.
 - `docs/`: detailed documentation (see the table in README.md).
   `docs/proposals/` holds design proposals, under review or accepted (an

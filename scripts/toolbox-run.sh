@@ -57,6 +57,21 @@ if [ -f .env ]; then
   done < .env
 fi
 
+# Resolve checkout metadata on the host: linked worktree .git pointers refer
+# outside /workspace and cannot be followed inside the toolbox. Refresh after
+# .env loading so stale OCI metadata cannot describe a different checkout.
+# Failure is nonfatal for lifecycle operations that do not publish OCI artifacts.
+unset KROPS_OCI_GIT_SHA KROPS_OCI_GIT_REF KROPS_OCI_SOURCE_URL
+if KROPS_OCI_GIT_SHA=$(git rev-parse HEAD 2>/dev/null); then
+  KROPS_OCI_GIT_REF=$(git branch --show-current 2>/dev/null) || KROPS_OCI_GIT_REF=""
+  KROPS_OCI_GIT_REF="${KROPS_OCI_GIT_REF:-detached}"
+  KROPS_OCI_SOURCE_URL=$(git config --get remote.origin.url 2>/dev/null) || KROPS_OCI_SOURCE_URL=""
+  KROPS_OCI_SOURCE_URL="${KROPS_OCI_SOURCE_URL:-file://${REPO_ROOT}}"
+  export KROPS_OCI_GIT_SHA KROPS_OCI_GIT_REF KROPS_OCI_SOURCE_URL
+else
+  unset KROPS_OCI_GIT_SHA
+fi
+
 TOOLBOX_IMAGE="${TOOLBOX_IMAGE:-ghcr.io/polarsquad/krops-toolbox:latest}"
 
 # ── Engine detection (bootstrap.sh parity) ────────────────────────────────────
@@ -143,6 +158,9 @@ TOOLBOX_ENV_SPEC=(
   REGISTRY_PORT
   OCI_REPOSITORY
   OCI_TAG
+  KROPS_OCI_GIT_SHA
+  KROPS_OCI_GIT_REF
+  KROPS_OCI_SOURCE_URL
   BOOTSTRAP_PIVOT
   PIVOT_SKIP_DELETE
   GIT_REPO_URL

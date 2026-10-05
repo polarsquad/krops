@@ -241,3 +241,10 @@ Run the checks that match what you touched. CI runs all of them.
 krops is licensed under the Apache License 2.0 (`LICENSE`). By submitting a
 contribution you agree that it is licensed under the same terms. The project
 does not currently require a Developer Certificate of Origin sign-off.
+
+OCI publication from linked worktrees uses host Git metadata forwarded by
+`scripts/toolbox-run.sh`. For raw toolbox helper runs, follow the metadata
+exports in [operations](docs/operations.md#helper-tasks-in-the-toolbox).
+Keep `KROPS_OCI_GIT_SHA`, `KROPS_OCI_GIT_REF`, and `KROPS_OCI_SOURCE_URL` out
+of `.env`. Run `python3 tests/test-oci-push-worktree.py` when changing the
+wrapper or `oci-push`; validate and CI also run this gate.

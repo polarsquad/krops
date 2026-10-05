@@ -53,6 +53,11 @@ if ! python3 tests/test-toolbox-run-exec.py; then
   echo "    FAILED: toolbox-run.sh exec" >&2
   fail=1
 fi
+echo "==> OCI publication from linked worktrees"
+if ! python3 tests/test-oci-push-worktree.py; then
+  echo "    FAILED: OCI worktree publication" >&2
+  fail=1
+fi
 echo "==> toolbox-run.sh .env precedence"
 if ! python3 tests/test-toolbox-run-env-precedence.py; then
   echo "    FAILED: toolbox-run.sh .env precedence" >&2

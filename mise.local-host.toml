@@ -3,10 +3,9 @@ KROPS_PROFILE = "local-host"
 
 [tasks.oci-push]
 description = "Package the local Git checkout as an OCI artifact and push it to the local registry"
+dir = "{{config_root}}"
 run = '''
-REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) \
-  || { echo "ERROR: not inside a Git repository" >&2; exit 1; }
-cd "$REPO_ROOT"
+REPO_ROOT="$PWD"
 
 REGISTRY_PORT="${REGISTRY_PORT:-5001}"
 # Toolbox runs reach the registry by kind-network name (the CLI exports
@@ -31,11 +30,26 @@ if ! curl --fail --silent --show-error "http://${REGISTRY_HOST}:${REGISTRY_PORT}
   exit 1
 fi
 
-GIT_SHA=$(git rev-parse HEAD)
-GIT_REF=$(git branch --show-current)
-GIT_REF="${GIT_REF:-detached}"
-SOURCE_URL=$(git config --get remote.origin.url || true)
-SOURCE_URL="${SOURCE_URL:-file://${REPO_ROOT}}"
+# The wrapper (or raw container caller) supplies all three host-side values.
+# A partial tuple is an error; never mix metadata from different checkouts.
+if [ "${KROPS_OCI_GIT_SHA+x}${KROPS_OCI_GIT_REF+x}${KROPS_OCI_SOURCE_URL+x}" != "" ]; then
+  if [ -z "${KROPS_OCI_GIT_SHA:-}" ] || [ -z "${KROPS_OCI_GIT_REF:-}" ] || [ -z "${KROPS_OCI_SOURCE_URL:-}" ]; then
+    echo "ERROR: supply complete OCI metadata: KROPS_OCI_GIT_SHA, KROPS_OCI_GIT_REF, KROPS_OCI_SOURCE_URL" >&2
+    exit 1
+  fi
+  GIT_SHA="$KROPS_OCI_GIT_SHA"
+  GIT_REF="$KROPS_OCI_GIT_REF"
+  SOURCE_URL="$KROPS_OCI_SOURCE_URL"
+else
+  GIT_SHA=$(git rev-parse HEAD 2>/dev/null) || {
+    echo "ERROR: Git metadata unavailable; forward KROPS_OCI_GIT_SHA, KROPS_OCI_GIT_REF, KROPS_OCI_SOURCE_URL from the host" >&2
+    exit 1
+  }
+  GIT_REF=$(git branch --show-current)
+  GIT_REF="${GIT_REF:-detached}"
+  SOURCE_URL=$(git config --get remote.origin.url || true)
+  SOURCE_URL="${SOURCE_URL:-file://${REPO_ROOT}}"
+fi
 
 ARTIFACT_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/krops-oci.XXXXXX")
 cleanup_artifact_root() {

@@ -569,15 +569,33 @@ for the full management plane (`allowSchedulingOnControlPlanes`).
 - Configurable via `REGISTRY_PORT` env var (defaults to 5001)
 - Idempotent: restarts if stopped, no action needed if already running
 
+`scripts/toolbox-run.sh` resolves current SHA, branch (or `detached`), and
+origin URL on the host after loading `.env`, then forwards them as
+`KROPS_OCI_GIT_SHA`, `KROPS_OCI_GIT_REF`, and `KROPS_OCI_SOURCE_URL`.
+These names are reserved for checkout metadata; do not set them in `.env`,
+which mise loads again inside the container. The raw helper below supplies
+all three explicitly. OCI publication uses mise's configuration root and
+never follows a linked worktree's host-only `.git` pointer when metadata is
+supplied. Native runs can derive metadata from Git; a partial or empty
+supplied tuple fails with an error. Without an origin, the source is a
+`file://` URL for the checkout.
+
 **Workflow:**
 ```bash
 # Republish the local management and workload folders after making changes
+# Resolve metadata on the host, including when this checkout is a linked worktree.
+export KROPS_OCI_GIT_SHA="$(git rev-parse HEAD)"
+export KROPS_OCI_GIT_REF="$(git branch --show-current)"
+export KROPS_OCI_GIT_REF="${KROPS_OCI_GIT_REF:-detached}"
+export KROPS_OCI_SOURCE_URL="$(git config --get remote.origin.url || true)"
+export KROPS_OCI_SOURCE_URL="${KROPS_OCI_SOURCE_URL:-file://$PWD}"
 docker run --rm -it \
   -v "$PWD:/workspace" -w /workspace \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v "$PWD/.kube:/root/.kube" \
   -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml \
   -e MISE_AUTO_INSTALL=0 --network kind -e REGISTRY_HOST=krops-registry -e REGISTRY_PORT=5000 \
+  -e KROPS_OCI_GIT_SHA -e KROPS_OCI_GIT_REF -e KROPS_OCI_SOURCE_URL \
   --entrypoint mise "$TOOLBOX_IMAGE" -E local-host run oci-push
 
 # Optional overrides: add -e OCI_REPOSITORY=my-config -e OCI_TAG=v1 to the same run.

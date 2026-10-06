@@ -42,7 +42,6 @@ REQUIRED_ACTIONS = {
         "s3:ListAllMyBuckets",
         "s3:GetBucketLocation",
         "s3:TagResource",
-        "s3:DeleteBucketTagging",
         "s3:GetBucketTagging", "s3:PutBucketTagging",
         "s3:GetBucketPublicAccessBlock", "s3:PutBucketPublicAccessBlock",
         "s3:GetEncryptionConfiguration", "s3:PutEncryptionConfiguration",

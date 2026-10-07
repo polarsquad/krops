@@ -350,21 +350,6 @@
     },
     {
       "customType": "regex",
-      "description": "Config Connector operator version (management and workload copies must stay identical; the pinned-manifest gate, tests/test-kcc-operator-pin.py, keeps them in lockstep - Renovate bumps the version comment and image tag, the gate then goes red until the whole release bundle is re-downloaded, issue #72)",
-      "managerFilePatterns": [
-        "/(^|/)mgmt/gcp/infrastructure/kcc-operator/configconnector-operator\\.yaml$/",
-        "/(^|/)workload/gcp-base/kcc/configconnector-operator\\.yaml$/"
-      ],
-      "matchStrings": [
-        "kcc-operator-version: (?<currentValue>[0-9.]+)",
-        "image: gcr.io/gke-release/cnrm/operator:(?<currentValue>[0-9.]+)"
-      ],
-      "depNameTemplate": "GoogleCloudPlatform/k8s-config-connector",
-      "datasourceTemplate": "github-releases",
-      "extractVersionTemplate": "^v(?<version>.+)"
-    },
-    {
-      "customType": "regex",
       "description": "CAAPH (helm add-on) provider version",
       "managerFilePatterns": [
         "/(^|/)mgmt/(aws|azure|gcp|local-host)/capi-providers/caaph-system/.+\\.ya?ml$/"
@@ -374,6 +359,19 @@
       "datasourceTemplate": "github-releases",
       "extractVersionTemplate": "^v(?<version>.+)",
       "autoReplaceStringTemplate": "  version: \"v{{newValue}}\""
+    },
+    // ── KCC operator OCIRepository tag ───────────────────────────────────
+    {
+      "customType": "regex",
+      "description": "KCC operator OCIRepository tag tracks the published Helm chart on GHCR (issue #72)",
+      "managerFilePatterns": [
+        "/(^|/)kcc-operator/ocirepository\\.ya?ml$/"
+      ],
+      "matchStrings": ["tag: \"(?<currentValue>[0-9][^\"]+)\""],
+      "depNameTemplate": "lioramilbaum/config-connector-helm/config-connector",
+      "registryUrlTemplate": "https://ghcr.io",
+      "datasourceTemplate": "docker",
+      "autoReplaceStringTemplate": "tag: \"{{newValue}}\""
     },
     // ── kind node images ─────────────────────────────────────────────────
     {

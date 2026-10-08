@@ -23,7 +23,7 @@ BOOTSTRAP = REPO_ROOT / "bootstrap.toml"
 KCC_WORKLOAD = REPO_ROOT / "workload/gcp-base/kcc/configconnector.yaml"
 READER = REPO_ROOT / "workload/gcp-base/iam/reader.yaml"
 SQL = REPO_ROOT / "workload/gcp-base/postgres/postgres.yaml"
-CLUSTER_VARS = REPO_ROOT / "mgmt/gcp/addons/flux-apps/flux-instance.yaml"
+CLUSTER_VARS = REPO_ROOT / "mgmt/gcp/addons/flux-apps/regions/europe-north1/cluster-vars.yaml"
 # Project numbers are 12 digits today; leave headroom.
 BUCKET_PROJECT_NUMBER_DIGITS = 19
 KCC_WORKLOAD_SA = "cnrm-system/cnrm-controller-manager"
@@ -203,11 +203,10 @@ def main() -> int:
     cluster_name = None
     for d in docs(CLUSTER_VARS):
         if d and d.get("kind") == "ConfigMap":
-            # CLUSTER_NAME is embedded in the flux-instance.yaml artifact
-            # string inside the ConfigMap's data.
-            m = re.search(r'CLUSTER_NAME:\s*"([^"]+)"', str(d.get("data", {})))
-            if m:
-                cluster_name = m.group(1)
+            # cluster-vars is a plain ConfigMap; read the value directly.
+            cluster_name = d.get("data", {}).get("CLUSTER_NAME")
+            if cluster_name is not None:
+                cluster_name = str(cluster_name)
     if cluster_name is None:
         failures.append(f"{CLUSTER_VARS.relative_to(REPO_ROOT)}: CLUSTER_NAME not found in cluster-vars")
     else:

@@ -128,6 +128,11 @@ if ! python3 tests/test-bootstrap-config.py; then
   echo "    FAILED: bootstrap.toml cross-check" >&2
   fail=1
 fi
+echo "==> flux-apps ResourceSet delivery (no CRS)"
+if ! uv run python tests/test-flux-apps-resourceset.py; then
+  echo "    FAILED: flux-apps ResourceSet" >&2
+  fail=1
+fi
 echo "==> shell REGION_PLAN vs bootstrap.toml"
 if ! python3 tests/test-bootstrap-shell-region-plan.py; then
   echo "    FAILED: shell REGION_PLAN vs bootstrap.toml" >&2

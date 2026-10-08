@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-vars
+  namespace: flux-system
+data:
+  GCP_REGION: "europe-north1"
+  CLUSTER_NAME: "europe-north1-workload"
+  GCP_PROJECT: "krops-placeholder"
+  GCP_PROJECT_NUMBER: "000000000000"
+  GCP_NETWORK: "krops-europe-north1-workload"

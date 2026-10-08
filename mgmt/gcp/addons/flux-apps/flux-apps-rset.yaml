@@ -1,0 +1,42 @@
+---
+# Per-workload-cluster Flux bootstrap bag via a templated ResourceSet.
+#
+# Replaces the ClusterResourceSet (ApplyOnce) path. One input per workload
+# cluster; per input the operator renders a Kustomization in namespace
+# `default` (co-located with the CAPI <cluster>-kubeconfig Secret) that
+# remote-applies the per-region bundle (namespace + cluster-vars + pull
+# secret + FluxInstance) into flux-system on that workload cluster, with
+# prune: true so values update and objects are GC'd on re-creation.
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSet
+metadata:
+  name: flux-apps
+  namespace: default
+spec:
+  inputs:
+    - region: "europe-north1"
+      cluster: "europe-north1-workload"
+  resourcesTemplate: |
+    apiVersion: kustomize.toolkit.fluxcd.io/v1
+    kind: Kustomization
+    metadata:
+      name: flux-apps-<< inputs.region >>
+      namespace: default
+    spec:
+      interval: 5m
+      retryInterval: 2m
+      timeout: 10m
+      prune: true
+      wait: false
+      kubeConfig:
+        secretRef:
+          name: << inputs.cluster >>-kubeconfig
+      sourceRef:
+        kind: GitRepository
+        name: flux-system
+        namespace: flux-system
+      path: ./mgmt/gcp/addons/flux-apps/regions/<< inputs.region >>
+      decryption:
+        provider: sops
+        secretRef:
+          name: sops-age

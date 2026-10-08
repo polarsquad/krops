@@ -118,7 +118,7 @@ mgmt-eks-cluster-name = "default_eu-north-1-management-control-plane"
 mgmt-iam-role-prefix = "eu-north-1-management"
 # Workload clusters the orphan sweep visits (order: file order = sweep
 # order). Names mirror the Kustomization namePrefixes and the cluster-vars
-# substitutions in mgmt/aws/addons/flux-apps/flux-instance.yaml.
+# substitutions in mgmt/aws/addons/flux-apps/regions/*/cluster-vars.yaml.
 [[environments.aws.teardown.aws-workloads]]
 region = "eu-north-1"
 cluster-name = "eu-north-1-workload"

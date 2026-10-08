@@ -6,7 +6,7 @@
 # S3 bucket names are globally unique, so the account ID and cluster name are
 # part of each name. There is no cluster-vars ConfigMap on the management
 # cluster, so the values are literal (the account ID is already a literal in
-# mgmt/aws/addons/flux-apps/flux-instance.yaml).
+# mgmt/aws/addons/flux-apps/regions/*/cluster-vars.yaml).
 #
 # The controller's default region is eu-north-1; the eu-west-1 bucket overrides
 # it with the services.k8s.aws/region annotation.

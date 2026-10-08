@@ -519,7 +519,10 @@ This initial imperative phase performs these steps:
 1. Creates the `mgmt` kind cluster.
 2. Installs the Flux Operator (Helm).
 3. Creates the `flux-github-pat` secret (for Git access) and the `sops-age`
-   secret (the age private key Flux uses to decrypt SOPS-encrypted secrets).
+   secret (the age private key Flux uses to decrypt SOPS-encrypted secrets)
+   in both the Flux namespace (`flux-system`) and `default` (where the
+   ResourceSet remote-apply Kustomizations SOPS-decrypt the per-region pull
+   secret).
 4. Installs a `FluxInstance` that syncs `mgmt/aws/` and hands off to GitOps.
 5. Pivots: moves the CAPI inventory into the self-managed management cluster
    and deletes the kind cluster (see [Pivot recovery](#pivot-recovery)).

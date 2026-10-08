@@ -57,7 +57,7 @@ flowchart TD
         KONF["konflate (SOPS token)<br/>rendered Flux PR review"]
         EUN[eu-north-1 cluster def]
         EUW[eu-west-1 cluster def]
-        FA["flux-apps (SOPS pull secret)<br/>HelmChartProxy + ClusterResourceSets"]
+        FA["flux-apps (SOPS pull secret)<br/>HelmChartProxy + ResourceSet"]
 
         FS --> CM --> CO
         CO --> CI --> AMC
@@ -90,7 +90,7 @@ flowchart TD
     RUSER -.->|sts:AssumeRole| RD1
     RUSER -.->|sts:AssumeRole| RD2
 
-    FA -->|"HelmChartProxy: flux-operator<br/>CRS: FluxInstance + cluster-vars + pull secret"| WF1
+    FA -->|"HelmChartProxy: flux-operator<br/>ResourceSet: FluxInstance + cluster-vars + pull secret (remote-apply)"| WF1
     FA -->|same, per region label| WF2
 
     subgraph wl1["Workload cluster eu-north-1"]
@@ -159,12 +159,15 @@ Flux instance stays installed, ready for a future application workload)
 1. Each `Cluster` in `mgmt/aws/clusters/` carries labels `fluxcd: enabled`
    and `region: <region>`.
 2. `flux-apps` matches those labels: a **HelmChartProxy** installs the Flux
-   Operator on every workload cluster, and per-region **ClusterResourceSets**
-   apply a `FluxInstance` (syncing `workload/<region>-01/`), a `cluster-vars`
-   ConfigMap (`AWS_REGION`, `CLUSTER_NAME`, `AWS_ACCOUNT_ID`, kept as the
-   `postBuild` substitution channel for a future workload), and the Git pull
-   secret.
-3. The workload cluster's Flux reconciles `workload/`, whose `base/` overlay
+   Operator on every `fluxcd: enabled` workload cluster, and a templated
+   **ResourceSet** remote-applies the per-region Flux bootstrap bag
+   (namespace, cluster-vars, pull secret, FluxInstance) into `flux-system`
+   on each workload via its CAPI kubeconfig Secret, with inventory pruning
+   on re-creation. `cluster-vars` keeps `AWS_REGION`, `CLUSTER_NAME`, and
+   `AWS_ACCOUNT_ID` as the `postBuild` substitution channel for a future
+   workload.
+3. The workload cluster's Flux reconciles `workload/<region>-01`, whose
+   `base/` overlay
    is intentionally empty since issue #346: the ACK controllers and the
    Bucket / DBInstance / reader Role CRs moved to the management cluster
    (`mgmt/aws/infrastructure/ack-controllers/` and
@@ -225,7 +228,7 @@ flowchart TD
         AZID["azure-identity (secret-free)<br/>AzureClusterIdentity: WorkloadIdentity"]
         ASOWI["aso-workload-identity<br/>krops-aso + krops-capz identities + FICs + roles"]
         SWEDENC["swedencentral cluster def<br/>swedencentral-management (self-hosted)<br/>swedencentral-workload"]
-        FA["flux-apps (SOPS pull secret)<br/>HelmChartProxy + ClusterResourceSets"]
+        FA["flux-apps (SOPS pull secret)<br/>HelmChartProxy + ResourceSet"]
 
         FS --> CM --> CO --> CAPIS --> CAPZS
         CAPIS --> CAAPH --> FA
@@ -253,7 +256,7 @@ flowchart TD
     ASOWI -->|bundled ASO creates| ROLE
     ROLE -.->|scopes to| RG
 
-    FA -->|"HelmChartProxy: flux-operator<br/>CRS: FluxInstance + cluster-vars + pull secret"| WF
+    FA -->|"HelmChartProxy: flux-operator<br/>ResourceSet: FluxInstance + cluster-vars + pull secret (remote-apply)"| WF
 
     subgraph wl["Workload cluster swedencentral-workload"]
         WF["Flux (sync: workload/swedencentral-01)"]
@@ -346,7 +349,7 @@ flowchart TD
         KCC["kcc (ConfigConnector in cnrm-system)<br/>WIF credential Secret"]
         KCCI["kcc-identity (KCC-managed)<br/>krops pool + mgmt provider + GSA grants"]
         EUNC["europe-north1 cluster defs<br/>europe-north1-management (self-hosted)<br/>europe-north1-workload"]
-        FA["flux-apps (SOPS pull secret)<br/>HelmChartProxy + ClusterResourceSets"]
+        FA["flux-apps (SOPS pull secret)<br/>HelmChartProxy + ResourceSet"]
 
         FS --> CM --> CO --> CAPIS --> CAPGS
         CAPIS --> CAAPH --> FA
@@ -369,7 +372,7 @@ flowchart TD
     KCCI -->|KCC creates| POOL
     KCCI -->|KCC creates| GSAS
     KCC -->|KCC reconciles| SQL
-    FA -->|"HelmChartProxy: flux-operator<br/>CRS: FluxInstance + cluster-vars + pull secret"| WF
+    FA -->|"HelmChartProxy: flux-operator<br/>ResourceSet: FluxInstance + cluster-vars + pull secret (remote-apply)"| WF
 
     subgraph wl["Workload cluster europe-north1-workload (GKE)"]
         WF["Flux (sync: workload/europe-north1-01)"]

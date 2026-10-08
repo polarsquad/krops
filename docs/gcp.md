@@ -53,7 +53,7 @@ that reconciles GCP resources from `workload/gcp-base/`.
 1. `mgmt/gcp/infrastructure/gcp-vars/gcp-vars.yaml`: `GCP_PROJECT`,
    `GCP_PROJECT_NUMBER` (printed by `gcp-bootstrap`). The region (`europe-north1`)
    and zone (`europe-north1-a`) are committed constants.
-2. `mgmt/gcp/addons/flux-apps/flux-instance.yaml` (`cluster-vars`): the same
+2. `mgmt/gcp/addons/flux-apps/regions/europe-north1/cluster-vars.yaml`: the same
    `GCP_PROJECT` / `GCP_PROJECT_NUMBER` for the workload cluster.
 3. Pick the GKE version: `gcloud container get-server-config --zone europe-north1-a`
    and set `version:` in

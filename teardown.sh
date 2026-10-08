@@ -221,7 +221,7 @@ _get_eks_cluster() {
 }
 
 # CLUSTER_NAME as substituted into the workload manifests (cluster-vars
-# ConfigMap in mgmt/aws/addons/flux-apps/flux-instance.yaml). Used to derive
+# ConfigMap in mgmt/aws/addons/flux-apps/regions/*/cluster-vars.yaml). Used to derive
 # the S3 bucket name, the CAPA ownership tag, and to sweep CAPA-created IAM
 # roles by name.
 _get_cluster_name() {

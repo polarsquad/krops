@@ -55,7 +55,7 @@ Commit these (non-secret) values:
   mgmt/gcp/infrastructure/gcp-vars/gcp-vars.yaml
     GCP_PROJECT:        "${GCP_PROJECT}"
     GCP_PROJECT_NUMBER: "${PROJECT_NUMBER}"
-  mgmt/gcp/addons/flux-apps/flux-instance.yaml (cluster-vars)
+  mgmt/gcp/addons/flux-apps/regions/europe-north1/cluster-vars.yaml
     GCP_PROJECT / GCP_PROJECT_NUMBER: the same values
 Nothing is secret: no service-account key exists (issue #72).
 EOF

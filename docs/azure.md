@@ -48,7 +48,7 @@ Operator (ASO) that reconciles Azure resources from `workload/azure-base/`.
 1. `mgmt/azure/infrastructure/azure-identity/azure-vars.yaml`:
    `AZURE_SUBSCRIPTION_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` (the
    `krops-capz` UAMI client ID).
-2. `mgmt/azure/addons/flux-apps/flux-instance.yaml` (`cluster-vars`):
+2. `mgmt/azure/addons/flux-apps/regions/swedencentral/cluster-vars.yaml`:
    the same two IDs plus `AZURE_ASO_CLIENT_ID`, `AZURE_ASO_PRINCIPAL_ID`
    (the `krops-aso` identity) and `STORAGE_ACCOUNT_NAME` (globally unique,
    3-24 lowercase alphanumerics; change it if creation fails with

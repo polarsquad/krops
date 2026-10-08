@@ -17,7 +17,7 @@ with `spec.decryption.provider: sops`):
 |---|---|---|
 | `mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml` | `capa-system` | CAPA controller AWS credentials |
 | `mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml` | `ack-controllers` | ACK S3/RDS/IAM controller AWS credentials (shared-credentials-file format) |
-| `mgmt/aws/addons/flux-apps/flux-pull-secret.sops.yaml` | `flux-apps` | GitHub PAT pull secret (basic auth), delivered to each workload cluster via ClusterResourceSet so its Flux can clone this (private) repo. The `mgmt/azure/addons/flux-apps/` and `mgmt/gcp/addons/flux-apps/` copies serve the same role for their environments. |
+| `mgmt/aws/addons/flux-apps/regions/<region>/flux-github-pat.sops.yaml` | `flux-apps` | GitHub PAT pull secret (basic auth), delivered to each workload cluster by a templated ResourceSet (management Kustomization in `default` + `kubeConfig` remote-apply + SOPS decryption via `default/sops-age`) so its Flux can clone this (private) repo. The `mgmt/azure/addons/flux-apps/` and `mgmt/gcp/addons/flux-apps/` copies serve the same role for their environments. |
 | `mgmt/aws/infrastructure/konflate/konflate-token.sops.yaml` | `konflate` | `KONFLATE_TOKEN` (read-only GitHub PAT so konflate can list PRs and clone this private repo) and `KONFLATE_WRITE_TOKEN` (write-back credential konflate uses to post the PR summary comment and the `Konflate` commit status) |
 
 ## First-time setup
@@ -122,18 +122,27 @@ The management cluster's own `flux-github-pat` secret is created imperatively
 at bootstrap (from `GITHUB_TOKEN` in `.env`) and is **not** in Git; Flux
 needs it to clone the repo before it could ever decrypt anything (a
 chicken-and-egg constraint). The workload clusters' copy *is* in Git
-(`flux-pull-secret.sops.yaml`) because the management cluster's Flux decrypts
-it before shipping it out via ClusterResourceSet.
+(`regions/<region>/flux-github-pat.sops.yaml`, one per region) because the
+management cluster's Flux SOPS-decrypts it in namespace `default` and
+remote-applies it to the workload via the ResourceSet-generated
+`Kustomization` (through `kubeConfig` + the CAPI `<cluster>-kubeconfig`
+Secret).
 
-To set or rotate the PAT in the workload clusters' pull secret:
+To set or rotate the PAT in the workload clusters' pull secret, decrypt,
+edit `stringData.password`, and re-encrypt the copy in **every** region
+directory that carries it (aws: eu-north-1 + eu-west-1, azure: swedencentral,
+gcp: europe-north1) so the per-region copies stay identical:
 
 ```sh
-# Decrypt in place, put the PAT into the nested stringData.password field,
-# then re-encrypt:
-krops_mise x -- sops --decrypt --in-place --input-type yaml --output-type yaml \
-  mgmt/aws/addons/flux-apps/flux-pull-secret.sops.yaml
-$EDITOR mgmt/aws/addons/flux-apps/flux-pull-secret.sops.yaml
-krops_mise run sops-encrypt mgmt/aws/addons/flux-apps/flux-pull-secret.sops.yaml
+for f in \
+  mgmt/aws/addons/flux-apps/regions/eu-north-1/flux-github-pat.sops.yaml \
+  mgmt/aws/addons/flux-apps/regions/eu-west-1/flux-github-pat.sops.yaml \
+  mgmt/azure/addons/flux-apps/regions/swedencentral/flux-github-pat.sops.yaml \
+  mgmt/gcp/addons/flux-apps/regions/europe-north1/flux-github-pat.sops.yaml; do
+  krops_mise x -- sops --decrypt --in-place --input-type yaml --output-type yaml "$f"
+  $EDITOR "$f"
+  krops_mise run sops-encrypt "$f"
+done
 ```
 
 Remember to also update `GITHUB_TOKEN` in `.env` so the next bootstrap uses

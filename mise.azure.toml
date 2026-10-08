@@ -58,7 +58,7 @@ Commit these (non-secret) values:
     AZURE_SUBSCRIPTION_ID: "${AZURE_SUBSCRIPTION_ID}"
     AZURE_TENANT_ID:       "${TENANT_ID}"
     AZURE_CLIENT_ID:       "${CAPZ_CLIENT_ID}"   # krops-capz UAMI client ID
-  mgmt/azure/addons/flux-apps/flux-instance.yaml (cluster-vars)
+  mgmt/azure/addons/flux-apps/regions/swedencentral/cluster-vars.yaml
     AZURE_ASO_CLIENT_ID:    "${ASO_CLIENT_ID}"
     AZURE_ASO_PRINCIPAL_ID: "${ASO_PRINCIPAL_ID}"
 Nothing is secret: no service principal exists (issue #236).

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-vars
+  namespace: flux-system
+data:
+  AWS_REGION: "eu-west-1"
+  CLUSTER_NAME: "eu-west-1-workload"
+  AWS_ACCOUNT_ID: "120392301094"

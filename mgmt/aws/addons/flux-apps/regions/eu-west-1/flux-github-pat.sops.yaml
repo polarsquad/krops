@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: flux-github-pat
+    namespace: flux-system
+type: Opaque
+stringData:
+    username: ENC[AES256_GCM,data:WpMk,iv:nzQUcOYYQBfu9UdmaDZNQiUPtYhaGcyqigFMUFk4K8M=,tag:kWtRGsrkn64ltFPDz9SGrA==,type:str]
+    password: ENC[AES256_GCM,data:07OLxCTw/A7Hz1bzj05YKsk0k0onIubZgcUwHPdFYxZW1+V8LWXrVP4R2yItPkrXLf2BIMWM0tJEpwROCYmsiePnZmv7L5m4gevEMpPGvJIvJr7KsgifMd9U1jWh,iv:4WPW0Xj7rojIH6cIxCEgSFE07Xn1s0vc15Z82dzWjwI=,tag:qZJ891KpMsjtxRSNZSzGbw==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBOYjRuMlNnZHlQRFpiVjJC
+            K2l2YVFyNE9pZDl3SUpLNXNYQm4rYVBWeHdRCnVma0VsNE9nUWdxSU5VZjVpKzI1
+            dk11dDFyb0E1NVNGZk1LQ3VCeGRtaVEKLS0tIDFNUGY3YXc1RVQxNDh3eWJ0YjA0
+            UXQrVElSUUMyclc4QjNDNXk3N0N4SU0KGNI8sT+05+78aYrsruq0/T68P7Naflen
+            yBupuA5ddKuzKGnO8GA0bPAPhjcEetQUsK+mK9tROYAEdHsOTIYqHg==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1amqtgevmdxutg07rkr3wggua43620zgncgfq53vkww0283wrgspqv9q0jw
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-10-08T18:21:56Z"
+    mac: ENC[AES256_GCM,data:NB0uLqn9gqqyDyZdzLcMqO+8ilJ38YGnzvoV1VSCfcO/rXHS3TF9rC/XCeJw5DbP2V17+BTQAgpbASkfhvaCWdcPYHNt+ICFleY4hlM+SA/Bi3PIjqvaGJqU6amDDMpTnKPDEE6iunrutCU1SemZuL4eTOu9Lxum3uoVuEq7dLg=,iv:nmcNSf6gJxysN+ICqB1g0kfm2hDmK4phj8B05HOEEqM=,tag:idZVmCEZq29d5+sWY6GHtw==,type:str]
+    version: 3.13.3

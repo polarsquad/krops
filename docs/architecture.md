@@ -15,6 +15,29 @@ network while the bootstrap cluster exists, and leaves no toolbox workload in
 the managed clusters. This packaging changes the host tool boundary, not the
 Flux or CAPI reconciliation architecture.
 
+## Architecture pillars
+
+These principles guide every change to krops. A change that departs from
+one states why in its pull request or in a `docs/proposals/` entry.
+
+### One reconciliation loop, minimal abstractions
+
+Flux is the single reconciliation loop. Every persistent change is YAML in
+Git, and Flux converges the clusters toward it: cluster lifecycle (Cluster
+API), per-cluster Flux instances (CAPI addons), and cloud resources (ACK,
+ASO, Config Connector) are all Kubernetes resources reconciled the same way.
+There is no Terraform, no state file, and no second toolchain with its own
+plan and apply cycle. The only imperative steps are bootstrap, pivot, and
+teardown, run by `krops-bootstrap` or the shell equivalent `teardown.sh`; bootstrap and pivot hand control to Flux
+and exit.
+
+Each abstraction layer is one more thing a human or AI agent operator must
+understand before changing the system, and one more place for mistakes and
+hallucinations. krops therefore uses each component's upstream API (Flux,
+CAPI, the cloud operators) directly instead of wrapping it in generators,
+templating layers, or in-house CRDs, and adds a layer only when it removes
+more complexity than it introduces.
+
 ## AWS environment (aws)
 
 The reference environment manages AWS infrastructure through the Kubernetes

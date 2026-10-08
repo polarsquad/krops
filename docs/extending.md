@@ -9,9 +9,11 @@
 3. Register it in `mgmt/aws/clusters/<region>/kustomization.yaml` and add a
    `Kustomization` entry in `mgmt/aws/clusters/flux-ks.yaml` with
    `dependsOn: [capa-system]`.
-4. In `mgmt/aws/addons/flux-apps/flux-instance.yaml`, add a per-region
-   FluxInstance ConfigMap (sync path `workload/<region>-01`, plus `cluster-vars`)
-   and a matching `ClusterResourceSet`.
+4. In `mgmt/aws/addons/flux-apps/flux-apps-rset.yaml`, add the workload
+   cluster to the `ResourceSet` `inputs` (region + the live CAPI cluster
+   name) and create the per-region bundle `mgmt/aws/addons/flux-apps/
+   regions/<region>/` (namespace, `cluster-vars`, `flux-instance` with sync
+   path `workload/<region>-01`, `flux-github-pat.sops.yaml`).
 5. Add the cluster's `Bucket`, `DBInstance`, and reader `Role` CRs to
    `mgmt/aws/infrastructure/workload-resources/` (literal account ID and
    cluster name; use the `services.k8s.aws/region` annotation for

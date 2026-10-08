@@ -442,7 +442,7 @@ teardown controls, toolbox release, and current parity status.
 │   ├── capi-providers/           capi-system, capa-system (SOPS creds),
 │   │                              caaph-system
 │   ├── addons/flux-apps/         Installs Flux on each workload cluster
-│   │                              (HelmChartProxy + ClusterResourceSets)
+│   │                              (HelmChartProxy + ResourceSet)
 │   └── clusters/                 EKS cluster defs: eu-north-1, eu-west-1
 │                                  (x86 + ARM MachinePools); eu-north-1 also
 │                                  carries the self-managed management cluster

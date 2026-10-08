@@ -11,9 +11,10 @@ metadata:
   namespace: default
   labels:
     region: eu-north-1
-    # Deliberately NOT `fluxcd: enabled`: the ClusterResourceSets in
-    # mgmt/aws/addons/flux-apps/ select on fluxcd=enabled + region and would
-    # deploy a workload-cluster FluxInstance into the management cluster.
+    # Deliberately NOT `fluxcd: enabled`: the ResourceSet-generated
+    # remote-apply Kustomizations in mgmt/aws/addons/flux-apps/ target
+    # clusters by region and would deploy a workload-cluster FluxInstance
+    # into the management cluster.
 spec:
   clusterNetwork:
     pods:

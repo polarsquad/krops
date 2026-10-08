@@ -1,8 +1,8 @@
 ---
 # ── GKE workload Cluster ────────────────────────────────────────────────────
 # Reconciled by this management cluster's Flux once the workload cluster is
-# up; its own Flux instance then syncs workload/europe-north1-01 (via the
-# flux-apps ClusterResourceSet in mgmt/gcp/addons/).
+# up; its own Flux instance then syncs workload/europe-north1-01 (delivered
+# by the flux-apps ResourceSet in mgmt/gcp/addons/).
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
 metadata:

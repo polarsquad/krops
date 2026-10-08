@@ -93,9 +93,10 @@ cluster.
 
 ## Commit the identifiers
 
-1. `mgmt/aws/addons/flux-apps/flux-instance.yaml` (the `cluster-vars`
-   ConfigMap per region): set `AWS_ACCOUNT_ID` to your account ID, kept as
-   the `postBuild` substitution channel for a future workload app.
+1. `mgmt/aws/addons/flux-apps/regions/<region>/cluster-vars.yaml`
+   (the `cluster-vars` ConfigMap per region): set `AWS_ACCOUNT_ID` to your
+   account ID, kept as the `postBuild` substitution channel for a future
+   workload app.
 2. `mgmt/aws/infrastructure/workload-resources/`: the account ID is a
    literal in the bucket names, the bucket policy ARNs, the reader-role
    trust principal, and the RDS resource-level policy ARNs (there is no

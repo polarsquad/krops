@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-vars
+  namespace: flux-system
+data:
+  AZURE_LOCATION: "swedencentral"
+  CLUSTER_NAME: "swedencentral-workload"
+  AZURE_SUBSCRIPTION_ID: "00000000-0000-0000-0000-000000000000"
+  AZURE_TENANT_ID: "00000000-0000-0000-0000-000000000000"
+  AZURE_ASO_CLIENT_ID: "00000000-0000-0000-0000-000000000000"
+  AZURE_ASO_PRINCIPAL_ID: "00000000-0000-0000-0000-000000000000"
+  STORAGE_ACCOUNT_NAME: "kropsswcworkloadsksimc"

@@ -302,6 +302,17 @@ seed_flux() {
       --namespace flux-system \
       --from-file="keys.${AGE_PUBKEY}.agekey=${AGE_KEY_FILE}" \
       --dry-run=client -o yaml | seed_kubectl apply -f -
+
+    # The per-cluster ResourceSet remote-apply Kustomizations live in
+    # namespace `default` (co-located with the CAPI <cluster>-kubeconfig
+    # Secrets) and SOPS-decrypt the per-region pull secret there, so they
+    # need the age key in `default` as well as in flux-system.
+    echo ">>> Creating sops-age decryption secret in default..."
+    seed_kubectl delete secret sops-age -n default --ignore-not-found
+    seed_kubectl create secret generic sops-age \
+      --namespace default \
+      --from-file="keys.${AGE_PUBKEY}.agekey=${AGE_KEY_FILE}" \
+      --dry-run=client -o yaml | seed_kubectl apply -f -
   fi
 
   # ── Install the FluxInstance via Helm ───────────────────────────────────────

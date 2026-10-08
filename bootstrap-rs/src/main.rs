@@ -1419,6 +1419,40 @@ async fn create_github_secrets(
             },
         }),
     )
+    .await?;
+
+    // The per-cluster ResourceSet remote-apply Kustomizations live in
+    // namespace `default` (co-located with the CAPI <cluster>-kubeconfig
+    // Secrets) and SOPS-decrypt the per-region pull secret there, so they
+    // need the age key in `default` as well as in the flux namespace.
+    println!(">>> Creating sops-age decryption secret in default...");
+    run(
+        "kubectl",
+        &kubectl_cmd(
+            kubeconfig,
+            &[
+                "delete",
+                "secret",
+                sops_secret,
+                "-n",
+                "default",
+                "--ignore-not-found",
+            ],
+        ),
+    )
+    .await?;
+    kubectl_apply(
+        kubeconfig,
+        &json!({
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": { "name": sops_secret, "namespace": "default" },
+            "type": "Opaque",
+            "stringData": {
+                format!("keys.{}.agekey", github.age_pubkey): github.age_key_content,
+            },
+        }),
+    )
     .await
 }
 

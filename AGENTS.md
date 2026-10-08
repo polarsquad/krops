@@ -358,3 +358,5 @@ Load these only when the task touches their domain:
 - `docs/troubleshooting-ack.md`: ACK controller failure modes for the CRs krops ships (Terminal after the pivot, non-retrying Terminal, Recoverable backoff).
 - `docs/airgap.md`: Zarf offline bundle for the local-host profile.
 - `docs/crossplane.md`: Crossplane as an alternative resource plane (decided, not yet implemented): per-environment selector, one plane per environment, ownership rules, slices #446 to #455.
+
+<!-- konflate render control: no-op on feat/kcc-helm-chart -->

@@ -7,3 +7,4 @@ resources:
   - kcc-operator
   - kcc
   - kcc-identity
+  - workload-resources

@@ -1,20 +1,26 @@
 ---
 # ══════════════════════════════════════════════════════════════════════════════
 # Private Service Access for Cloud SQL (issue #72, the AWS NAT/egress and
-# Azure delegated-subnet counterparts).
+# Azure delegated-subnet counterparts). Moved to the management cluster in
+# issue #560: the management cluster's KCC reconciles it as krops-capg, and
+# the `networking` Flux Kustomization in
+# mgmt/gcp/infrastructure/flux-ks.yaml orders it after kcc-identity.
 #
 # A global ComputeAddress reserves a /16 in the global IP space for the PSA
 # range, and ServiceNetworkingConnection peers it into the workload VPC (the
-# VPC CAPG creates, named in cluster-vars). Cloud SQL's private IP is then
-# allocated from that range (postgres/). The KCC v1.156.0 bundle has no
-# ComputeGlobalAddress kind; a ComputeAddress with location: global is the
-# equivalent (its location field takes the literal "global").
+# VPC CAPG creates, named krops-europe-north1-workload as a literal: the
+# management-side gcp-vars ConfigMap carries no per-cluster keys). Cloud
+# SQL's private IP is then allocated from that range (postgres/). The KCC
+# v1.156.0 bundle has no ComputeGlobalAddress kind; a ComputeAddress with
+# location: global is the equivalent (its location field takes the literal
+# "global").
 #
-# dependsOn: kcc so the KCC operator StatefulSet is Ready before these CRs
-# land (the kcc Kustomization orders after kcc-operator). KCC reports
-# readiness on managed resources via status.conditions, so wait: true on this
-# Kustomization blocks until the range and peering are actually created, and
-# postgres (dependsOn: networking) is safe to order after it.
+# dependsOn: kcc-identity (see the Kustomization) orders this after the
+# management ConfigConnector's operator and after krops-capg's project
+# grants are managed. KCC reports readiness on managed resources via
+# status.conditions, so wait: true on the Kustomization blocks until the
+# range and peering are actually created, and postgres (dependsOn:
+# networking) is safe to order after it.
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: compute.cnrm.cloud.google.com/v1beta1
 kind: ComputeAddress
@@ -22,13 +28,13 @@ metadata:
   name: psa
   namespace: default
 spec:
-  resourceID: krops-${CLUSTER_NAME}-psa
+  resourceID: krops-europe-north1-workload-psa
   location: global
   purpose: VPC_PEERING
   addressType: INTERNAL
   prefixLength: 16
   networkRef:
-    external: "projects/${GCP_PROJECT}/global/networks/${GCP_NETWORK}"
+    external: "projects/${GCP_PROJECT}/global/networks/krops-europe-north1-workload"
 ---
 apiVersion: servicenetworking.cnrm.cloud.google.com/v1beta1
 kind: ServiceNetworkingConnection
@@ -37,7 +43,7 @@ metadata:
   namespace: default
 spec:
   networkRef:
-    external: "projects/${GCP_PROJECT}/global/networks/${GCP_NETWORK}"
+    external: "projects/${GCP_PROJECT}/global/networks/krops-europe-north1-workload"
   reservedPeeringRanges:
     # Reference the KCC-managed ComputeAddress by its metadata.name (same
     # namespace). The v1.156.0 schema allows name/namespace or external here;

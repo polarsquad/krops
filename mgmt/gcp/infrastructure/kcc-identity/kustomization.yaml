@@ -4,4 +4,3 @@ resources:
   - services.yaml
   - pool.yaml
   - identities.yaml
-  - europe-north1-workload.yaml

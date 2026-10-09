@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Cross-check the GCP workload-identity chain (issue #72).
 
-The management-side WIF resources and the workload-cluster Config Connector
-are coupled by literal names that no renderer validates. Requires PyYAML and
+The management-side WIF resources and the management-cluster Config
+Connector are coupled by literal names that no renderer validates. Since
+issue #560 the workload cloud resources live on the management cluster
+under mgmt/gcp/infrastructure/workload-resources/ (reconciled as
+krops-capg), so this test checks that placement too. Requires PyYAML and
 tomllib (mise's python provides both via `uv run`).
 """
 
@@ -20,18 +23,21 @@ MGMT_KCC = REPO_ROOT / "mgmt/gcp/infrastructure/kcc"
 MGMT_CLUSTER = REPO_ROOT / "mgmt/gcp/clusters/europe-north1/management/cluster.yaml"
 MISE_GCP = REPO_ROOT / "mise.gcp.toml"
 BOOTSTRAP = REPO_ROOT / "bootstrap.toml"
-KCC_WORKLOAD = REPO_ROOT / "workload/gcp-base/kcc/configconnector.yaml"
-READER = REPO_ROOT / "workload/gcp-base/iam/reader.yaml"
-SQL = REPO_ROOT / "workload/gcp-base/postgres/postgres.yaml"
-CLUSTER_VARS = REPO_ROOT / "mgmt/gcp/addons/flux-apps/regions/europe-north1/cluster-vars.yaml"
+WORKLOAD_RESOURCES = REPO_ROOT / "mgmt/gcp/infrastructure/workload-resources"
+MGMT_FLUX_KS = REPO_ROOT / "mgmt/gcp/infrastructure/flux-ks.yaml"
+READER = WORKLOAD_RESOURCES / "iam/reader.yaml"
+SQL = WORKLOAD_RESOURCES / "postgres/postgres.yaml"
+# The one live workload cluster: its name is a literal in the moved CRs
+# (the management-side gcp-vars ConfigMap carries no per-cluster keys).
+CLUSTER_NAME = "europe-north1-workload"
 # Project numbers are 12 digits today; leave headroom.
 BUCKET_PROJECT_NUMBER_DIGITS = 19
-KCC_WORKLOAD_SA = "cnrm-system/cnrm-controller-manager"
-# Per-cluster reader GSA accountId template (the -reader / -rd forms are 35 /
-# 31 chars, over GCP's 30-char service account ID limit; -r is 30 and fits).
-READER_ACCOUNT = "krops-${CLUSTER_NAME}-r"
+# Per-cluster reader GSA accountId (issue #560: the cluster name is literal,
+# so the template is resolved once here; the -reader / -rd forms would be
+# 35 / 31 chars, over GCP's 30-char service account ID limit; -r fits).
+READER_ACCOUNT = "krops-europe-north1-workload-r"
 SA_ID_MAX_LEN = 30
-READER_ACCOUNT_DOC = READER_ACCOUNT.replace("${CLUSTER_NAME}", "<cluster>")
+READER_ACCOUNT_DOC = READER_ACCOUNT.replace(CLUSTER_NAME, "<cluster>")
 
 # The service accounts the workload-identity pool admits. CAPG exchanges on
 # kind (provider `kind`) and post-pivot (provider `mgmt`); the management-side
@@ -39,6 +45,14 @@ READER_ACCOUNT_DOC = READER_ACCOUNT.replace("${CLUSTER_NAME}", "<cluster>")
 EXPECTED_SUBJECTS = {
     "system:serviceaccount:capg-system:capg-manager",
     "system:serviceaccount:cnrm-system:cnrm-controller-manager",
+}
+
+# The project-level grants the moved workload-resources CRs need on
+# krops-capg (issue #560): name -> role.
+EXPECTED_KROPS_CAPG_GRANTS = {
+    "krops-capg-cloudsql-admin": "roles/cloudsql.admin",
+    "krops-capg-storage-admin": "roles/storage.admin",
+    "krops-capg-servicenetworking-admin": "roles/servicenetworking.networksAdmin",
 }
 
 # secret path -> (expected name, expected namespace, expected JSON key)
@@ -96,8 +110,6 @@ def main() -> int:
         if res.get("kind") != "IAMServiceAccount":
             failures.append(f"{path}: workloadIdentityUser grant on the wrong resource kind: {res}")
             continue
-        if res.get("name") == "krops-kcc":
-            continue  # the workload-cluster binding, verified in (e)
         if res.get("name") != "krops-capg":
             failures.append(f"{path}: workloadIdentityUser grant on the wrong service account: {res}")
             continue
@@ -167,22 +179,29 @@ def main() -> int:
             if wanted not in pivot_manifests:
                 failures.append(f"(d) bootstrap.toml: {wanted} missing from [environments.gcp] pivot-manifests")
 
-    # ── (e) the workload ConfigConnector names krops-kcc and the per-cluster
-    # binding grants workloadIdentityUser on krops-kcc for the workload SA. ──
-    cc = [d for d in docs(KCC_WORKLOAD) if d.get("kind") == "ConfigConnector"]
-    if not cc:
-        failures.append(f"{KCC_WORKLOAD.relative_to(REPO_ROOT)}: missing ConfigConnector")
-    elif cc[0]["spec"].get("googleServiceAccount") != "krops-kcc@${GCP_PROJECT}.iam.gserviceaccount.com":
-        failures.append(f"(e) {KCC_WORKLOAD.relative_to(REPO_ROOT)}: googleServiceAccount must be krops-kcc@${{GCP_PROJECT}}.iam.gserviceaccount.com")
-    wi = [d for d in docs(IDENTITY / "europe-north1-workload.yaml") if d.get("kind") == "IAMPolicyMember"]
-    if len(wi) != 1:
-        failures.append(f"(e) {IDENTITY.relative_to(REPO_ROOT)}: expected 1 workload-identity binding, got {len(wi)}")
-    else:
-        b = wi[0]["spec"]
-        if b.get("resourceRef", {}).get("name") != "krops-kcc" or b.get("role") != "roles/iam.workloadIdentityUser":
-            failures.append(f"(e) {IDENTITY.relative_to(REPO_ROOT)}: binding must grant workloadIdentityUser on krops-kcc")
-        if b.get("member") != f"serviceAccount:${{GCP_PROJECT}}.svc.id.goog[{KCC_WORKLOAD_SA}]":
-            failures.append(f"(e) {IDENTITY.relative_to(REPO_ROOT)}: binding member must target {KCC_WORKLOAD_SA}")
+    # ── (e) the moved workload-resources CRs reconcile as krops-capg: the
+    # three project-level grants they need exist on krops-capg with the
+    # documented roles (issue #560). ───────────────────────────────────────
+    got_grants = {}
+    for path, doc in all_docs(IDENTITY):
+        if doc.get("kind") != "IAMPolicyMember":
+            continue
+        spec = doc["spec"]
+        if spec.get("role") not in EXPECTED_KROPS_CAPG_GRANTS.values():
+            continue
+        res = spec.get("resourceRef", {})
+        member_from = spec.get("memberFrom", {})
+        if res.get("kind") != "Project" or res.get("external") != "projects/${GCP_PROJECT}":
+            failures.append(f"{path}: {doc['metadata']['name']} must be project-level (projects/${{GCP_PROJECT}}): {res}")
+        if member_from.get("serviceAccountRef", {}).get("name") != "krops-capg":
+            failures.append(f"{path}: {doc['metadata']['name']} member must be the krops-capg GSA")
+        got_grants[doc["metadata"]["name"]] = spec.get("role")
+    for name, role in EXPECTED_KROPS_CAPG_GRANTS.items():
+        if got_grants.get(name) != role:
+            failures.append(f"(e) identities.yaml: missing or wrong grant {name} -> {role}, got {got_grants.get(name)}")
+    for name, role in got_grants.items():
+        if EXPECTED_KROPS_CAPG_GRANTS.get(name) != role:
+            failures.append(f"(e) identities.yaml: unexpected workload-resources grant {name} -> {role}")
 
     # ── (f) the management ConfigConnector reads kcc-wif-credentials, which
     # lives in cnrm-system. ─────────────────────────────────────────────────
@@ -190,31 +209,20 @@ def main() -> int:
     if not mcc:
         failures.append(f"{MGMT_KCC.relative_to(REPO_ROOT)}/configconnector.yaml: missing ConfigConnector")
     elif mcc[0]["spec"].get("credentialSecretName") != "kcc-wif-credentials":
-        failures.append(f"(f) {MGMT_KCC.relative_to(REPO_ROOT)}/configconnector.yaml: credentialSecretName must be kcc-wif-credentials")
+        failures.append(f"{MGMT_KCC.relative_to(REPO_ROOT)}/configconnector.yaml: credentialSecretName must be kcc-wif-credentials")
     kcc_sec = docs(MGMT_KCC / "kcc-wif-credentials.yaml")[0]
     if kcc_sec["metadata"]["namespace"] != "cnrm-system":
-        failures.append(f"(f) {MGMT_KCC.relative_to(REPO_ROOT)}/kcc-wif-credentials.yaml: namespace must be cnrm-system")
+        failures.append(f"{MGMT_KCC.relative_to(REPO_ROOT)}/kcc-wif-credentials.yaml: namespace must be cnrm-system")
 
-    # ── the per-cluster reader GSA: the accountId template fits GCP's
-    # 30-char limit for the real cluster name, the grants name it, and the
-    # PostgreSQL SQLUser is that GSA's email in the required truncated .iam
-    # form (the project-level krops-reader has no cloudsql.instances.login,
-    # so the DB user must be the per-cluster GSA). ─────────────────────────
-    cluster_name = None
-    for d in docs(CLUSTER_VARS):
-        if d and d.get("kind") == "ConfigMap":
-            # cluster-vars is a plain ConfigMap; read the value directly.
-            cluster_name = d.get("data", {}).get("CLUSTER_NAME")
-            if cluster_name is not None:
-                cluster_name = str(cluster_name)
-    if cluster_name is None:
-        failures.append(f"{CLUSTER_VARS.relative_to(REPO_ROOT)}: CLUSTER_NAME not found in cluster-vars")
-    else:
-        sa_name = READER_ACCOUNT.replace("${CLUSTER_NAME}", cluster_name)
-        if len(sa_name) > SA_ID_MAX_LEN:
-            failures.append(
-                f"(g) per-cluster reader accountId `{sa_name}` is {len(sa_name)} chars; "
-                f"GCP service account IDs are capped at {SA_ID_MAX_LEN}")
+    # ── the per-cluster reader GSA: the account ID fits GCP's 30-char
+    # limit, the grants name it, and the PostgreSQL SQLUser is that GSA's
+    # email in the required truncated .iam form (the project-level
+    # krops-reader has no cloudsql.instances.login, so the DB user must be
+    # the per-cluster GSA). ─────────────────────────────────────────────────
+    if len(READER_ACCOUNT) > SA_ID_MAX_LEN:
+        failures.append(
+            f"(g) per-cluster reader accountId `{READER_ACCOUNT}` is {len(READER_ACCOUNT)} chars; "
+            f"GCP service account IDs are capped at {SA_ID_MAX_LEN}")
 
     # KCC takes the GCP account ID from metadata.name (there is no accountId
     # field); a bare `krops-reader` would collide with the human GSA.
@@ -260,7 +268,7 @@ def main() -> int:
     # instanceRef must name the SQLInstance's Kubernetes object. ───────────
     forbidden = {"IAMServiceAccount": "accountId", "ComputeAddress": "name",
                  "SQLInstance": "name", "SQLDatabase": "name", "SQLUser": "name"}
-    for path, doc in all_docs(REPO_ROOT / "workload/gcp-base"):
+    for path, doc in all_docs(WORKLOAD_RESOURCES):
         field = forbidden.get(doc.get("kind"))
         if field and field in doc.get("spec", {}):
             failures.append(f"(h) {path}: {doc['kind']} has no spec.{field}; use resourceID or metadata.name")
@@ -274,26 +282,28 @@ def main() -> int:
 
     # ── (i) the iam Kustomization orders after what its grants reference, and
     # the reader.yaml rationale is documented. ─────────────────────────────
-    iam_ks = docs(REPO_ROOT / "workload/gcp-base/iam/flux-ks.yaml")[0]
-    deps = {d["name"] for d in iam_ks["spec"].get("dependsOn", [])}
-    for wanted in ("kcc", "storage", "postgres"):
-        if wanted not in deps:
-            failures.append(f"(i) workload/gcp-base/iam/flux-ks.yaml: dependsOn must include `{wanted}`, got {sorted(deps)}")
+    iam_ks = [d for d in docs(MGMT_FLUX_KS) if d.get("kind") == "Kustomization" and d["metadata"]["name"] == "iam"]
+    if len(iam_ks) != 1:
+        failures.append(f"{MGMT_FLUX_KS.relative_to(REPO_ROOT)}: expected exactly 1 Kustomization named `iam`, got {len(iam_ks)}")
+    else:
+        deps = {d["name"] for d in iam_ks[0]["spec"].get("dependsOn", [])}
+        for wanted in ("kcc-identity", "storage", "postgres"):
+            if wanted not in deps:
+                failures.append(f"(i) {MGMT_FLUX_KS.relative_to(REPO_ROOT)}: the iam Kustomization's dependsOn must include `{wanted}`, got {sorted(deps)}")
     wl_doc = (REPO_ROOT / "docs/workload-resources.md").read_text()
     for needed in ("roles/cloudsql.viewer", f"`{READER_ACCOUNT_DOC}`", f"{SA_ID_MAX_LEN}-char"):
         if needed not in wl_doc:
             failures.append(f"(i) docs/workload-resources.md must document `{needed}`")
 
     # (j) check bucket name length
-    if cluster_name is not None:
-        bucket_path = REPO_ROOT / "workload/gcp-base/storage/bucket.yaml"
-        buckets = [d for d in docs(bucket_path) if d.get("kind") == "StorageBucket"]
-        if len(buckets) != 1:
-            failures.append(f"(j) {bucket_path.relative_to(REPO_ROOT)}: expected 1 StorageBucket, got {len(buckets)}")
-        else:
-            name = buckets[0]["spec"]["resourceID"].replace("${GCP_PROJECT_NUMBER}", "9" * BUCKET_PROJECT_NUMBER_DIGITS).replace("${CLUSTER_NAME}", cluster_name)
-            if len(name) > 63:
-                failures.append(f"(j) bucket name `{name}` is {len(name)} chars; GCS bucket names are capped at 63")
+    bucket_path = WORKLOAD_RESOURCES / "storage/bucket.yaml"
+    buckets = [d for d in docs(bucket_path) if d.get("kind") == "StorageBucket"]
+    if len(buckets) != 1:
+        failures.append(f"{bucket_path.relative_to(REPO_ROOT)}: expected 1 StorageBucket, got {len(buckets)}")
+    else:
+        name = buckets[0]["spec"]["resourceID"].replace("${GCP_PROJECT_NUMBER}", "9" * BUCKET_PROJECT_NUMBER_DIGITS)
+        if len(name) > 63:
+            failures.append(f"(j) bucket name `{name}` is {len(name)} chars; GCS bucket names are capped at 63")
 
     if failures:
         print("gcp identity chain FAILED:")
@@ -301,7 +311,8 @@ def main() -> int:
             print(f"  - {f}")
         return 1
     print(f"gcp identity chain OK ({len(EXPECTED_SUBJECTS)} pool subjects, "
-          f"{len(wif_subjects)} WIF grants, {len(CREDENTIALS)} credential secrets)")
+          f"{len(wif_subjects)} WIF grants, {len(CREDENTIALS)} credential secrets, "
+          f"{len(EXPECTED_KROPS_CAPG_GRANTS)} workload-resources grants)")
     return 0
 
 

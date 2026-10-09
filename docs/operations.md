@@ -512,7 +512,7 @@ an OIDC issuer for CAPZ/ASO workload identity (issue #236).
 
 GCP: see [gcp.md](./gcp.md) for the project prep step that precedes
 the `gcp` wrapper run (`gcp-bootstrap` enables the APIs and creates the
-`krops-capg` / `krops-kcc` / `krops-reader` service accounts and the `krops`
+`krops-capg` / `krops-reader` service accounts and the `krops`
 workload identity pool; nothing it prints is secret). After the kind cluster
 is created, bootstrap-rs runs the `wif-federate` mise task, which registers
 the kind cluster's OIDC provider and the impersonation bindings for CAPG and

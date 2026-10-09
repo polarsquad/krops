@@ -35,17 +35,18 @@ instance overrides it with the `services.k8s.aws/region` annotation:
 > creates the EKS VPC dynamically, so its subnet IDs cannot be declared in
 > Git ahead of time.
 
-## GCP resources (GKE workload cluster)
+## GCP resources (management cluster's KCC)
 
-On the GKE workload cluster, Config Connector (KCC) creates the
-counterparts from `workload/gcp-base/`; the management cluster's KCC is
-the authoring identity (see [GCP environment](./gcp.md) for how it
-authenticates).
+Since issue #560, Config Connector (KCC) on the management cluster creates
+the counterparts from `mgmt/gcp/infrastructure/workload-resources/`,
+reconciling as `krops-capg`; the management cluster's KCC is the authoring
+identity (see [GCP environment](./gcp.md) for how it authenticates).
 
 ### Storage bucket
 
-`workload/gcp-base/storage/bucket.yaml` creates one bucket per cluster
-(`krops-<project-number>-<cluster>-data`) with the same posture as the S3
+`mgmt/gcp/infrastructure/workload-resources/storage/bucket.yaml` creates one
+bucket per cluster (`krops-<project-number>-<cluster>-data`) with the same
+posture as the S3
 bucket: uniform bucket-level access on (no object ACLs), versioning on,
 no public access. GCS caps bucket names at 63 characters; the identity chain
 test checks the name against the real cluster name using up to a 19-digit
@@ -53,12 +54,12 @@ project number (conservative upper bound; 12 digits today).
 
 ### Cloud SQL (private IP, IAM auth)
 
-`workload/gcp-base/postgres/postgres.yaml` creates one PostgreSQL 17
-instance per cluster (`krops-<cluster>-db`), zonal, with:
+`mgmt/gcp/infrastructure/workload-resources/postgres/postgres.yaml` creates one
+PostgreSQL 17 instance per cluster (`krops-<cluster>-db`), zonal, with:
 
 - private IP only (`ipv4Enabled: false`, no public address), the private IP
   reaching the workload VPC through the Private Service Access range and
-  VPC peering in `workload/gcp-base/networking/`
+  VPC peering in `mgmt/gcp/infrastructure/workload-resources/networking/`
 - `sslMode: ENCRYPTED_ONLY` (the deprecated `requireSsl` is not set)
 - `edition: ENTERPRISE`, set explicitly: the shared-core `db-f1-micro` tier
   only exists on the Enterprise edition, and PostgreSQL 17 can otherwise
@@ -90,7 +91,8 @@ both the connect path and the impersonation.
 
 ### Per-cluster reader identity
 
-`workload/gcp-base/iam/reader.yaml` creates the per-cluster reader service
+`mgmt/gcp/infrastructure/workload-resources/iam/reader.yaml` creates the
+per-cluster reader service
 account (`krops-<cluster>-r`; the account ID, taken from the resource's `metadata.name`, is capped at GCP's 30-char
 service-account ID limit) with `storage.objectViewer` on the bucket and
 `cloudsql.instanceUser` on the project (the IAM database-auth login role,

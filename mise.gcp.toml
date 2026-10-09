@@ -16,7 +16,7 @@ CLOUDSDK_CONFIG = "{{config_root}}/.gcloud"
 gcloud = "587.0.0"
 
 [tasks.gcp-bootstrap]
-description = "One-time project prep: enable APIs, create the krops-capg / krops-kcc / krops-reader service accounts with their role grants and the krops workload identity pool; prints the values to commit. No key is created (issue #72)."
+description = "One-time project prep: enable APIs, create the krops-capg / krops-reader service accounts with their role grants and the krops workload identity pool; prints the values to commit. No key is created (issue #72)."
 run = '''
 set -eu
 : "${GCP_PROJECT:?set GCP_PROJECT in .env or the shell}"
@@ -37,14 +37,12 @@ grant() { # <sa> <role>
 }
 echo "==> service accounts (adopted from Git by KCC afterwards)"
 sa krops-capg   "krops CAPG + management-side Config Connector"
-sa krops-kcc    "krops workload-cluster Config Connector"
 sa krops-reader "krops human read-only identity"
 for r in roles/container.admin roles/compute.networkAdmin roles/iam.serviceAccountUser \
          roles/iam.serviceAccountTokenCreator roles/iam.serviceAccountAdmin \
          roles/iam.workloadIdentityPoolAdmin roles/resourcemanager.projectIamAdmin \
-         roles/serviceusage.serviceUsageAdmin; do grant krops-capg "$r"; done
-for r in roles/cloudsql.admin roles/storage.admin roles/compute.networkAdmin \
-         roles/servicenetworking.networksAdmin roles/iam.serviceAccountAdmin; do grant krops-kcc "$r"; done
+         roles/serviceusage.serviceUsageAdmin roles/cloudsql.admin roles/storage.admin \
+         roles/servicenetworking.networksAdmin; do grant krops-capg "$r"; done
 for r in roles/cloudsql.viewer roles/storage.objectViewer; do grant krops-reader "$r"; done
 echo "==> workload identity pool krops (providers: wif-federate adds kind, Git declares mgmt)"
 gcloud iam workload-identity-pools describe krops --location=global >/dev/null 2>&1 \

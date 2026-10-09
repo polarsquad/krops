@@ -1,11 +1,16 @@
 ---
 # ══════════════════════════════════════════════════════════════════════════════
 # Application data bucket (issue #72, the S3 and Azure blob counterparts).
+# Moved to the management cluster in issue #560: the management cluster's KCC
+# reconciles it as krops-capg, and the `storage` Flux Kustomization in
+# mgmt/gcp/infrastructure/flux-ks.yaml orders it after kcc-identity.
 # The S3 posture: no public access (publicAccessPrevention enforced +
 # uniformBucketLevelAccess, i.e. ACLs disabled), versioning, soft delete.
 # Encryption is Google-managed by default. resourceID is globally unique:
-# project number + cluster name (substituted from cluster-vars).
-# force-destroy stays false: deleting a bucket with objects fails loudly.
+# project number + cluster name (the cluster is literal
+# europe-north1-workload: the management-side gcp-vars ConfigMap carries no
+# per-cluster keys). force-destroy stays false: deleting a bucket with
+# objects fails loudly.
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: storage.cnrm.cloud.google.com/v1beta1
 kind: StorageBucket
@@ -15,7 +20,7 @@ metadata:
   annotations:
     cnrm.cloud.google.com/force-destroy: "false"
 spec:
-  resourceID: "krops-${GCP_PROJECT_NUMBER}-${CLUSTER_NAME}-data"
+  resourceID: "krops-${GCP_PROJECT_NUMBER}-europe-north1-workload-data"
   location: "${GCP_REGION}"
   storageClass: STANDARD
   uniformBucketLevelAccess: true

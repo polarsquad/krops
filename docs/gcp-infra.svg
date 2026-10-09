@@ -22,7 +22,7 @@
 
   <!-- ===== title block ===== -->
   <text x="800" y="60" text-anchor="middle" font-family="DejaVu Sans" font-size="40" font-weight="bold" fill="#5CE0B4">krops &#183; GCP Environment &#183; CAPG + GKE + Config Connector</text>
-  <text x="800" y="96" text-anchor="middle" font-family="DejaVu Sans" font-size="19" fill="#859D91">Flux + CAPG + workload Config Connector &#183; Workload Identity Federation &#183; private Cloud SQL and versioned bucket</text>
+  <text x="800" y="96" text-anchor="middle" font-family="DejaVu Sans" font-size="19" fill="#859D91">Flux + CAPG + management Config Connector &#183; Workload Identity Federation &#183; private Cloud SQL and versioned bucket</text>
 
   <!-- ===== section headers ===== -->
   <text x="64" y="138" font-family="DejaVu Sans" font-size="20" font-weight="bold" fill="#FFFFFF">TOPOLOGY (clusters and sync flows)</text>
@@ -72,7 +72,7 @@
   <text x="284" y="360" text-anchor="middle" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#5CE0B4">Manages infrastructure &amp; identity</text>
   <text x="106" y="386" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; <tspan font-weight="bold">GKE clusters:</tspan> GCPManaged* (management + workload)</text>
   <text x="106" y="410" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; <tspan font-weight="bold">Identity:</tspan> krops WIF pool, mgmt provider, krops-* GSAs</text>
-  <text x="106" y="434" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; <tspan font-weight="bold">KCC 1.158.0:</tspan> pinned bundle, cluster-mode in cnrm-system</text>
+  <text x="106" y="434" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">&#8226; <tspan font-weight="bold">KCC 1.158.0:</tspan> cluster-mode in cnrm-system, workload resources</text>
   <text x="106" y="458" font-family="DejaVu Sans" font-size="14" fill="#859D91">&#8226; <tspan font-family="DejaVu Sans Mono">external_account</tspan> Secrets (plain, secret-free)</text>
 
   <!-- ===== git repository ===== -->
@@ -117,35 +117,16 @@
   <text x="352" y="705" text-anchor="middle" font-family="DejaVu Sans" font-size="12.5" fill="#D4E2DA">syncs overlay</text>
   <text x="352" y="728" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="15" fill="#68C5EB">workload/europe-north1-01/</text>
 
-  <!-- pipeline stages -->
+  <!-- pipeline stages (Flux only since issue #560: the workload KCC is gone) -->
   <g stroke="#D4E2DA" stroke-width="1.8" fill="none">
     <circle cx="120" cy="788" r="11"/>
     <circle cx="120" cy="788" r="3.8"/>
   </g>
-  <line x1="142" y1="788" x2="176" y2="788" stroke="#859D91" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
-  <g stroke="#5CE0B4" stroke-width="1.8" fill="none">
-    <rect x="188" y="774" width="28" height="28" rx="6"/>
-    <path d="M196,788 h12 M202,782 v12"/>
-  </g>
-  <line x1="228" y1="788" x2="262" y2="788" stroke="#859D91" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
-  <g stroke="#68C5EB" stroke-width="1.8" fill="none">
-    <circle cx="282" cy="788" r="10"/>
-    <path d="M276,788 h12 M282,782 v12"/>
-  </g>
-  <line x1="304" y1="788" x2="338" y2="788" stroke="#859D91" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
-  <g stroke="#E8A868" stroke-width="1.8" fill="none">
-    <ellipse cx="362" cy="778" rx="12" ry="4"/>
-    <path d="M350,778 v18 a12,4 0 0 0 24,0 v-18"/>
-  </g>
-
-  <text x="120" y="828" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="13" fill="#D4E2DA">cert-mgr</text>
-  <text x="202" y="828" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="13" fill="#D4E2DA">kcc</text>
-  <text x="282" y="828" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="13" fill="#D4E2DA">net + stor</text>
-  <text x="362" y="828" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="13" fill="#D4E2DA">sql + iam</text>
+  <text x="150" y="794" font-family="DejaVu Sans" font-size="14" fill="#D4E2DA">Flux only &#183; gcp-base root intentionally empty (issue #560)</text>
 
   <!-- auth badge -->
   <rect x="88" y="848" width="412" height="38" rx="6" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
-  <text x="294" y="872" text-anchor="middle" font-family="DejaVu Sans" font-size="13.5" fill="#5CE0B4">Zero secrets in cluster &#183; GKE-native Workload Identity</text>
+  <text x="294" y="872" text-anchor="middle" font-family="DejaVu Sans" font-size="13.5" fill="#5CE0B4">Zero secrets in cluster &#183; no cloud credentials</text>
 
   <!-- lifecycle strip -->
   <rect x="88" y="896" width="412" height="40" rx="8" fill="#68C5EB" fill-opacity="0.14"/>
@@ -155,7 +136,7 @@
   <rect x="560" y="600" width="460" height="350" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
   <rect x="576" y="608" width="428" height="5" rx="2.5" fill="#E8A868"/>
   <text x="790" y="646" text-anchor="middle" font-family="DejaVu Sans" font-size="24" font-weight="bold" fill="#E8A868">GCP Managed Resources</text>
-  <text x="790" y="670" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">europe-north1 &#183; reconciled by workload KCC</text>
+  <text x="790" y="670" text-anchor="middle" font-family="DejaVu Sans" font-size="16" fill="#D4E2DA">europe-north1 &#183; reconciled by mgmt KCC (as krops-capg)</text>
 
   <!-- resource boxes -->
   <rect x="584" y="690" width="412" height="60" rx="8" fill="#1B2C23" stroke="#284637" stroke-width="1.2"/>
@@ -191,8 +172,8 @@
   <text x="497" y="1022" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#68C5EB">Workload cluster</text>
   <text x="671" y="1022" font-family="DejaVu Sans" font-size="14.5" fill="#D4E2DA">= apps</text>
   <line x1="739" y1="994" x2="739" y2="1036" stroke="#284637" stroke-width="1.4"/>
-  <text x="757" y="1022" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#E8A868">Workload KCC</text>
-  <text x="907" y="1022" font-family="DejaVu Sans" font-size="14.5" fill="#D4E2DA">= GCP CRDs</text>
+  <text x="757" y="1022" font-family="DejaVu Sans" font-size="16" font-weight="bold" fill="#E8A868">GCP resources</text>
+  <text x="907" y="1022" font-family="DejaVu Sans" font-size="14.5" fill="#D4E2DA">= via mgmt KCC CRs</text>
 
   <!-- ===== flow panel ===== -->
   <rect x="1090" y="150" width="446" height="904" rx="14" fill="#131E18" stroke="#284637" stroke-width="1.5"/>
@@ -211,23 +192,23 @@
   <text x="1140" y="360" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">2</text>
   <text x="1168" y="350" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">KCC reconciles identity:</text>
   <text x="1168" y="376" font-family="DejaVu Sans Mono" font-size="15.5" fill="#B0F6C0">krops WIF pool + mgmt provider (GKE OIDC),</text>
-  <text x="1168" y="402" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">krops-capg / krops-kcc / krops-reader</text>
+  <text x="1168" y="402" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">krops-capg / krops-reader</text>
   <text x="1168" y="428" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">GSAs and their project role grants.</text>
   <line x1="1122" y1="462" x2="1504" y2="462" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- step 3 -->
   <circle cx="1140" cy="510" r="15" fill="#68C5EB"/>
   <text x="1140" y="516" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">3</text>
-  <text x="1168" y="506" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Workload cluster runs local Flux:</text>
-  <text x="1168" y="540" font-family="DejaVu Sans Mono" font-size="17" fill="#D4E2DA">1. <tspan fill="#FFFFFF">kcc</tspan> <tspan font-family="DejaVu Sans" font-size="15" fill="#859D91">(GKE Workload Identity)</tspan></text>
-  <text x="1168" y="568" font-family="DejaVu Sans Mono" font-size="17" fill="#D4E2DA">2. <tspan fill="#FFFFFF">networking · storage</tspan></text>
-  <text x="1168" y="596" font-family="DejaVu Sans Mono" font-size="17" fill="#D4E2DA">3. <tspan fill="#FFFFFF">postgres · iam</tspan> <tspan font-family="DejaVu Sans" font-size="14.5" fill="#859D91">(dependsOn)</tspan></text>
+  <text x="1168" y="506" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Management Flux orders workload-resources:</text>
+  <text x="1168" y="540" font-family="DejaVu Sans Mono" font-size="17" fill="#D4E2DA">1. <tspan fill="#FFFFFF">networking</tspan> <tspan font-family="DejaVu Sans" font-size="15" fill="#859D91">(PSA + peering, after kcc-identity)</tspan></text>
+  <text x="1168" y="568" font-family="DejaVu Sans Mono" font-size="17" fill="#D4E2DA">2. <tspan fill="#FFFFFF">storage</tspan></text>
+  <text x="1168" y="596" font-family="DejaVu Sans Mono" font-size="17" fill="#D4E2DA">3. <tspan fill="#FFFFFF">postgres &#183; iam</tspan> <tspan font-family="DejaVu Sans" font-size="14.5" fill="#859D91">(dependsOn)</tspan></text>
   <line x1="1122" y1="658" x2="1504" y2="658" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- step 4 -->
   <circle cx="1140" cy="704" r="15" fill="#E8A868"/>
   <text x="1140" y="710" text-anchor="middle" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#0C120F">4</text>
-  <text x="1168" y="700" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Workload KCC creates cloud infra:</text>
+  <text x="1168" y="700" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Mgmt KCC (as krops-capg) creates cloud infra:</text>
   <text x="1168" y="726" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">VPC + PSA range + peering,</text>
   <text x="1168" y="752" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Storage bucket (versioning, PAP),</text>
   <text x="1168" y="778" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Cloud SQL (IAM auth) + reader GSA.</text>
@@ -251,6 +232,6 @@
   <text x="1412" y="1012" font-family="DejaVu Sans Mono" font-size="14" fill="#D4E2DA">gcp</text>
 
   <!-- ===== footer ===== -->
-  <text x="800" y="1102" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">No secrets at rest: management CAPG/KCC and workload KCC all authenticate via Workload Identity.</text>
+  <text x="800" y="1102" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">No secrets at rest: management CAPG/KCC authenticate via Workload Identity; the workload cluster holds no cloud credentials.</text>
   <text x="800" y="1128" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">No Terraform, no state files: CAPI and Config Connector manage GCP entirely through Kubernetes CRDs.</text>
 </svg>

@@ -11,10 +11,10 @@ metadata:
   namespace: default
   labels:
     region: eu-north-1
-    # Deliberately NOT `fluxcd: enabled`: the ResourceSet-generated
-    # remote-apply Kustomizations in mgmt/aws/addons/flux-apps/ target
-    # clusters by region and would deploy a workload-cluster FluxInstance
-    # into the management cluster.
+    # The management cluster is not listed in spec.inputs of the
+    # flux-apps ResourceSet (mgmt/aws/addons/flux-apps/flux-apps-rset.yaml).
+    # fluxcd: enabled is deliberately absent: the flux-operator HelmChartProxy
+    # would compete with the bootstrap-installed release.
 spec:
   clusterNetwork:
     pods:

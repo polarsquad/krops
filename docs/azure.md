@@ -48,7 +48,9 @@ reconciles the workload Azure resources from
 
 1. `mgmt/azure/infrastructure/azure-identity/azure-vars.yaml`:
    `AZURE_SUBSCRIPTION_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` (the
-   `krops-capz` UAMI client ID).
+   `krops-capz` UAMI client ID), and `AZURE_CAPZ_PRINCIPAL_ID` (the
+   `krops-capz` UAMI principal ID, substituted for the
+   `FlexibleServersAdministrator` `azureName`).
 2. `mgmt/azure/addons/flux-apps/regions/swedencentral/cluster-vars.yaml`:
    the same two IDs plus `STORAGE_ACCOUNT_NAME` (globally unique,
    3-24 lowercase alphanumerics; change it if creation fails with

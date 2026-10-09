@@ -70,14 +70,10 @@ resources. There is no app source code here, only declarative infrastructure.
   layout as `mgmt/aws/` (`infrastructure/`, `capi-providers/`, `addons/`,
   `clusters/`), synced from GitHub. CAPG v1.13.1
   (`capi-providers/capg-system/`) provisions GKE clusters
-  (`GCPManaged*`); the Config Connector operator ships as a pinned verbatim
-  release bundle (`infrastructure/kcc-operator/`, version comment
-  `kcc-operator-version:`) and `tests/test-kcc-operator-pin.py` (in
-  `mise run validate` and CI) keeps every committed copy byte-identical and
-  matching the version comment: Renovate bumps the comment and the operator
-  image tag, and the gate then goes red until the whole release bundle is
-  re-downloaded (same "Renovate opens, human completes" posture as the
-  Talos images). Credentials: none at rest; Workload Identity Federation
+  (`GCPManaged*`); the Config Connector operator (`infrastructure/kcc-operator/`)
+  is deployed via Flux HelmRelease consuming the published Helm chart from
+  `lioramilbaum/config-connector-helm` (Renovate tracks the chart tag in the
+  OCIRepository). Credentials: none at rest; Workload Identity Federation
   through the `krops` pool with plain `external_account` Secrets
   (`capg-wif-credentials`, `kcc-wif-credentials`), provider
   `${GCP_WIF_PROVIDER:=mgmt}` (kind bootstrap overrides to `kind` via the
@@ -96,9 +92,9 @@ resources. There is no app source code here, only declarative infrastructure.
     `tests/test-azure-identity-chain.py` (in `mise run validate` and CI)
     cross-checks the ConfigMap/subject couplings between these and
     `mgmt/azure/infrastructure/aso-workload-identity/`.
-  - `gcp-base/` (PR 2, issue #72): Config Connector (the same
-    pinned operator bundle as the management side; it ships its own webhook
-    certs, so no cert-manager) and the GCP resources
+  - `gcp-base/` (PR 2, issue #72): Config Connector deployed via Flux
+    HelmRelease (using the Helm chart from `lioramilbaum/config-connector-helm`;
+    it ships its own webhook certs, so no cert-manager) and the GCP resources
     (PSA range + peering, storage bucket, Cloud SQL with IAM database auth,
     per-cluster reader GSA). `europe-north1-01/` points at it;
     `tests/test-gcp-identity-chain.py` cross-checks the WIF

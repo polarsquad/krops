@@ -27,3 +27,8 @@ spec:
     substituteFrom:
       - kind: ConfigMap
         name: cluster-vars
+        # optional: cluster-vars is bootstrapped onto the workload cluster via
+        # remote-apply (ResourceSet); the diff renderer cannot trace that
+        # cross-cluster path so it cannot verify the ConfigMap exists at render
+        # time. In practice it is always present before this Kustomization runs.
+        optional: true

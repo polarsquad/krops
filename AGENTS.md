@@ -17,7 +17,7 @@ resources. There is no app source code here, only declarative infrastructure.
     Role CRs (`workload-resources/`), account-global IAM, konflate.
   - `capi-providers/`: capi-system, capa-system, caaph-system.
   - `addons/flux-apps/`: installs Flux on each workload cluster
-    (HelmChartProxy + ClusterResourceSets).
+    (HelmChartProxy + ResourceSet).
   - `clusters/`: EKS cluster definitions per region (`eu-north-1`,
     `eu-west-1`); `eu-north-1` also defines the self-managed management
     cluster (`clusters/management/`).

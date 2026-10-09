@@ -2,13 +2,14 @@
 
 The `azure` environment mirrors `aws`: a kind bootstrap cluster runs Flux,
 CAPZ builds an AKS management cluster, the pivot moves the management
-objects into it, and each AKS workload cluster runs its own Azure Service
-Operator (ASO) that reconciles Azure resources from `workload/azure-base/`.
+objects into it, and the management cluster's ASO (bundled with CAPZ)
+reconciles the workload Azure resources from
+`mgmt/azure/infrastructure/workload-resources/`.
 
 | AWS (`aws`) | Azure (`azure`) |
 |---|---|
 | CAPA, `AWSManagedControlPlane` | CAPZ v1.27.0, `AzureASOManagedControlPlane` (AKS via inline ASO resources) |
-| ACK controllers on the management cluster only (issue #346) | Workload ASO 2.21.1 Helm release on workload clusters (management runs the ASO bundled by CAPZ) |
+| ACK controllers on the management cluster only (issue #346) | ASO bundled by CAPZ on the management cluster only (workload release removed, issue #559) |
 | Static SOPS credentials on the management cluster (no EKS Pod Identity since issue #346) | Workload identity: user-assigned identity + federated credential + role assignment, reconciled by the ASO bundled with CAPZ on mgmt |
 | S3 bucket | Storage account + blob container |
 | RDS PostgreSQL | PostgreSQL Flexible Server (private access, Entra-only auth) |
@@ -49,8 +50,7 @@ Operator (ASO) that reconciles Azure resources from `workload/azure-base/`.
    `AZURE_SUBSCRIPTION_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` (the
    `krops-capz` UAMI client ID).
 2. `mgmt/azure/addons/flux-apps/regions/swedencentral/cluster-vars.yaml`:
-   the same two IDs plus `AZURE_ASO_CLIENT_ID`, `AZURE_ASO_PRINCIPAL_ID`
-   (the `krops-aso` identity) and `STORAGE_ACCOUNT_NAME` (globally unique,
+   the same two IDs plus `STORAGE_ACCOUNT_NAME` (globally unique,
    3-24 lowercase alphanumerics; change it if creation fails with
    `StorageAccountAlreadyTaken`).
 3. Pick the AKS version: `az aks get-versions --location swedencentral -o table`
@@ -65,10 +65,12 @@ workload identity against the `krops-capz` UAMI (`AzureClusterIdentity` with
 `serviceoperator.azure.com/credential-from: aso-credentials` annotation, a
 plain Secret); in kind the token issuer is the Arc-hosted OIDC issuer (the
 `arc-federate` mise task, run by bootstrap-rs as `post-kind-create-task`),
-post-pivot it is the management cluster's own OIDC issuer. Workload clusters
-are unchanged: their ASO authenticates with workload identity through the
-federated credential in `mgmt/azure/infrastructure/aso-workload-identity/`
-(`krops-aso` UAMI).
+post-pivot it is the management cluster's own OIDC issuer. The workload
+Azure resources (VNet, storage account, PostgreSQL Flexible Server)
+reconcile on the management cluster through the same `aso-credentials`
+Secret (the `krops-capz` principal has subscription scope, which covers the
+per-cluster data resource group). Workload clusters hold no Azure
+credentials at all.
 
 ## Bootstrap, pivot, teardown
 
@@ -116,21 +118,21 @@ tracked in the follow-up issue linked from #71.
 
 Management cluster: cert-manager, capi-operator, capi-system, capz-system
 (health check waits for the CAPZ and the additional ASO CRDs),
-azure-identity, aso-workload-identity, swedencentral (clusters), flux-apps.
+azure-identity, aso-workload-identity, workload-resources, swedencentral
+(clusters), flux-apps.
 `azure-identity` substitutes from the `azure-vars` ConfigMap it creates
 itself, so its first reconcile fails once and succeeds on the 2-minute
 retry.
 
-Workload cluster: cert-manager, aso, then networking, storage, and
-postgres (postgres depends on networking).
+Workload cluster: cert-manager only (the Azure resources moved to the
+management cluster in issue #559).
 
 ## Upgrading CAPZ and ASO
 
 CAPZ bundles a specific ASO version and ASO only supports upgrades one
 minor version at a time. Renovate proposes CAPZ minors one at a time
 (`separateMultipleMinor`); merge and let the management cluster settle
-before the next. Keep the workload ASO chart (`workload/azure-base/aso/helm.yaml`)
-within one minor of the management-side bundle.
+before the next.
 
 ## Known limitations
 
@@ -143,5 +145,5 @@ within one minor of the management-side bundle.
   covered by Renovate.
 - No GPU node pool: GPU quota is 0 on new subscriptions.
 - No reader identity (the `krops-reader` IAM counterpart).
-- The Flexible Server's only administrator is the `krops-aso` identity;
+- The Flexible Server's only administrator is the `krops-capz` identity;
   grant humans through `FlexibleServersAdministrator` resources.

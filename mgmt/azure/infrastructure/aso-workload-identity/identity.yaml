@@ -7,9 +7,9 @@
 #     imperatively by `mise -E azure run azure-bootstrap` so their IDs can be
 #     committed ahead of cluster creation; ASO adopts them here (same name,
 #     same location) and owns them from then on;
-#   - krops-aso serves the workload-cluster ASO (its principalId is exported
-#     to a ConfigMap the RoleAssignments below reference, so no ID has to be
-#     pasted twice);
+#   - krops-aso no longer serves a workload-cluster ASO (issue #559 moved
+#     the workload CRs here and dropped the workload release); it is kept
+#     grant-less per that issue's acceptance criteria, with no consumers;
 #   - krops-capz serves CAPZ and the management-side bundled ASO (adopted
 #     here so ASO owns it; the RoleAssignments for krops-capz stay in
 #     azure-bootstrap, not Git — nothing reads their IDs);
@@ -42,14 +42,6 @@ spec:
   location: ${AZURE_LOCATION}
   owner:
     name: krops-shared
-  operatorSpec:
-    configMaps:
-      principalId:
-        name: krops-aso-identity
-        key: principalId
-      clientId:
-        name: krops-aso-identity
-        key: clientId
   tags:
     managed-by: flux-aso
 ---

@@ -1,7 +1,9 @@
 ---
 # ══════════════════════════════════════════════════════════════════════════════
-# cert-manager on the workload cluster: ASO's webhooks require it. wait: true
-# so the ASO HelmRelease only installs once the CA injector is Ready.
+# cert-manager on the workload cluster. Kept as the thin-workload-root
+# component per issue #559 (the workload-side ASO it existed for is gone;
+# the Azure resources now reconcile on the management cluster). wait: true
+# so the Kustomization only reports ready once the CA injector is Ready.
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization

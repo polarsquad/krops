@@ -9,6 +9,7 @@ from renovate_harness import render_auto_replacements
 class ReplaceTemplatesTest(unittest.TestCase):
     def test_no_op_update_reproduces_matched_text(self):
         results = render_auto_replacements()
+        # Intentional: renovate.json5 keeps {{newValue}} templates; delete this test once none remain.
         self.assertTrue(results, "no regex-manager deps with a replacement template extracted")
         for result in results:
             with self.subTest(manager=result["manager"], file=result["file"], dep=result["depName"]):

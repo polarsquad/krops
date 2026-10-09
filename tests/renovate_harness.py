@@ -250,6 +250,7 @@ import { execFileSync } from 'node:child_process';
 const [root, repoRoot] = process.argv.slice(1);
 const require = createRequire(`${root}/package.json`);
 const JSON5 = require('json5');
+// dist/ paths verified against renovate 44.132.2 (validate.yml pin); recheck on bump.
 const load = (path) => import(pathToFileURL(`${root}/dist/${path}`).href);
 const { extractPackageFile } = await load('modules/manager/custom/regex/index.js');
 const { compile } = await load('util/template/index.js');

@@ -25,8 +25,8 @@ reconciles the workload Azure resources from
   [operations.md](./operations.md)). No host toolchain: `az` is in the
   toolbox image.
 - Resource providers (including the Arc ones), the shared resource group and
-  the `krops-capz` / `krops-aso` user-assigned identities with their role
-  grants are created by `azure-bootstrap`. Log in first with the device-code
+  the `krops-capz` user-assigned identity with its role grants are created
+  by `azure-bootstrap`. Log in first with the device-code
   flow; the session persists in a host directory mounted as `/root/.azure`
   (keep it outside the checkout or gitignore it):
 

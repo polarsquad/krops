@@ -249,7 +249,7 @@ flowchart TD
         CAPZS["capz-system (CAPZ v1.27.0 + bundled ASO)"]
         CAAPH[caaph-system]
         AZID["azure-identity (secret-free)<br/>AzureClusterIdentity: WorkloadIdentity"]
-        ASOWI["aso-workload-identity<br/>krops-aso + krops-capz identities + FICs + data RG"]
+        ASOWI["aso-workload-identity<br/>krops-capz + FICs + data RG"]
         WLR["workload-resources Ks<br/>VNet + storage + PostgreSQL"]
         SWEDENC["swedencentral cluster def<br/>swedencentral-management (self-hosted)<br/>swedencentral-workload"]
         FA["flux-apps (SOPS pull secret)<br/>HelmChartProxy + ResourceSet"]

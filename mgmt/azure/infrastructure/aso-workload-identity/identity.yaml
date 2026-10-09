@@ -3,13 +3,14 @@
 # Identity for the ASO controllers and CAPZ.
 #
 # Reconciled by the ASO bundled with CAPZ on this (management) cluster:
-#   - the shared resource group and BOTH user-assigned identities are created
-#     imperatively by `mise -E azure run azure-bootstrap` so their IDs can be
-#     committed ahead of cluster creation; ASO adopts them here (same name,
-#     same location) and owns them from then on;
-#   - krops-aso no longer serves a workload-cluster ASO (issue #559 moved
-#     the workload CRs here and dropped the workload release); it is kept
-#     grant-less per that issue's acceptance criteria, with no consumers;
+#   - the shared resource group and the krops-capz user-assigned identity
+#     are created imperatively by `mise -E azure run azure-bootstrap` so
+#     their IDs can be committed ahead of cluster creation; ASO adopts
+#     them here (same name, same location) and owns them from then on;
+#   - the second user-assigned identity (the former workload-cluster ASO
+#     identity) was deleted with the workload release (issue #559): it was
+#     left with zero consumers and zero grants (the GCP leg deleted its
+#     analog the same way);
 #   - krops-capz serves CAPZ and the management-side bundled ASO (adopted
 #     here so ASO owns it; the RoleAssignments for krops-capz stay in
 #     azure-bootstrap, not Git — nothing reads their IDs);
@@ -28,20 +29,6 @@ metadata:
     serviceoperator.azure.com/credential-from: aso-credentials
 spec:
   location: ${AZURE_LOCATION}
-  tags:
-    managed-by: flux-aso
----
-apiVersion: managedidentity.azure.com/v1api20230131
-kind: UserAssignedIdentity
-metadata:
-  name: krops-aso
-  namespace: default
-  annotations:
-    serviceoperator.azure.com/credential-from: aso-credentials
-spec:
-  location: ${AZURE_LOCATION}
-  owner:
-    name: krops-shared
   tags:
     managed-by: flux-aso
 ---

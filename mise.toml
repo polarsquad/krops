@@ -192,6 +192,11 @@ if ! uv run python tests/test-aws-iam-doc-scope-regressions.py; then
   echo "    FAILED: ACK CR scope regressions" >&2
   fail=1
 fi
+echo "==> AWS credentials: none at rest (#379)"
+if ! python3 tests/test-aws-no-static-credentials.py; then
+  echo "    FAILED: AWS credentials are static" >&2
+  fail=1
+fi
 echo "==> AWS account ID literals match flux-instance.yaml"
 if ! uv run python tests/test-aws-account-id-consistency.py; then
   echo "    FAILED: AWS account ID consistency" >&2

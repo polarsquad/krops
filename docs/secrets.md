@@ -15,8 +15,6 @@ with `spec.decryption.provider: sops`):
 
 | File | Consumed by | Purpose |
 |---|---|---|
-| `mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml` | `capa-system` | CAPA controller AWS credentials |
-| `mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml` | `ack-controllers` | ACK S3/RDS/IAM controller AWS credentials (shared-credentials-file format) |
 | `mgmt/aws/addons/flux-apps/regions/<region>/flux-github-pat.sops.yaml` | `flux-apps` | GitHub PAT pull secret (basic auth), delivered to each workload cluster by a templated ResourceSet (management Kustomization in `default` + `kubeConfig` remote-apply + SOPS decryption via `default/sops-age`) so its Flux can clone this (private) repo. The `mgmt/azure/addons/flux-apps/` and `mgmt/gcp/addons/flux-apps/` copies serve the same role for their environments. |
 | `mgmt/aws/infrastructure/konflate/konflate-token.sops.yaml` | `konflate` | `KONFLATE_TOKEN` (read-only GitHub PAT so konflate can list PRs and clone this private repo) and `KONFLATE_WRITE_TOKEN` (write-back credential konflate uses to post the PR summary comment and the `Konflate` commit status) |
 
@@ -57,56 +55,25 @@ krops_mise run sops-updatekeys
 
 ## Setting / rotating AWS credentials
 
-Rotate all consumers of the affected key together: the gitignored `.env`,
-CAPA's encrypted profile, and the management ACK shared credentials file.
-Updating CAPA alone leaves ACK using its previous credential. For a suspected
-compromise, disable the old key immediately as described in
-[Credential revocation](./aws-iam.md#e2e-account-incident-and-credential-revocation),
-even if controllers temporarily lose AWS access.
+AWS credentials are **not** stored in Git (issue #379): the CAPA and ACK
+controller secrets are created imperatively from ambient credentials
+(`AWS_B64ENCODED_CREDENTIALS`) at bootstrap/pivot time. This mirrors the Azure
+and GCP posture ("none at rest").
 
-1. Validate the replacement with `aws sts get-caller-identity` in the intended
-   credential context; check the account and principal against the environment
-   being managed. Update `.env` before generating CAPA's profile: mise loads
-   that file ahead of process environment values.
-2. Update both encrypted manifests using the commands below. Preserve CAPA's
-   generated profile and ACK's `[default]` profile, including a session token
-   when using temporary credentials. Keep the existing age recipient.
+To set or rotate credentials, update the AWS access key ID and secret in `.env`:
 
 ```sh
-# CAPA: generate the base64 profile. clusterawsadm reads AWS_ACCESS_KEY_ID /
-# AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN / AWS_REGION from .env first
-# (mise env_file), then from the process environment:
-krops_mise -E aws run aws-credentials
-# Put the value into stringData.AWS_B64ENCODED_CREDENTIALS, then encrypt:
-$EDITOR mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml
-krops_mise run sops-encrypt mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml
+# Update .env with the new access key:
+# AWS_ACCESS_KEY_ID=AKIA...
+# AWS_SECRET_ACCESS_KEY=...
+# (and optionally AWS_SESSION_TOKEN for temporary credentials)
 
-# ACK: standard AWS shared-credentials-file format under stringData.credentials:
-$EDITOR mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml
-krops_mise run sops-encrypt mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml
+# Re-run bootstrap/pivot to seed the new credentials:
+./bootstrap.sh aws  # or ./pivot.sh if already bootstrapped
 ```
 
-3. Decrypt both manifests in a local process, decode CAPA's base64 profile,
-   and compare its access key, secret key, and optional session token with
-   ACK's profile and the intended replacement. Report only match/mismatch;
-   do not print credentials or put decrypted material in tracked files or
-   logs. If the age identity cannot decrypt either manifest, stop rather than
-   assuming its encrypted value matches.
-4. Run `mise run validate` and review that both manifests still encrypt all
-   credential fields before committing. A Git update is not live adoption:
-   after merge to `main`, inspect Flux reconciliation and verify successful
-   AWS operations from CAPA and each management ACK controller (S3, RDS,
-   IAM). Also verify any running bootstrap process has adopted the replacement.
-   Secret reconciliation alone does not prove a process reloaded its credential.
-5. For a routine rotation, retire the old key only after those checks. For an
-   incident, keep it disabled throughout recovery and delete it after verifying
-   replacement adoption; do not reactivate it to restore reconciliation.
-
-View a decrypted secret without changing it:
-
-```sh
-krops_mise run sops-decrypt <file>.sops.yaml
-```
+No SOPS encryption or re-encryption is needed: credentials are derived from
+`.env` on demand by the bootstrap/pivot phases.
 
 ## Azure credentials
 

@@ -75,8 +75,9 @@ CAPA is the provider this repo already runs; use it as the template:
   `InfrastructureProvider aws` v2.13.1 with `configSecret: aws-credentials`
   and the EKS feature gates
   (`EKS=true,EKSEnableIAM=true,EKSAllowAddRoles=true,MachinePool=true`).
-- `aws-credentials.sops.yaml` carries `AWS_B64ENCODED_CREDENTIALS`, produced
-  by the `aws-credentials` task (toolbox run, see [docs/aws.md](./aws.md)) (rotation: [docs/secrets.md](./secrets.md)).
+- The `aws-credentials` secret is created imperatively from ambient credentials
+  at bootstrap/pivot time (no SOPS file required); see [docs/aws.md](./aws.md)
+  and [docs/secrets.md](./secrets.md) for the current credential flow.
 - Cluster definitions in `mgmt/aws/clusters/<region>/<env>/` use
   `AWSManagedControlPlane` + `AWSManagedMachinePool` (EKS). The ACK
   controllers and the per-cluster AWS resource CRs run on the management

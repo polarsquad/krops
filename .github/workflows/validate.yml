@@ -224,6 +224,9 @@ jobs:
           uv run python tests/test-aws-iam-doc-scope.py
           uv run python tests/test-aws-iam-doc-scope-regressions.py
 
+      - name: AWS credentials none at rest (#379)
+        run: python3 tests/test-aws-no-static-credentials.py
+
       - name: AWS account ID literals vs flux-instance.yaml
         run: python3 tests/test-aws-account-id-consistency.py
 

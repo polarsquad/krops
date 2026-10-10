@@ -9,6 +9,7 @@ tracking issue.
 | Proposal | Status | Tracking issue |
 |----------|--------|----------------|
 | [Crossplane on the management cluster](crossplane-management-cluster.md) | accepted, see [docs/crossplane.md](https://github.com/polarsquad/krops/blob/main/docs/crossplane.md) | [#313](https://github.com/polarsquad/krops/issues/313) |
+| [Virtualized e2e harness architecture (WireMock)](wiremock-e2e-architecture.md) | under review | [#355](https://github.com/polarsquad/krops/issues/355) |
 
 Proposals link to other repository files with absolute GitHub URLs, because
 the documentation site assembles this folder separately from the top-level

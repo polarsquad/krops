@@ -129,7 +129,8 @@ WireMock image's own keytool, both `--keystore-password` and
   `iam.googleapis.com` (IAMServiceAccount, IAMPolicyMember, the
   WorkloadIdentityPool family in `mgmt/gcp/infrastructure/kcc-identity/`),
   `serviceusage.googleapis.com` (the Service activations), and from
-  `workload/gcp-base/` `storage.googleapis.com`, `sqladmin.googleapis.com`,
+  `mgmt/gcp/infrastructure/workload-resources/` `storage.googleapis.com`,
+  `sqladmin.googleapis.com`,
   and `servicenetworking.googleapis.com`. Under the WIF repoint those calls
   authenticate against WireMock and then dial the real hosts with a dummy
   token, so they are neither intercepted nor assertable. Phase 2 must

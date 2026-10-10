@@ -309,8 +309,10 @@ cert-manager (the Azure resources moved to the management cluster in issue #559)
 The `gcp` environment mirrors `azure`: a disposable kind cluster bootstraps
 Flux, CAPG v1.13.1 provisions a GKE management cluster
 (`europe-north1-management`), the pivot moves the management objects into
-it, and the GKE workload cluster runs its own Config Connector (KCC 1.158.0)
-reconciling GCP resources from `workload/gcp-base/`.
+it, and the management cluster's Config Connector (KCC 1.158.0) reconciles
+the GCP workload resources from
+`mgmt/gcp/infrastructure/workload-resources/` (issue #560: the workload
+cluster no longer runs its own KCC).
 
 No GCP secret exists at rest. CAPG and the management-side Config Connector
 authenticate with Workload Identity Federation against the `krops` pool:
@@ -318,8 +320,7 @@ their service accounts present the cluster's projected token through the
 `kind` provider at bootstrap and the Git-declared `mgmt` provider
 post-pivot, and the credential files are plain `external_account` Secrets
 with a subject condition restricted to exactly those two service accounts
-(`krops-capg` is the GSA they impersonate). The workload cluster uses
-GKE-native Workload Identity through `krops-kcc`. The pivot applies the two
+(`krops-capg` is the GSA they impersonate). The pivot applies the two
 credential Secrets to the target before `clusterctl move`
 (`pivot-manifests`) and pins `GCP_WIF_PROVIDER=mgmt`
 (`pivot-manifest-vars`), because the source-side ConfigMap merge order
@@ -357,12 +358,13 @@ flowchart TD
         KCCO["kcc-operator (1.158.0, pinned bundle)"]
         KCC["kcc (ConfigConnector in cnrm-system)<br/>WIF credential Secret"]
         KCCI["kcc-identity (KCC-managed)<br/>krops pool + mgmt provider + GSA grants"]
+        WRES["workload-resources (KCC CRs, issue #560)<br/>networking / storage / postgres / iam"]
         EUNC["europe-north1 cluster defs<br/>europe-north1-management (self-hosted)<br/>europe-north1-workload"]
         FA["flux-apps (SOPS pull secret)<br/>HelmChartProxy + ResourceSet"]
 
         FS --> CM --> CO --> CAPIS --> CAPGS
         CAPIS --> CAAPH --> FA
-        FS --> KCCO --> KCC --> KCCI
+        FS --> KCCO --> KCC --> KCCI --> WRES
         CAPGS --> EUNC
     end
 
@@ -371,7 +373,7 @@ flowchart TD
     subgraph gcp["GCP: europe-north1"]
         GKE[GKE: europe-north1-management<br/>+ europe-north1-workload]
         POOL["Workload Identity Pool: krops<br/>providers: kind (bootstrap) + mgmt (Git)"]
-        GSAS["krops-capg / krops-kcc / krops-reader GSAs"]
+        GSAS["krops-capg / krops-reader GSAs"]
         VPC[(VPC + PSA range: krops-europe-north1-workload-psa)]
         BUCKET[(Storage bucket: krops-&lt;number&gt;-europe-north1-workload-data)]
         SQL[(Cloud SQL: krops-europe-north1-workload-db<br/>private IP, IAM auth)]
@@ -380,29 +382,16 @@ flowchart TD
     EUNC -->|CAPG provisions| GKE
     KCCI -->|KCC creates| POOL
     KCCI -->|KCC creates| GSAS
-    KCC -->|KCC reconciles| SQL
+    WRES -->|KCC reconciles as krops-capg| SQL
+    WRES -->|KCC reconciles| VPC
+    WRES -->|KCC reconciles| BUCKET
     FA -->|"HelmChartProxy: flux-operator<br/>ResourceSet: FluxInstance + cluster-vars + pull secret (remote-apply)"| WF
 
     subgraph wl["Workload cluster europe-north1-workload (GKE)"]
-        WF["Flux (sync: workload/europe-north1-01)"]
-        WKCCO["kcc-operator Ks<br/>KCC 1.158.0 operator (wait: true)"]
-        WKCC["kcc Ks<br/>cluster-mode ConfigConnector<br/>GKE Workload Identity via krops-kcc"]
-        WNET["networking Ks<br/>PSA range + peering (dependsOn: kcc)"]
-        WSTOR["storage Ks<br/>bucket (dependsOn: kcc)"]
-        WPSQL["postgres Ks<br/>Cloud SQL (dependsOn: kcc, networking)"]
-        WIAM["iam Ks<br/>per-cluster reader GSA (dependsOn: kcc, storage)"]
-
-        WF --> WKCCO --> WKCC --> WNET
-        WKCC --> WSTOR
-        WKCC --> WPSQL
-        WKCC --> WIAM
+        WF["Flux (sync: workload/europe-north1-01)<br/>gcp-base root intentionally empty (issue #560)"]
     end
 
     WF --> REPO
-    GKE -.->|GKE-native Workload Identity token| WKCC
-    WNET -->|reconciles| VPC
-    WSTOR -->|reconciles| BUCKET
-    WPSQL -->|reconciles| SQL
 ```
 
 ### Reconciliation order (GCP management cluster)
@@ -417,13 +406,10 @@ europe-north1 clusters (dependsOn: capg-system, gcp-vars)
 ### Reconciliation order (GCP workload cluster)
 
 ```
-kcc-operator (operator StatefulSet Ready; the pinned bundle ships its own
-webhook certs, so no cert-manager) ▶ kcc (ConfigConnector, no wait: the CR
-has no standard ready condition)
-                                     ├▶ networking (PSA range + peering)
-                                     ├▶ storage (bucket)
-                                     ├▶ postgres (Cloud SQL, dependsOn: networking)
-                                     └▶ iam (per-cluster reader GSA, dependsOn: storage)
+Flux only. The gcp-base root is intentionally empty (issue #560): the
+workload cloud resources reconcile on the management cluster - see the
+management-cluster chain above, where workload-resources depends on
+kcc-identity (networking first, then postgres after networking, iam last).
 ```
 
 ## Local host environment (local-host)

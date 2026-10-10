@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Check the workload Cloud SQL instance settings and their documentation.
+"""Check the Cloud SQL instance settings and their documentation.
 
+The instance lives on the management cluster (issue #560: the workload
+cloud CRs moved off the workload cluster) and reconciles as krops-capg.
 Requires PyYAML (`uv run`). Rationale for each check lives in
 docs/workload-resources.md.
 """
@@ -11,10 +13,10 @@ from pathlib import Path
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SQL = REPO_ROOT / "workload/gcp-base/postgres/postgres.yaml"
+SQL = REPO_ROOT / "mgmt/gcp/infrastructure/workload-resources/postgres/postgres.yaml"
 DOC = REPO_ROOT / "docs/workload-resources.md"
 CLAIM_FILES = [DOC, REPO_ROOT / "docs/gcp.md", REPO_ROOT / "docs/architecture.md",
-               REPO_ROOT / "workload/gcp-base/postgres/flux-ks.yaml",
+               REPO_ROOT / "mgmt/gcp/infrastructure/flux-ks.yaml",
                REPO_ROOT / "AGENTS.md", REPO_ROOT / "docs/gcp-infra.svg"]
 
 

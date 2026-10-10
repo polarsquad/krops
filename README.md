@@ -250,11 +250,13 @@ the CLI prints the steps.
 #### GCP
 
 CAPG v1.13.1 provisions a GKE management cluster in `europe-north1` plus a
-workload GKE cluster; the workload cluster runs its own Config Connector (KCC)
-reconciling GCP resources from `workload/gcp-base/`. No GCP secret exists at
-rest: CAPG and the management-side Config Connector authenticate with
+workload GKE cluster; the management cluster's Config Connector (KCC)
+reconciles the workload GCP resources from
+`mgmt/gcp/infrastructure/workload-resources/` (issue #560). No GCP secret
+exists at rest: CAPG and the management-side Config Connector
+authenticate with
 Workload Identity Federation against the `krops` pool (no service-account
-keys), and the workload cluster uses GKE-native Workload Identity. It needs a
+keys). It needs a
 GitHub PAT, an age key, and a project with a billing account where you hold
 Owner.
 
@@ -398,7 +400,7 @@ teardown controls, toolbox release, and current parity status.
 | [docs/operations.md](docs/operations.md) | Toolbox runtime, prerequisites, e2e AWS account designation and budget, quotas, bootstrap, pivot recovery, teardown, validation |
 | [docs/extending.md](docs/extending.md) | Adding a workload cluster, adding apps to the workload clusters, adding other providers (Azure, Talos, k0smotron) |
 | [docs/azure.md](docs/azure.md) | Azure environment: subscription prep, credentials, AKS clusters, ASO on workload clusters, upgrades |
-| [docs/gcp.md](docs/gcp.md) | GCP environment: project prep, WIF credentials (no keys), GKE clusters, Config Connector on the workload cluster, upgrades |
+| [docs/gcp.md](docs/gcp.md) | GCP environment: project prep, WIF credentials (no keys), GKE clusters, Config Connector on the management cluster, upgrades |
 | [docs/airgap.md](docs/airgap.md) | Zarf air-gap bundle: package build, offline deploy, verification checklist, update drill |
 | [docs/crossplane.md](docs/crossplane.md) | Crossplane as an alternative resource plane on the management cluster: selector design, ownership rules, slices (decided, not yet implemented) |
 | [docs/proposals/](docs/proposals/README.md) | Design proposals, under review or accepted |
@@ -469,9 +471,9 @@ teardown controls, toolbox release, and current parity status.
     ├── azure-base/               cert-manager only (the Azure workload
     │                              resources moved to the management cluster,
     │                              #559)
-    ├── gcp-base/                 KCC operator + ConfigConnector, PSA range,
-    │                              storage bucket, Cloud SQL, per-cluster
-    │                              reader GSA
+    ├── gcp-base/                 intentionally empty (issue #560: KCC and
+    │                              the GCP resources moved to the management
+    │                              cluster's workload-resources)
     ├── local-host/               OCI-synced Podinfo workload overlay
     ├── eu-north-01/              Per-cluster overlay (sync target)
     ├── eu-west-01/               Per-cluster overlay (sync target)

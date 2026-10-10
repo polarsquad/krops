@@ -6,9 +6,9 @@
 #
 #   krops-capg   CAPG + management-side Config Connector (the krops-capz
 #                precedent: one GSA for both, split later if a least-privilege
-#                review demands it).
-#   krops-kcc    the workload-cluster Config Connector (GKE-native WI, bound
-#                per-cluster in europe-north1-workload.yaml).
+#                review demands it). Since issue #560 it also reconciles the
+#                per-workload-cluster resources under
+#                mgmt/gcp/infrastructure/workload-resources/.
 #   krops-reader the human read-only identity; humans impersonate it.
 #
 # Project-level role grants mirror the gcp-bootstrap grant() loop, so KCC
@@ -21,16 +21,6 @@ metadata:
   namespace: default
 spec:
   displayName: krops CAPG + management-side Config Connector
-  projectRef:
-    external: projects/${GCP_PROJECT}
----
-apiVersion: iam.cnrm.cloud.google.com/v1beta1
-kind: IAMServiceAccount
-metadata:
-  name: krops-kcc
-  namespace: default
-spec:
-  displayName: krops workload-cluster Config Connector
   projectRef:
     external: projects/${GCP_PROJECT}
 ---
@@ -189,11 +179,15 @@ spec:
   role: roles/iam.workloadIdentityUser
   member: principal://iam.googleapis.com/projects/${GCP_PROJECT_NUMBER}/locations/global/workloadIdentityPools/krops/subject/system:serviceaccount:cnrm-system:cnrm-controller-manager
 ---
-# ── krops-kcc project-level grants (workload-cluster KCC) ────────────────────
+# ── krops-capg grants for the workload-resources CRs (issue #560) ───────────
+# The three admin roles the moved workload resources need (SQLInstance /
+# SQLDatabase / SQLUser, StorageBucket, ServiceNetworkingConnection); the
+# ComputeAddress needs compute.networkAdmin, which krops-capg already
+# carries.
 apiVersion: iam.cnrm.cloud.google.com/v1beta1
 kind: IAMPolicyMember
 metadata:
-  name: krops-kcc-cloudsql-admin
+  name: krops-capg-cloudsql-admin
   namespace: default
 spec:
   resourceRef:
@@ -202,12 +196,12 @@ spec:
   role: roles/cloudsql.admin
   memberFrom:
     serviceAccountRef:
-      name: krops-kcc
+      name: krops-capg
 ---
 apiVersion: iam.cnrm.cloud.google.com/v1beta1
 kind: IAMPolicyMember
 metadata:
-  name: krops-kcc-storage-admin
+  name: krops-capg-storage-admin
   namespace: default
 spec:
   resourceRef:
@@ -216,26 +210,12 @@ spec:
   role: roles/storage.admin
   memberFrom:
     serviceAccountRef:
-      name: krops-kcc
+      name: krops-capg
 ---
 apiVersion: iam.cnrm.cloud.google.com/v1beta1
 kind: IAMPolicyMember
 metadata:
-  name: krops-kcc-compute-network-admin
-  namespace: default
-spec:
-  resourceRef:
-    kind: Project
-    external: projects/${GCP_PROJECT}
-  role: roles/compute.networkAdmin
-  memberFrom:
-    serviceAccountRef:
-      name: krops-kcc
----
-apiVersion: iam.cnrm.cloud.google.com/v1beta1
-kind: IAMPolicyMember
-metadata:
-  name: krops-kcc-servicenetworking-admin
+  name: krops-capg-servicenetworking-admin
   namespace: default
 spec:
   resourceRef:
@@ -244,21 +224,7 @@ spec:
   role: roles/servicenetworking.networksAdmin
   memberFrom:
     serviceAccountRef:
-      name: krops-kcc
----
-apiVersion: iam.cnrm.cloud.google.com/v1beta1
-kind: IAMPolicyMember
-metadata:
-  name: krops-kcc-iam-sa-admin
-  namespace: default
-spec:
-  resourceRef:
-    kind: Project
-    external: projects/${GCP_PROJECT}
-  role: roles/iam.serviceAccountAdmin
-  memberFrom:
-    serviceAccountRef:
-      name: krops-kcc
+      name: krops-capg
 ---
 # ── krops-reader project-level grants (human read-only) ──────────────────────
 apiVersion: iam.cnrm.cloud.google.com/v1beta1

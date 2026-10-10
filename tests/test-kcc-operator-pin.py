@@ -2,15 +2,11 @@
 """Cross-check the Config Connector operator pin (issue #72).
 
 The operator manifest is committed verbatim from Google's versioned release
-bundle, in two copies (management and workload clusters). Renovate bumps the
-annotated version and the image tag but cannot rewrite the 3500-line manifest,
-so this gate fails deliberately when an image tag drifts from its annotated
-version or the two copies fall out of sync: a human must re-download the
-release bundle and replace the files (see docs/gcp.md).
-
-The management copy always exists; the workload copy lands with the workload
-resources (workload/gcp-base/), so the cross-copy checks apply only when both
-copies are present.
+bundle, in the one copy that exists (management cluster; issue #560 removed
+the workload copy). Renovate bumps the annotated version and the image tag
+but cannot rewrite the 3500-line manifest, so this gate fails deliberately
+when an image tag drifts from its annotated version: a human must
+re-download the release bundle and replace the file (see docs/gcp.md).
 """
 
 import re
@@ -20,7 +16,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 OPERATOR_FILES = [
     REPO_ROOT / "mgmt/gcp/infrastructure/kcc-operator/configconnector-operator.yaml",
-    REPO_ROOT / "workload/gcp-base/kcc-operator/configconnector-operator.yaml",
 ]
 VERSION_RE = re.compile(r"^# kcc-operator-version: (?P<version>[0-9.]+)\s*$", re.MULTILINE)
 IMAGE_RE = re.compile(

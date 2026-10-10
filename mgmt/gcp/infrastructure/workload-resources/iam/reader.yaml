@@ -1,12 +1,19 @@
 ---
 # Per-cluster read-only identity (issue #72); see docs/workload-resources.md.
+# Moved to the management cluster in issue #560: the management cluster's
+# KCC reconciles it as krops-capg, and the `iam` Flux Kustomization in
+# mgmt/gcp/infrastructure/flux-ks.yaml orders it after kcc-identity, storage
+# and postgres. The cluster name is literal europe-north1-workload (the
+# management-side gcp-vars ConfigMap carries no per-cluster keys). The grants
+# are unchanged from the workload-cluster copy: the human krops-reader flow
+# is byte-equivalent in behavior.
 apiVersion: iam.cnrm.cloud.google.com/v1
 kind: IAMServiceAccount
 metadata:
-  name: krops-${CLUSTER_NAME}-r
+  name: krops-europe-north1-workload-r
   namespace: default
 spec:
-  displayName: "krops reader (${CLUSTER_NAME})"
+  displayName: "krops reader (europe-north1-workload)"
 ---
 apiVersion: iam.cnrm.cloud.google.com/v1
 kind: IAMPolicyMember
@@ -15,7 +22,7 @@ metadata:
   namespace: default
 spec:
   role: "roles/storage.objectViewer"
-  member: "serviceAccount:krops-${CLUSTER_NAME}-r@${GCP_PROJECT}.iam.gserviceaccount.com"
+  member: "serviceAccount:krops-europe-north1-workload-r@${GCP_PROJECT}.iam.gserviceaccount.com"
   resourceRef:
     kind: StorageBucket
     name: data
@@ -27,7 +34,7 @@ metadata:
   namespace: default
 spec:
   role: "roles/cloudsql.viewer"
-  member: "serviceAccount:krops-${CLUSTER_NAME}-r@${GCP_PROJECT}.iam.gserviceaccount.com"
+  member: "serviceAccount:krops-europe-north1-workload-r@${GCP_PROJECT}.iam.gserviceaccount.com"
   resourceRef:
     external: "projects/${GCP_PROJECT}"
 ---
@@ -38,7 +45,7 @@ metadata:
   namespace: default
 spec:
   role: "roles/cloudsql.instanceUser"
-  member: "serviceAccount:krops-${CLUSTER_NAME}-r@${GCP_PROJECT}.iam.gserviceaccount.com"
+  member: "serviceAccount:krops-europe-north1-workload-r@${GCP_PROJECT}.iam.gserviceaccount.com"
   resourceRef:
     external: "projects/${GCP_PROJECT}"
 ---
@@ -52,4 +59,4 @@ spec:
   member: "serviceAccount:krops-reader@${GCP_PROJECT}.iam.gserviceaccount.com"
   resourceRef:
     kind: IAMServiceAccount
-    name: krops-${CLUSTER_NAME}-r
+    name: krops-europe-north1-workload-r

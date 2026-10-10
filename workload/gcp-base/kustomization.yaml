@@ -1,9 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-resources:
-  - kcc-operator/flux-ks.yaml
-  - kcc/flux-ks.yaml
-  - networking/flux-ks.yaml
-  - storage/flux-ks.yaml
-  - postgres/flux-ks.yaml
-  - iam/flux-ks.yaml
+# Intentionally empty: no GCP resource-provisioning apps run on the workload
+# cluster anymore (issue #560 — the Config Connector operator, the cluster-
+# mode ConfigConnector, and the PSA range / bucket / Cloud SQL / reader GSA
+# CRs moved to the management cluster under
+# mgmt/gcp/infrastructure/workload-resources/, reconciled by the management
+# cluster's Config Connector as krops-capg). The workload cluster keeps its
+# own Flux instance, ready for a future application workload (the local-host
+# Podinfo pattern), but reconciles nothing today.
+resources: []

@@ -73,11 +73,15 @@ resources. There is no app source code here, only declarative infrastructure.
   (`GCPManaged*`); the Config Connector operator ships as a pinned verbatim
   release bundle (`infrastructure/kcc-operator/`, version comment
   `kcc-operator-version:`) and `tests/test-kcc-operator-pin.py` (in
-  `mise run validate` and CI) keeps every committed copy byte-identical and
+  `mise run validate` and CI) keeps the committed copy byte-identical and
   matching the version comment: Renovate bumps the comment and the operator
   image tag, and the gate then goes red until the whole release bundle is
   re-downloaded (same "Renovate opens, human completes" posture as the
-  Talos images). Credentials: none at rest; Workload Identity Federation
+  Talos images). The management Config Connector also reconciles the GCP
+  workload cloud CRs (`infrastructure/workload-resources/`: PSA range,
+  storage bucket, Cloud SQL, per-cluster reader GSA), ordered after
+  `kcc-identity` in `infrastructure/flux-ks.yaml` (issue #560). Credentials:
+  none at rest; Workload Identity Federation
   through the `krops` pool with plain `external_account` Secrets
   (`capg-wif-credentials`, `kcc-wif-credentials`), provider
   `${GCP_WIF_PROVIDER:=mgmt}` (kind bootstrap overrides to `kind` via the
@@ -90,19 +94,24 @@ resources. There is no app source code here, only declarative infrastructure.
     the S3/RDS/IAM custom resources moved to `mgmt/aws/infrastructure/`);
     the workload Flux instance stays ready for a future application
     workload.
-  - `azure-base/`: cert-manager, ASO (workload identity), and the Azure
-    resources (VNet + delegated subnet + private DNS, storage account +
-    container, PostgreSQL Flexible Server). `swedencentral-01/` points at it.
+  - `azure-base/`: cert-manager only since issue #559 (the workload ASO and
+    the Azure resources (VNet, storage account, PostgreSQL Flexible Server)
+    moved to `mgmt/azure/infrastructure/workload-resources/`, reconciled by
+    the management cluster's bundled ASO); the workload Flux instance stays
+    ready for a future application workload. `swedencentral-01/` points at it;
     `tests/test-azure-identity-chain.py` (in `mise run validate` and CI)
-    cross-checks the ConfigMap/subject couplings between these and
+    cross-checks the management-side FICs and the moved CRs' data resource
+    group couplings against
     `mgmt/azure/infrastructure/aso-workload-identity/`.
-  - `gcp-base/` (PR 2, issue #72): Config Connector (the same
-    pinned operator bundle as the management side; it ships its own webhook
-    certs, so no cert-manager) and the GCP resources
-    (PSA range + peering, storage bucket, Cloud SQL with IAM database auth,
-    per-cluster reader GSA). `europe-north1-01/` points at it;
-    `tests/test-gcp-identity-chain.py` cross-checks the WIF
-    pool/provider/subject couplings against `mgmt/gcp/`.
+  - `gcp-base/`: intentionally empty since issue #560 (the Config Connector
+    operator, the cluster-mode ConfigConnector, and the PSA range / bucket /
+    Cloud SQL / reader GSA CRs moved to
+    `mgmt/gcp/infrastructure/workload-resources/`, reconciled by the
+    management cluster's Config Connector as `krops-capg`); the workload Flux
+    instance stays ready for a future application workload. `europe-north1-01/`
+    points at it; `tests/test-gcp-identity-chain.py` cross-checks the WIF
+    pool/provider/subject couplings and the moved-CR grants against
+    `mgmt/gcp/`.
   - `<region>-01/`: per-cluster overlays pointing at `../base`.
 - `airgap/`: Zarf offline transfer bundle for the local-host profile.
   `zarf.yaml` is the authoritative image listing for the package and

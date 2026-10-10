@@ -3,8 +3,13 @@
 # Application database (issue #72, the RDS and PostgreSQL Flexible Server
 # counterparts). Cloud SQL PostgreSQL 17, zonal, private IP only (no public
 # address; the private IP peers into the workload VPC through the PSA range
-# in networking/), IAM database authentication for the reader user, TLS required.
-# No rootPassword: the built-in postgres user is created passwordless and cannot log in; see docs/gcp.md (Known limitations).
+# in networking/), IAM database authentication for the reader user, TLS
+# required. Moved to the management cluster in issue #560: the management
+# cluster's KCC reconciles it as krops-capg, and the `postgres` Flux
+# Kustomization in mgmt/gcp/infrastructure/flux-ks.yaml orders it after
+# kcc-identity and networking.
+# No rootPassword: the built-in postgres user is created passwordless and
+# cannot log in; see docs/gcp.md (Known limitations).
 #
 # settings.diskType PD_HDD + db-f1-micro keep the default bill small; the
 # tier is a documented knob, not a pin. deletionProtectionEnabled stays
@@ -17,7 +22,7 @@ metadata:
   name: app-db
   namespace: default
 spec:
-  resourceID: "krops-${CLUSTER_NAME}-db"
+  resourceID: "krops-europe-north1-workload-db"
   region: "${GCP_REGION}"
   databaseVersion: POSTGRES_17
   deletionProtectionEnabled: false
@@ -31,7 +36,7 @@ spec:
       ipv4Enabled: false
       sslMode: ENCRYPTED_ONLY
       privateNetworkRef:
-        external: "projects/${GCP_PROJECT}/global/networks/${GCP_NETWORK}"
+        external: "projects/${GCP_PROJECT}/global/networks/krops-europe-north1-workload"
     databaseFlags:
       - name: "cloudsql.iam_authentication"
         value: "on"
@@ -67,5 +72,5 @@ metadata:
 spec:
   instanceRef:
     name: app-db
-  resourceID: "krops-${CLUSTER_NAME}-r@${GCP_PROJECT}.iam"
+  resourceID: "krops-europe-north1-workload-r@${GCP_PROJECT}.iam"
   type: CLOUD_IAM_SERVICE_ACCOUNT

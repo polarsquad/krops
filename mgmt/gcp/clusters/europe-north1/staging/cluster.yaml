@@ -34,7 +34,8 @@ spec:
   region: europe-north1
   network:
     # Literal final name: CAPG creates this VPC (auto mode). Cloud SQL's
-    # private IP peers into this VPC (workload/gcp-base/networking/).
+    # private IP peers into this VPC (mgmt/gcp/infrastructure/
+    # workload-resources/networking/).
     name: krops-europe-north1-workload
     autoCreateSubnetworks: true
 ---
@@ -53,8 +54,10 @@ spec:
   releaseChannel: regular
   clusterSecurity:
     workloadIdentityConfig:
-      # GKE-native Workload Identity for the workload-cluster Config Connector
-      # (krops-kcc, bound in infrastructure/kcc-identity/europe-north1-workload.yaml).
+      # GKE-native Workload Identity pool for the workload cluster's own
+      # service accounts (no consumer in Git today: the workload cluster no
+      # longer runs its own Config Connector, issue #560; kept for a future
+      # in-cluster identity need).
       workloadPool: ${GCP_PROJECT}.svc.id.goog
 ---
 apiVersion: cluster.x-k8s.io/v1beta1

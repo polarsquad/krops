@@ -260,4 +260,4 @@ manual = """GCP teardown is not automated yet (issue #72 follow-up).
      gcloud services vpc-peerings delete --network krops-europe-north1-workload
      gcloud compute addresses delete krops-europe-north1-workload-psa --global
   5. Delete the VPCs and firewall rules CAPG created: gcloud compute networks delete krops-europe-north1-{management,workload}
-(the krops pool, its providers and the three service accounts may stay; they are re-adopted on the next bootstrap)"""
+(the krops pool, its providers and the two service accounts may stay; they are re-adopted on the next bootstrap)"""

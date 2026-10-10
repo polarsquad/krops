@@ -1,14 +1,17 @@
 # GCP environment
 
 The `gcp` environment mirrors `azure`: a kind bootstrap cluster runs Flux,
-CAPG builds a GKE management cluster, the pivot moves the management objects
-into it, and the GKE workload cluster runs its own Config Connector (KCC)
-that reconciles GCP resources from `workload/gcp-base/`.
+CAPG builds a GKE management cluster, and the pivot moves the management
+objects into it. The management cluster's Config Connector (KCC)
+reconciles the GCP workload resources (PSA range, bucket, Cloud SQL,
+reader GSA) from
+`mgmt/gcp/infrastructure/workload-resources/` (issue #560: the workload
+clusters no longer run their own Config Connector).
 
 | AWS (`aws`) | Azure (`azure`) | GCP (`gcp`) |
 |---|---|---|
 | CAPA, `AWSManagedControlPlane` | CAPZ, `AzureASOManagedControlPlane` | CAPG v1.13.1, `GCPManagedControlPlane` (GKE) |
-| ACK controllers on the management cluster only (issue #346) | ASO bundled by CAPZ on the management cluster only (workload release removed, issue #559) | Config Connector (KCC 1.158.0) Helm release |
+| ACK controllers on the management cluster only (issue #346) | ASO bundled by CAPZ on the management cluster only (workload release removed, issue #559) | Config Connector (KCC 1.158.0) on the management cluster only (issue #560) |
 | Static SOPS credentials on the management cluster (no EKS Pod Identity since issue #346) | Entra Workload Identity | Workload Identity Federation (WIF pool `krops`) |
 | S3 bucket | Storage account + blob container | Storage bucket (versioning, uniform access, PAP) |
 | RDS PostgreSQL | PostgreSQL Flexible Server | Cloud SQL (private IP, IAM auth) |
@@ -34,8 +37,8 @@ that reconciles GCP resources from `workload/gcp-base/`.
   ```
 
 - The one-time project preparation (enable the GKE/SQL/Storage/IAM/STS APIs,
-  create the `krops-capg` / `krops-kcc` / `krops-reader` service accounts
-  with their project role grants, and create the `krops` workload identity
+  create the `krops-capg` / `krops-reader` service accounts with their
+  project role grants, and create the `krops` workload identity
   pool):
 
   ```sh
@@ -84,11 +87,6 @@ restricted by `attributeCondition` to exactly those two service accounts.
   issuer, `allowedAudiences` equal to the issuer). The pivot pins
   `GCP_WIF_PROVIDER=mgmt` through `pivot-manifest-vars` in `bootstrap.toml`
   because the source-side ConfigMap merge order cannot guarantee it.
-- The workload cluster uses GKE-native Workload Identity: the management
-  cluster's KCC grants `roles/iam.workloadIdentityUser` on `krops-kcc` to
-  the workload cluster's `cnrm-controller-manager`
-  (`mgmt/gcp/infrastructure/kcc-identity/europe-north1-workload.yaml`), and
-  its `ConfigConnector` uses `googleServiceAccount: krops-kcc` directly.
 
 ## Bootstrap, pivot, teardown
 
@@ -134,16 +132,16 @@ cert-manager, capi-operator, capi-system, capg-system (health checks wait
 for the GCPManaged* CRDs), caaph-system, kcc-operator (waits for the
 operator StatefulSet), kcc (the `cnrm-system` ConfigConnector), kcc-identity
 (the `krops` pool, `mgmt` provider and GSA grants, managed by KCC),
-europe-north1 (clusters), flux-apps. The `kcc` and `capg-system`
-Kustomizations substitute from `gcp-vars` plus the optional `gcp-wif`
-ConfigMap, so their first reconcile on a fresh source can fail once and
-succeeds on the 2-minute retry.
+workload-resources (the per-workload-cluster cloud resources, issue #560:
+networking (Private Service Access), storage (bucket), postgres (Cloud
+SQL, depends on networking), iam (per-cluster reader), all depending on
+kcc-identity), europe-north1 (clusters), flux-apps. The `kcc` and
+`capg-system` Kustomizations substitute from `gcp-vars` plus the optional
+`gcp-wif` ConfigMap, so their first reconcile on a fresh source can fail
+once and succeeds on the 2-minute retry.
 
-Workload cluster: kcc-operator (the operator, waited on; the pinned
-bundle ships its own webhook certs, so no cert-manager), kcc (the
-cluster-mode ConfigConnector), then networking (Private Service Access),
-storage (bucket), postgres (Cloud SQL, depends on networking) and iam
-(per-cluster reader).
+Workload cluster: Flux only, ready for a future application workload
+(its gcp-base root is intentionally empty, issue #560).
 
 ## Upgrading CAPG and the Config Connector operator
 
@@ -157,16 +155,16 @@ version comment `kcc-operator-version:`). Renovate bumps the version
 comment and the operator image tag, but it does not rewrite the ~3500-line
 manifest: `tests/test-kcc-operator-pin.py` (in `mise run validate`) then
 goes red on purpose. Complete the bump by hand: download the new
-`release-bundle.tar.gz`, replace the file, and commit (both the management
-and the workload copies must stay byte-identical).
+`release-bundle.tar.gz`, replace the file, and commit.
 
 ## Known limitations
 
 - Cloud SQL creates the built-in `postgres` user with no password; it cannot
   log in, and `cloudsql.iam_authentication` does not remove it. No `rootPassword`
-  is committed; a SOPS-backed one is deliberately skipped because workload
-  clusters have no SOPS decryption, and wiring it would undermine the WIF
-  "no credentials at rest" posture (follow-up if needed). If an operator needs
+  is committed; a SOPS-backed one is deliberately skipped because the
+  management cluster's KCC credentials are secret-free WIF files, and wiring
+  it would undermine the WIF "no credentials at rest" posture (follow-up if
+  needed). If an operator needs
   superuser access: `gcloud sql users set-password postgres --instance=krops-<cluster>-db --prompt-for-password`
   -- never put it in Git or a cluster Secret. Limit who holds
   `cloudsql.users.update` (roles/cloudsql.admin, roles/editor) as that

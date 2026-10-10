@@ -118,3 +118,111 @@ spec:
     substituteFrom:
       - kind: ConfigMap
         name: gcp-vars
+---
+# ── workload cloud resources (issue #560: moved off the workload cluster) ───
+# The four Kustomizations below own the GCP resources each workload GKE
+# used to run its own Config Connector for (workload/gcp-base/): they now
+# reconcile on the management cluster's KCC, which acts as krops-capg.
+# dependsOn: kcc-identity transitively orders them after kcc-operator and
+# kcc, and after krops-capg's project grants (the three admin roles the
+# moved CRs need) are managed. KCC reports readiness on managed resources
+# via status.conditions, so wait: true blocks until each resource is
+# actually created.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: networking
+  namespace: flux-system
+spec:
+  interval: 5m
+  retryInterval: 2m
+  timeout: 10m
+  prune: true
+  # wait: the PSA range + peering must actually exist before postgres
+  # (privateNetworkRef target).
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./mgmt/gcp/infrastructure/workload-resources/networking
+  dependsOn:
+    - name: kcc-identity
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: gcp-vars
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: storage
+  namespace: flux-system
+spec:
+  interval: 5m
+  retryInterval: 2m
+  timeout: 5m
+  prune: true
+  # wait: the bucket must exist before the iam Kustomization's
+  # objectViewer grant references it.
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./mgmt/gcp/infrastructure/workload-resources/storage
+  dependsOn:
+    - name: kcc-identity
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: gcp-vars
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: postgres
+  namespace: flux-system
+spec:
+  interval: 5m
+  retryInterval: 2m
+  timeout: 30m
+  prune: true
+  # wait: instance creation takes 10-20 min; iam's instanceUser grant
+  # and the SQLUser both reference the instance.
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./mgmt/gcp/infrastructure/workload-resources/postgres
+  dependsOn:
+    - name: kcc-identity
+    - name: networking
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: gcp-vars
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: iam
+  namespace: flux-system
+spec:
+  interval: 5m
+  retryInterval: 2m
+  timeout: 5m
+  prune: true
+  # wait: the reader GSA and its grants must exist before the human
+  # krops-reader flow can use them.
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./mgmt/gcp/infrastructure/workload-resources/iam
+  dependsOn:
+    - name: kcc-identity
+    - name: storage
+    - name: postgres
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: gcp-vars

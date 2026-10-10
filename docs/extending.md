@@ -117,9 +117,11 @@ than adding CAPG to another environment:
   cluster overrides it to `kind` through the `gcp-wif` ConfigMap the
   `wif-federate` task creates, and the pivot pins `mgmt` through
   `pivot-manifest-vars`). No service-account key exists anywhere.
-- Cloud resources on the workload cluster are reconciled by a second Config
-  Connector (pinned release bundle, `workload/gcp-base/kcc/`) running under
-  GKE-native Workload Identity, not by a CAPI add-on.
+- Cloud resources for the workload cluster are reconciled by the
+  management cluster's Config Connector (pinned release bundle,
+  `mgmt/gcp/infrastructure/kcc-operator/`) from
+  `mgmt/gcp/infrastructure/workload-resources/` (issue #560: no second
+  Config Connector on the workload cluster), not by a CAPI add-on.
 - Clusters use `GCPManagedCluster` / `GCPManagedControlPlane` /
   `GCPManagedMachinePool` with the literal GKE `clusterName` kept as-is
   (kustomize's `namePrefix` does not rename it; the CAPI cross-references

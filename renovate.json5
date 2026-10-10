@@ -350,10 +350,9 @@
     },
     {
       "customType": "regex",
-      "description": "Config Connector operator version (management and workload copies must stay identical; the pinned-manifest gate, tests/test-kcc-operator-pin.py, keeps them in lockstep - Renovate bumps the version comment and image tag, the gate then goes red until the whole release bundle is re-downloaded, issue #72)",
+      "description": "Config Connector operator version (management copy only since issue #560 - the workload cluster no longer runs its own Config Connector; the pinned-manifest gate, tests/test-kcc-operator-pin.py, keeps the image tag in lockstep with the version comment - Renovate bumps the version comment and image tag, the gate then goes red until the whole release bundle is re-downloaded, issue #72)",
       "managerFilePatterns": [
-        "/(^|/)mgmt/gcp/infrastructure/kcc-operator/configconnector-operator\\.yaml$/",
-        "/(^|/)workload/gcp-base/kcc/configconnector-operator\\.yaml$/"
+        "/(^|/)mgmt/gcp/infrastructure/kcc-operator/configconnector-operator\\.yaml$/"
       ],
       "matchStrings": [
         "kcc-operator-version: (?<currentValue>[0-9.]+)",

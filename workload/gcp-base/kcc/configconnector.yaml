@@ -10,8 +10,9 @@
 # operator's projected token is minted by GKE directly and the ConfigConnector
 # only names the GSA (googleServiceAccount), no credentialSecretName.
 #
-# configconnector-operator.yaml is the verbatim release bundle, kept
-# byte-identical to the management copy by tests/test-kcc-operator-pin.py.
+# The operator itself is delivered as a Helm chart via the OCIRepository +
+# HelmRelease in the sibling kcc-operator/ directory (issue #72), pinned by
+# tag with cosign verification of the chart publisher's GitHub Actions identity.
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: core.cnrm.cloud.google.com/v1beta1
 kind: ConfigConnector

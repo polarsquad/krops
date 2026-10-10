@@ -139,8 +139,8 @@ Kustomizations substitute from `gcp-vars` plus the optional `gcp-wif`
 ConfigMap, so their first reconcile on a fresh source can fail once and
 succeeds on the 2-minute retry.
 
-Workload cluster: kcc-operator (the operator, waited on; the pinned
-bundle ships its own webhook certs, so no cert-manager), kcc (the
+Workload cluster: kcc-operator (the operator, waited on; the Helm chart
+ships its own webhook certs, so no cert-manager), kcc (the
 cluster-mode ConfigConnector), then networking (Private Service Access),
 storage (bucket), postgres (Cloud SQL, depends on networking) and iam
 (per-cluster reader).
@@ -151,14 +151,11 @@ CAPG minors: merge one at a time and let the management cluster settle
 before the next (GKE and MachinePool are feature-gated, see
 `capi-providers/capg-system/capg-variables.yaml`).
 
-The Config Connector operator is a pinned, verbatim release bundle
-(`mgmt/gcp/infrastructure/kcc-operator/configconnector-operator.yaml`,
-version comment `kcc-operator-version:`). Renovate bumps the version
-comment and the operator image tag, but it does not rewrite the ~3500-line
-manifest: `tests/test-kcc-operator-pin.py` (in `mise run validate`) then
-goes red on purpose. Complete the bump by hand: download the new
-`release-bundle.tar.gz`, replace the file, and commit (both the management
-and the workload copies must stay byte-identical).
+The Config Connector operator is deployed via Flux HelmRelease, consuming
+the published Helm chart from `lioramilbaum/config-connector-helm`. Renovate
+bumps the chart tag in the OCIRepository (`mgmt/gcp/infrastructure/kcc-operator/ocirepository.yaml`
+and `workload/gcp-base/kcc-operator/ocirepository.yaml`); the chart is fetched
+and installed automatically on the next Flux reconciliation.
 
 ## Known limitations
 

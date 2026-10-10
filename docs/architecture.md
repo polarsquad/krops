@@ -354,7 +354,7 @@ flowchart TD
         CAPIS[capi-system]
         CAPGS["capg-system (CAPG v1.13.1)<br/>WIF credential Secret, secret-free"]
         CAAPH[caaph-system]
-        KCCO["kcc-operator (1.158.0, pinned bundle)"]
+        KCCO["kcc-operator (1.158.0, Helm chart via OCIRepository)"]
         KCC["kcc (ConfigConnector in cnrm-system)<br/>WIF credential Secret"]
         KCCI["kcc-identity (KCC-managed)<br/>krops pool + mgmt provider + GSA grants"]
         EUNC["europe-north1 cluster defs<br/>europe-north1-management (self-hosted)<br/>europe-north1-workload"]
@@ -417,7 +417,7 @@ europe-north1 clusters (dependsOn: capg-system, gcp-vars)
 ### Reconciliation order (GCP workload cluster)
 
 ```
-kcc-operator (operator StatefulSet Ready; the pinned bundle ships its own
+kcc-operator (operator StatefulSet Ready; the Helm chart ships its own
 webhook certs, so no cert-manager) ▶ kcc (ConfigConnector, no wait: the CR
 has no standard ready condition)
                                      ├▶ networking (PSA range + peering)

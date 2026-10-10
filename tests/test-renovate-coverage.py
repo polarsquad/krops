@@ -58,8 +58,8 @@ EXPECTED = {
     "mgmt/gcp/capi-providers/capg-system/providers.yaml": {
         "kubernetes-sigs/cluster-api-provider-gcp",
     },
-    "mgmt/gcp/infrastructure/kcc-operator/configconnector-operator.yaml": {
-        "GoogleCloudPlatform/k8s-config-connector",
+    "mgmt/gcp/infrastructure/kcc-operator/ocirepository.yaml": {
+        "lioramilbaum/config-connector-helm/config-connector",
     },
     "mise.gcp.toml": {
         "gcr.io/google.com/cloudsdktool/google-cloud-cli",

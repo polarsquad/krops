@@ -312,8 +312,10 @@ Traps that have bitten this repo (each caught in a live review):
   (`depName`, `currentValue`, `newValue`, `newDigest`, ...). Custom capture
   groups (`indent`, `header`, `urlPrefix`, ...) render empty, `registryUrl`
   is stored as `registryUrls`, and `depName` is the `depNameTemplate`
-  result. Prefer no template: the default replacement swaps every
-  `currentValue`/`currentDigest` inside the match. That swap also hits a
+  result. Prefer no template when the default replacement gives the
+  correct result: it swaps every `currentValue`/`currentDigest` inside
+  the match; an explicit `{{newValue}}`-only template is fine when the
+  output structure must be stated explicitly. That swap also hits a
   pure-numeric tag (`registry:2`) inside its hex digest, so pin full
   tags (`2.8.3`). Lookbehind is not an escape hatch: Renovate compiles
   `matchStrings` with RE2, which rejects it (only a Node without RE2

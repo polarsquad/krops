@@ -42,8 +42,8 @@ data:
            lameduck 5s
         }
         ready
-        rewrite name exact login.microsoftonline.com wiremock.wiremock-system.svc.cluster.local.
-        rewrite name exact management.azure.com wiremock.wiremock-system.svc.cluster.local.
+        rewrite name exact login.microsoftonline.com wiremock.wiremock-system.svc.cluster.local
+        rewrite name exact management.azure.com wiremock.wiremock-system.svc.cluster.local
         kubernetes cluster.local in-addr.arpa ip6.arpa {
            pods insecure
            fallthrough in-addr.arpa ip6.arpa

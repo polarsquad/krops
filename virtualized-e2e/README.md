@@ -34,10 +34,11 @@ virtualized-e2e/
 ```
 
 `aws/` is the reference arm (the global `AWS_ENDPOINT_URL` covers every
-service). `azure/` rewrites CAPZ/ASO control-plane and data-plane calls
-through CoreDNS to WireMock. `gcp/` does the CoreDNS rewrite plus
-SAN-matched TLS, with the WIF credential repoint for the auth path. All three
-arms are built.
+service). `azure/` is the second arm: ASO endpoint configuration through
+the `aso-controller-settings` Secret, plus a CoreDNS rewrite + SAN-matched
+TLS covering CAPZ and MSAL instance discovery. `gcp/` is the third arm:
+CoreDNS rewrite plus SAN-matched TLS, with the WIF credential repoint for
+the auth path. All three arms are built.
 
 ## What is NOT here yet
 

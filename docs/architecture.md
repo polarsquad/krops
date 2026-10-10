@@ -28,8 +28,9 @@ API), per-cluster Flux instances (CAPI addons), and cloud resources (ACK,
 ASO, Config Connector) are all Kubernetes resources reconciled the same way.
 There is no Terraform, no state file, and no second toolchain with its own
 plan and apply cycle. The only imperative steps are bootstrap, pivot, and
-teardown, run by `krops-bootstrap` or the shell equivalent `teardown.sh`; bootstrap and pivot hand control to Flux
-and exit.
+teardown, run by `krops-bootstrap` or the shell equivalents `bootstrap.sh`,
+`pivot.sh`, and `teardown.sh` (one script per phase); bootstrap and pivot
+hand control to Flux and exit.
 
 Each abstraction layer is one more thing a human or AI agent operator must
 understand before changing the system, and one more place for mistakes and

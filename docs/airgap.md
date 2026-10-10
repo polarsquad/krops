@@ -348,6 +348,13 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
      on a schedule, a fork, or a differently-named workflow entirely
      (`prototype-k3s-mgmt.yml`, issue #333) — no workflow name, repo, or ref
      needs hardcoding, and none of it breaks if a workflow file is renamed.
+   - Each kind/CAPD "node" is a container running a full nested systemd, and
+     a job with a management cluster plus a CAPD workload cluster runs four
+     of them at once. Default host inotify limits are sized for one, so
+     whichever node's systemd starts second can fail outright ("Failed to
+     allocate manager object: Too many open files"). `prototype-k3s-mgmt.yml`
+     raises `fs.inotify.max_user_watches`/`max_user_instances` (kind's own
+     documented values) before creating any node containers.
 
 ## Known limitations / follow-ups
 

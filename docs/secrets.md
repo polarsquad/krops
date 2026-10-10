@@ -8,7 +8,7 @@ safely in Git and Flux decrypts them at reconcile time.
   that encrypts only `data`/`stringData` fields of any `*.sops.yaml` file under
   `mgmt/aws/`, `mgmt/azure/`, or `mgmt/gcp/`.
 - The age *private* key lives in `age.agekey` (gitignored). The bootstrap
-  loads it into the cluster as the `sops-age` secret in `flux-system`.
+  loads it into the cluster as the `sops-age` secret in both `flux-system` and `default`.
 
 SOPS-encrypted secrets in this repo (each referenced by a Flux `Kustomization`
 with `spec.decryption.provider: sops`):
@@ -19,6 +19,24 @@ with `spec.decryption.provider: sops`):
 | `mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml` | `ack-controllers` | ACK S3/RDS/IAM controller AWS credentials (shared-credentials-file format) |
 | `mgmt/aws/addons/flux-apps/regions/<region>/flux-github-pat.sops.yaml` | `flux-apps` | GitHub PAT pull secret (basic auth), delivered to each workload cluster by a templated ResourceSet (management Kustomization in `default` + `kubeConfig` remote-apply + SOPS decryption via `default/sops-age`) so its Flux can clone this (private) repo. The `mgmt/azure/addons/flux-apps/` and `mgmt/gcp/addons/flux-apps/` copies serve the same role for their environments. |
 | `mgmt/aws/infrastructure/konflate/konflate-token.sops.yaml` | `konflate` | `KONFLATE_TOKEN` (read-only GitHub PAT so konflate can list PRs and clone this private repo) and `KONFLATE_WRITE_TOKEN` (write-back credential konflate uses to post the PR summary comment and the `Konflate` commit status) |
+
+## The age key in two namespaces
+
+Both bootstrap paths (`bootstrap-common.sh` and `create_github_secrets` in
+`bootstrap-rs/src/main.rs`) create `sops-age` in `flux-system` and `default` on
+the kind cluster and again on the pivot target. The ResourceSet-generated
+Kustomizations live in `default` and `spec.decryption.secretRef` resolves only
+in the Kustomization's own namespace.
+
+Exposure is the same full age key in both namespaces, capable of decrypting all
+`*.sops.yaml`. No workload pods run in `default` on the management cluster.
+Controllers with cluster-wide Secret read already have access to
+`flux-system/sops-age`. The second copy in `default` adds exposure only to
+principals with namespace-scoped Secret read in `default`, who can also read
+`<cluster>-kubeconfig` admin credentials there.
+
+Do not grant Secret read in `default` to anyone who should not hold the age
+key; do not run workloads there. Rotate both copies when rotating the age key.
 
 ## First-time setup
 

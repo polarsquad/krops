@@ -62,18 +62,6 @@ def render_template(tpl: str, inputs: dict) -> list:
     return list(yaml.safe_load_all(re.sub(r"<<\s*inputs\.(\w+)\s*>>", sub, tpl)))
 
 
-def build_bundle(rel: str) -> str:
-    """kubectl kustomize of the bundle (SOPS files render ENC[...] verbatim).
-
-    CI has no age private key, so the pull Secret is checked by FILE PRESENCE
-    (the SOPS-encrypted `flux-github-pat.sops.yaml` listed in the bundle's
-    kustomization.yaml), not by decrypting it. The raw build passes ENC[...]
-    placeholders through, which is enough to verify the manifest structure.
-    """
-    return subprocess.run(["kubectl", "kustomize", str(REPO / rel)],
-                          check=True, capture_output=True, text=True).stdout
-
-
 def main() -> None:
     fails: list[str] = []
     for cloud, spec in CLOUDS.items():
@@ -125,13 +113,16 @@ def main() -> None:
                 fails.append(f"{rel}: {region} path != {want_path}")
             if k["spec"].get("prune") is not True:
                 fails.append(f"{rel}: {region} Kustomization must set prune: true")
-            if not k["spec"].get("decryption"):
-                fails.append(f"{rel}: {region} Kustomization must SOPS-decrypt (pull secret)")
+            dec = k["spec"].get("decryption") or {}
+            if dec.get("provider") != "sops":
+                fails.append(f"{rel}: {region} decryption.provider != sops")
+            if dec.get("secretRef", {}).get("name") != "sops-age":
+                fails.append(f"{rel}: {region} decryption.secretRef.name != sops-age")
 
             # The per-region bundle must build and carry the right objects.
             brel = f"mgmt/{cloud}/addons/flux-apps/regions/{region}"
             try:
-                bundle = build_bundle(brel)
+                bundle = build(brel)
             except subprocess.CalledProcessError as e:
                 fails.append(f"{brel}: kustomize build failed: {e.stderr.strip()}")
                 continue

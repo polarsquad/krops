@@ -505,7 +505,7 @@ TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh bootstrap gcp        # aft
 Azure: see [azure.md](./azure.md) for the subscription prep step that
 precedes the `azure` wrapper run (`azure-bootstrap` registers the
 providers — including the Arc ones — and creates the shared resource group
-and the `krops-capz` / `krops-aso` user-assigned identities with their role
+and the `krops-capz` user-assigned identity with its role
 grants; nothing it prints is secret). After the kind cluster is created,
 bootstrap-rs runs the `arc-federate` mise task, which Arc-connects kind with
 an OIDC issuer for CAPZ/ASO workload identity (issue #236).

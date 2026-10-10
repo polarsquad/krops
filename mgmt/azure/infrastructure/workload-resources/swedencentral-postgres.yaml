@@ -1,28 +1,35 @@
 ---
 # ══════════════════════════════════════════════════════════════════════════════
-# Smallest-footprint PostgreSQL Flexible Server (the RDS instance's
-# counterpart in mgmt/aws/infrastructure/workload-resources/dbinstance.yaml).
-# Private access through the delegated subnet + private DNS zone
-# (workload/azure-base/networking/).
+# Smallest-footprint PostgreSQL Flexible Server for swedencentral-workload
+# (the RDS instance's counterpart in
+# mgmt/aws/infrastructure/workload-resources/dbinstance.yaml), reconciled by
+# the ASO bundled with CAPZ on THIS (management) cluster through the
+# aso-credentials Secret (krops-capz). Private access through the delegated
+# subnet + private DNS zone (swedencentral-networking.yaml).
 #
 # Authentication: Entra ID only, password auth disabled, so no master
 # password has to exist anywhere (RDS uses Secrets Manager for the same
-# reason). The krops-aso identity is the first Entra administrator so an
+# reason). The krops-capz identity is the first Entra administrator so an
 # operator can grant further principals through it.
 #
 # API version: v20250801, the only ASO v2.19.0 group version that has the
 # FlexibleServersAdministrator kind (verified in v2/api/dbforpostgresql/).
+#
+# One file per workload cluster (swedencentral-*.yaml); copy for a future
+# region, as in aso-workload-identity/.
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: dbforpostgresql.azure.com/v20250801
 kind: FlexibleServer
 metadata:
   name: db
   namespace: default
+  annotations:
+    serviceoperator.azure.com/credential-from: aso-credentials
 spec:
-  azureName: krops-${CLUSTER_NAME}-db
+  azureName: krops-swedencentral-workload-db
   location: ${AZURE_LOCATION}
   owner:
-    armId: /subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/krops-${CLUSTER_NAME}-data
+    armId: /subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/krops-swedencentral-workload-data
   version: "16"
   sku:
     name: Standard_B1ms
@@ -49,18 +56,22 @@ spec:
       name: postgres-dns
   tags:
     managed-by: flux-aso
-    cluster: ${CLUSTER_NAME}
+    cluster: swedencentral-workload
 ---
 apiVersion: dbforpostgresql.azure.com/v20250801
 kind: FlexibleServersAdministrator
 metadata:
-  name: db-admin-krops-aso
+  name: db-admin-krops-capz
   namespace: default
+  annotations:
+    serviceoperator.azure.com/credential-from: aso-credentials
 spec:
   # The Entra object ID of the administrator is the resource name in ARM.
-  azureName: ${AZURE_ASO_PRINCIPAL_ID}
+  # The FlexibleServersAdministrator schema has no FromConfig variant for
+  # azureName, so the krops-capz principal ID comes from azure-vars.
+  azureName: ${AZURE_CAPZ_PRINCIPAL_ID}
   owner:
     name: db
-  principalName: krops-aso
+  principalName: krops-capz
   principalType: ServicePrincipal
   tenantId: ${AZURE_TENANT_ID}

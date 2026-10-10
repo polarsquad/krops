@@ -221,12 +221,12 @@ posture: [Workload resources](docs/workload-resources.md).
 #### Azure
 
 CAPZ v1.27.0 provisions an AKS management cluster in `swedencentral` plus a
-workload AKS cluster; each workload cluster runs its own Azure Service
-Operator (ASO) reconciling Azure resources from `workload/azure-base/`. No
-Azure secret exists at rest: CAPZ and the bundled ASO authenticate with
-workload identity against the `krops-capz` user-assigned identity, and the
-workload ASO authenticates through a federated credential. It needs a GitHub
-PAT, an age key, and a subscription where you hold Owner.
+workload AKS cluster; the workload Azure resources (VNet, storage account,
+PostgreSQL Flexible Server) reconcile on the management cluster through the
+ASO bundled with CAPZ. No Azure secret exists at rest: CAPZ and the bundled
+ASO authenticate with workload identity against the `krops-capz`
+user-assigned identity. It needs a GitHub PAT, an age key, and a
+subscription where you hold Owner.
 
 ![krops azure architecture](docs/azure-infra.svg)
 
@@ -466,8 +466,9 @@ teardown controls, toolbox release, and current parity status.
     ├── base/                     Intentionally empty since #346 (ACK moved
     │                              to the management cluster); ready for a
     │                              future application workload
-    ├── azure-base/               cert-manager, ASO, and the Azure workload
-    │                              resources (VNet, storage, PostgreSQL)
+    ├── azure-base/               cert-manager only (the Azure workload
+    │                              resources moved to the management cluster,
+    │                              #559)
     ├── gcp-base/                 KCC operator + ConfigConnector, PSA range,
     │                              storage bucket, Cloud SQL, per-cluster
     │                              reader GSA

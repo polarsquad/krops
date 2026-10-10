@@ -11,7 +11,8 @@
 #
 # ADDITIONAL_ASO_CRDS extends the ASO CRD set CAPZ installs beyond its own
 # needs (';'-separated patterns) so the bundled ASO can also reconcile the
-# identity resources in infrastructure/aso-workload-identity/.
+# identity resources in infrastructure/aso-workload-identity/ and the
+# workload resources in infrastructure/workload-resources/ (issue #559).
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: v1
 kind: Secret
@@ -20,4 +21,4 @@ metadata:
   namespace: capz-system
 type: Opaque
 stringData:
-  ADDITIONAL_ASO_CRDS: "managedidentity.azure.com/*;authorization.azure.com/RoleAssignment"
+  ADDITIONAL_ASO_CRDS: "managedidentity.azure.com/*;authorization.azure.com/RoleAssignment;network.azure.com/*;storage.azure.com/*;dbforpostgresql.azure.com/*"

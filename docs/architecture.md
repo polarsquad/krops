@@ -206,19 +206,19 @@ create.
 
 The `azure` environment mirrors `aws`: a disposable kind cluster bootstraps
 Flux, CAPZ v1.27.0 provisions an AKS management cluster (`swedencentral-management`),
-the pivot moves the management objects into it, and each AKS workload cluster
-runs its own Azure Service Operator (workload ASO 2.21.1) reconciling Azure
-resources from `workload/azure-base/`.
+the pivot moves the management objects into it, and the management cluster's
+ASO (bundled with CAPZ) reconciles the workload Azure resources from
+`mgmt/azure/infrastructure/workload-resources/`.
 
 No Azure secret exists at rest: the management cluster authenticates CAPZ and
 the bundled ASO with workload identity against the `krops-capz`
 User-Assigned Identity (federated to the kind cluster's Arc OIDC issuer at
-bootstrap, and to the management cluster's own OIDC issuer post-pivot), while
+bootstrap, and to the management cluster's own OIDC issuer post-pivot), and
 workload clusters hold no credentials at all. The bundled ASO on the
-management cluster reconciles identity resources (`krops-aso` and `krops-capz`
-identities, resource group role assignments, and Federated Identity
-Credentials), enabling the workload ASO to authenticate with Entra ID
-Workload Identity.
+management cluster reconciles the workload Azure resources (VNet, storage
+account, PostgreSQL Flexible Server) and the management identity resources
+(`krops-capz` identity and its Federated Identity Credentials), all through
+the `aso-credentials` Secret.
 
 See the architecture diagram in [docs/azure-infra.svg](azure-infra.svg) and
 the [Azure environment guide](./azure.md).
@@ -249,13 +249,14 @@ flowchart TD
         CAPZS["capz-system (CAPZ v1.27.0 + bundled ASO)"]
         CAAPH[caaph-system]
         AZID["azure-identity (secret-free)<br/>AzureClusterIdentity: WorkloadIdentity"]
-        ASOWI["aso-workload-identity<br/>krops-aso + krops-capz identities + FICs + roles"]
+        ASOWI["aso-workload-identity<br/>krops-capz + FICs + data RG"]
+        WLR["workload-resources Ks<br/>VNet + storage + PostgreSQL"]
         SWEDENC["swedencentral cluster def<br/>swedencentral-management (self-hosted)<br/>swedencentral-workload"]
         FA["flux-apps (SOPS pull secret)<br/>HelmChartProxy + ResourceSet"]
 
         FS --> CM --> CO --> CAPIS --> CAPZS
         CAPIS --> CAAPH --> FA
-        CAPZS --> AZID --> ASOWI
+        CAPZS --> AZID --> ASOWI --> WLR
         CAPZS --> SWEDENC
         AZID --> SWEDENC
     end
@@ -264,9 +265,6 @@ flowchart TD
 
     subgraph azure["Azure: swedencentral"]
         AKS[AKS: swedencentral-workload<br/>AzureASOManagedControlPlane + MachinePool]
-        UAI[User-Assigned Identity: krops-aso]
-        FIC[Federated Identity Credential: workload-identity]
-        ROLE[Role Assignment: Contributor on data RG]
         RG[(Resource Group: krops-swedencentral-workload-data)]
         VNET[(VNet: krops-swedencentral-workload-vnet<br/>subnet: postgres<br/>private DNS zone)]
         SA[(Storage Account: blob container 'data')]
@@ -274,38 +272,28 @@ flowchart TD
     end
 
     SWEDENC -->|CAPZ provisions| AKS
-    ASOWI -->|bundled ASO creates| UAI
-    ASOWI -->|bundled ASO creates| FIC
-    ASOWI -->|bundled ASO creates| ROLE
-    ROLE -.->|scopes to| RG
+    ASOWI -->|bundled ASO creates| RG
 
     FA -->|"HelmChartProxy: flux-operator<br/>ResourceSet: FluxInstance + cluster-vars + pull secret (remote-apply)"| WF
 
     subgraph wl["Workload cluster swedencentral-workload"]
         WF["Flux (sync: workload/swedencentral-01)"]
         WCM["cert-manager Ks"]
-        WASO["aso Ks<br/>workload ASO 2.21.1 (Workload Identity)"]
-        WNET["networking Ks<br/>dependsOn: aso"]
-        WSTOR["storage Ks<br/>dependsOn: aso"]
-        WPSQL["postgres Ks<br/>dependsOn: aso, networking"]
 
-        WF --> WCM --> WASO --> WNET --> WPSQL
-        WASO --> WSTOR
+        WF --> WCM
     end
 
     WF --> REPO
-    UAI -.->|Entra Workload Identity token| WASO
-    FIC -.->|federates workload SA| WASO
-    WNET -->|reconciles| VNET
-    WSTOR -->|reconciles in data RG| SA
-    WPSQL -->|reconciles with private DNS| PSQL
+    WLR -->|bundled ASO reconciles| VNET
+    WLR -->|bundled ASO reconciles in data RG| SA
+    WLR -->|bundled ASO reconciles with private DNS| PSQL
 ```
 
 ### Reconciliation order (Azure management cluster)
 
 ```
 cert-manager ▶ capi-operator ▶ capi-system ▶ capz-system (bundled ASO)
-                                           ├▶ azure-identity ▶ aso-workload-identity
+                                           ├▶ azure-identity ▶ aso-workload-identity ▶ workload-resources
                                            ├▶ clusters (swedencentral)
                                            └▶ caaph-system ▶ flux-apps
 ```
@@ -313,9 +301,7 @@ cert-manager ▶ capi-operator ▶ capi-system ▶ capz-system (bundled ASO)
 ### Reconciliation order (Azure workload cluster)
 
 ```
-cert-manager ▶ aso (workload ASO 2.21.1 via Workload Identity) ▶ networking (VNet + delegated subnet + DNS)
-                                                      ├▶ storage (Storage Account + blob container)
-                                                      └▶ postgres (dependsOn: aso, networking)
+cert-manager (the Azure resources moved to the management cluster in issue #559)
 ```
 
 ## GCP environment (gcp)

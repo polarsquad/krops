@@ -61,19 +61,14 @@ spec:
           clientId: msi
         networkProfile:
           networkPlugin: azure
-        # Workload identity for the ASO controller on this cluster
-        # (mgmt/azure/infrastructure/aso-workload-identity/). The issuer URL
-        # is exported to a ConfigMap the FederatedIdentityCredential reads.
+        # Workload identity stays enabled on the AKS control plane (minimal
+        # diff; issue #559 only removed the ConfigMap export that fed the
+        # deleted workload-ASO federated credential).
         oidcIssuerProfile:
           enabled: true
         securityProfile:
           workloadIdentity:
             enabled: true
-        operatorSpec:
-          configMaps:
-            oidcIssuerProfile:
-              name: swedencentral-workload-oidc
-              key: issuer
         tags:
           managed-by: flux-capz
 ---

@@ -13,7 +13,7 @@ KROPS_PROFILE = "azure"
 "pipx:azure-cli" = "2.90.0"
 
 [tasks.azure-bootstrap]
-description = "One-time subscription prep: register providers (incl. Arc), create the shared resource group and the krops-capz / krops-aso user-assigned identities with their role grants; prints the values to commit. No service principal (issue #236)."
+description = "One-time subscription prep: register providers (incl. Arc), create the shared resource group and the krops-capz user-assigned identity with its role grants; prints the values to commit. No service principal (issue #236)."
 run = '''
 set -eu
 : "${AZURE_SUBSCRIPTION_ID:?set AZURE_SUBSCRIPTION_ID in .env or the shell}"
@@ -29,12 +29,6 @@ for ns in Microsoft.Compute Microsoft.Network Microsoft.ContainerService \
 done
 echo "==> resource group krops-shared"
 az group create --name krops-shared --location "$AZURE_LOCATION" --output none
-
-echo "==> user-assigned identity krops-aso (workload-cluster ASO; adopted from Git)"
-az identity create --name krops-aso --resource-group krops-shared \
-  --location "$AZURE_LOCATION" --output none
-ASO_CLIENT_ID=$(az identity show -g krops-shared -n krops-aso --query clientId -o tsv)
-ASO_PRINCIPAL_ID=$(az identity show -g krops-shared -n krops-aso --query principalId -o tsv)
 
 echo "==> user-assigned identity krops-capz (CAPZ + management-side ASO; adopted from Git)"
 az identity create --name krops-capz --resource-group krops-shared \
@@ -55,12 +49,13 @@ cat <<EOF
 
 Commit these (non-secret) values:
   mgmt/azure/infrastructure/azure-identity/azure-vars.yaml
-    AZURE_SUBSCRIPTION_ID: "${AZURE_SUBSCRIPTION_ID}"
-    AZURE_TENANT_ID:       "${TENANT_ID}"
-    AZURE_CLIENT_ID:       "${CAPZ_CLIENT_ID}"   # krops-capz UAMI client ID
+    AZURE_SUBSCRIPTION_ID:    "${AZURE_SUBSCRIPTION_ID}"
+    AZURE_TENANT_ID:          "${TENANT_ID}"
+    AZURE_CLIENT_ID:          "${CAPZ_CLIENT_ID}"   # krops-capz UAMI client ID
+    AZURE_CAPZ_PRINCIPAL_ID:  "${CAPZ_PRINCIPAL_ID}"
   mgmt/azure/addons/flux-apps/regions/swedencentral/cluster-vars.yaml
-    AZURE_ASO_CLIENT_ID:    "${ASO_CLIENT_ID}"
-    AZURE_ASO_PRINCIPAL_ID: "${ASO_PRINCIPAL_ID}"
+    (no values to commit here for a fresh bootstrap; the bag carries the
+     region and the cloud identifiers)
 Nothing is secret: no service principal exists (issue #236).
 EOF
 '''

@@ -34,8 +34,7 @@ CLOUDS = {
         "regions": {
             "swedencentral": ("swedencentral-workload",
                               ["AZURE_LOCATION", "CLUSTER_NAME", "AZURE_SUBSCRIPTION_ID",
-                               "AZURE_TENANT_ID", "AZURE_ASO_CLIENT_ID",
-                               "AZURE_ASO_PRINCIPAL_ID", "STORAGE_ACCOUNT_NAME"]),
+                               "AZURE_TENANT_ID", "STORAGE_ACCOUNT_NAME"]),
         },
     },
     "gcp": {

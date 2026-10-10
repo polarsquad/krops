@@ -1,25 +1,34 @@
 ---
 # ══════════════════════════════════════════════════════════════════════════════
-# Secure-by-default storage account + blob container (the S3 bucket's
-# counterpart in mgmt/aws/infrastructure/workload-resources/bucket.yaml).
+# Secure-by-default storage account + blob container for swedencentral-workload
+# (the S3 bucket's counterpart in
+# mgmt/aws/infrastructure/workload-resources/bucket.yaml), reconciled by the
+# ASO bundled with CAPZ on THIS (management) cluster through the
+# aso-credentials Secret (krops-capz).
 # Posture:
 #   - no anonymous blob access, HTTPS only, TLS 1.2 minimum
 #   - shared-key (account key) access disabled: Entra ID authorization only
 #   - blob versioning + 7-day soft delete
 #   - Microsoft-managed encryption at rest (default)
 # Account names are globally unique and 3-24 lowercase alphanumerics, so the
-# name is a committed literal in cluster-vars (STORAGE_ACCOUNT_NAME).
+# name is a committed literal (it is also a committed literal in the
+# flux-apps region cluster-vars, which no longer consumes it).
+#
+# One file per workload cluster (swedencentral-*.yaml); copy for a future
+# region, as in aso-workload-identity/.
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: storage.azure.com/v1api20230101
 kind: StorageAccount
 metadata:
   name: data
   namespace: default
+  annotations:
+    serviceoperator.azure.com/credential-from: aso-credentials
 spec:
-  azureName: ${STORAGE_ACCOUNT_NAME}
+  azureName: kropsswcworkloadsksimc
   location: ${AZURE_LOCATION}
   owner:
-    armId: /subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/krops-${CLUSTER_NAME}-data
+    armId: /subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/krops-swedencentral-workload-data
   kind: StorageV2
   sku:
     name: Standard_LRS
@@ -30,13 +39,15 @@ spec:
   minimumTlsVersion: TLS1_2
   tags:
     managed-by: flux-aso
-    cluster: ${CLUSTER_NAME}
+    cluster: swedencentral-workload
 ---
 apiVersion: storage.azure.com/v1api20230101
 kind: StorageAccountsBlobService
 metadata:
   name: data-blob
   namespace: default
+  annotations:
+    serviceoperator.azure.com/credential-from: aso-credentials
 spec:
   owner:
     name: data
@@ -50,6 +61,8 @@ kind: StorageAccountsBlobServicesContainer
 metadata:
   name: data
   namespace: default
+  annotations:
+    serviceoperator.azure.com/credential-from: aso-credentials
 spec:
   azureName: data
   owner:

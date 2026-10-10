@@ -1,34 +1,43 @@
 ---
 # ══════════════════════════════════════════════════════════════════════════════
-# Networking baseline for the workload resources, reconciled by this
-# cluster's ASO in the per-cluster data resource group (created by the
-# management cluster; referenced by ARM ID so no cross-namespace owner).
+# Networking baseline for the swedencentral-workload resources, reconciled
+# by the ASO bundled with CAPZ on THIS (management) cluster through the
+# aso-credentials Secret (krops-capz). Lives in the per-cluster data resource
+# group (aso-workload-identity/swedencentral-workload.yaml; referenced by ARM
+# ID so no cross-namespace owner).
 #
 # The subnet is delegated to PostgreSQL Flexible Server (private access);
 # the private DNS zone + link give the server a resolvable private name.
+#
+# One file per workload cluster (swedencentral-*.yaml); copy for a future
+# region, as in aso-workload-identity/.
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: network.azure.com/v1api20240301
 kind: VirtualNetwork
 metadata:
   name: vnet
   namespace: default
+  annotations:
+    serviceoperator.azure.com/credential-from: aso-credentials
 spec:
-  azureName: krops-${CLUSTER_NAME}-vnet
+  azureName: krops-swedencentral-workload-vnet
   location: ${AZURE_LOCATION}
   owner:
-    armId: /subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/krops-${CLUSTER_NAME}-data
+    armId: /subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/krops-swedencentral-workload-data
   addressSpace:
     addressPrefixes:
       - 10.60.0.0/16
   tags:
     managed-by: flux-aso
-    cluster: ${CLUSTER_NAME}
+    cluster: swedencentral-workload
 ---
 apiVersion: network.azure.com/v1api20240301
 kind: VirtualNetworksSubnet
 metadata:
   name: postgres
   namespace: default
+  annotations:
+    serviceoperator.azure.com/credential-from: aso-credentials
 spec:
   azureName: postgres
   owner:
@@ -43,11 +52,13 @@ kind: PrivateDnsZone
 metadata:
   name: postgres-dns
   namespace: default
+  annotations:
+    serviceoperator.azure.com/credential-from: aso-credentials
 spec:
-  azureName: ${CLUSTER_NAME}.private.postgres.database.azure.com
+  azureName: swedencentral-workload.private.postgres.database.azure.com
   location: global
   owner:
-    armId: /subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/krops-${CLUSTER_NAME}-data
+    armId: /subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/krops-swedencentral-workload-data
   tags:
     managed-by: flux-aso
 ---
@@ -56,8 +67,10 @@ kind: PrivateDnsZonesVirtualNetworkLink
 metadata:
   name: postgres-dns-vnet
   namespace: default
+  annotations:
+    serviceoperator.azure.com/credential-from: aso-credentials
 spec:
-  azureName: krops-${CLUSTER_NAME}-vnet
+  azureName: krops-swedencentral-workload-vnet
   location: global
   owner:
     name: postgres-dns

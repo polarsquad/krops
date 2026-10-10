@@ -5,3 +5,4 @@ resources:
   - capi-operator
   - azure-identity
   - aso-workload-identity
+  - workload-resources

@@ -113,9 +113,10 @@ preflight_aws_quotas() {
     # Quota values come back as floats (e.g. "5.0"); round to an integer.
     limit=$(printf '%.0f' "${limit_raw:-0}" 2>/dev/null) || limit=0
 
+    # BYOIP does not consume this quota; credit ownership from the same population.
     if ! allocated=$(aws ec2 describe-addresses \
       --region "$region" \
-      --filters "Name=domain,Values=vpc" \
+      --filters "Name=domain,Values=vpc" "Name=public-ipv4-pool,Values=amazon" \
       --query 'length(Addresses)' \
       --output text); then
       echo "ERROR: Failed to list EC2 EIPs in ${region}" >&2
@@ -135,7 +136,8 @@ preflight_aws_quotas() {
     for cluster in ${clusters//,/ }; do
       if ! count=$(aws ec2 describe-addresses \
         --region "$region" \
-        --filters "Name=tag:sigs.k8s.io/cluster-api-provider-aws/cluster/${cluster},Values=owned" \
+        --filters "Name=domain,Values=vpc" "Name=public-ipv4-pool,Values=amazon" \
+          "Name=tag:sigs.k8s.io/cluster-api-provider-aws/cluster/${cluster},Values=owned" \
         --query 'length(Addresses)' \
         --output text); then
         echo "ERROR: Failed to list EC2 EIPs owned by ${cluster} in ${region}" >&2

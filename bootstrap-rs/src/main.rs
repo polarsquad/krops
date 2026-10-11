@@ -908,6 +908,10 @@ async fn preflight_github(cfg: &Config, http: &reqwest::Client) -> Result<Github
 }
 
 async fn preflight_aws_quotas(cfg: &Config) -> Result<()> {
+    preflight_aws_quotas_with(cfg, "aws").await
+}
+
+async fn preflight_aws_quotas_with(cfg: &Config, aws: &str) -> Result<()> {
     let workloads = &cfg.environment.teardown.aws_workloads;
     let requirements = derive_eip_requirements(workloads, &cfg.environment.mgmt_cluster)?;
     if requirements.is_empty() {
@@ -921,7 +925,7 @@ async fn preflight_aws_quotas(cfg: &Config) -> Result<()> {
     for (region, plan) in &requirements {
         let required = plan.required;
         let limit_raw = capture(
-            "aws",
+            aws,
             &[
                 "service-quotas",
                 "get-service-quota",
@@ -949,8 +953,9 @@ async fn preflight_aws_quotas(cfg: &Config) -> Result<()> {
             .with_context(|| format!("unexpected EIP quota value '{limit_raw}' in {region}"))?
             as u32;
 
+        // BYOIP is exempt; both counts must cover the same quota population.
         let allocated_raw = capture(
-            "aws",
+            aws,
             &[
                 "ec2",
                 "describe-addresses",
@@ -958,6 +963,7 @@ async fn preflight_aws_quotas(cfg: &Config) -> Result<()> {
                 region,
                 "--filters",
                 "Name=domain,Values=vpc",
+                "Name=public-ipv4-pool,Values=amazon",
                 "--query",
                 "length(Addresses)",
                 "--output",
@@ -974,13 +980,15 @@ async fn preflight_aws_quotas(cfg: &Config) -> Result<()> {
         for cluster in &plan.clusters {
             let filter = format!("Name=tag:{},Values=owned", teardown::capa_tag_key(cluster));
             let owned_raw = capture(
-                "aws",
+                aws,
                 &[
                     "ec2",
                     "describe-addresses",
                     "--region",
                     region,
                     "--filters",
+                    "Name=domain,Values=vpc",
+                    "Name=public-ipv4-pool,Values=amazon",
                     &filter,
                     "--query",
                     "length(Addresses)",
@@ -2957,6 +2965,84 @@ mod tests {
     fn teardown_minimal_config() -> Config {
         let cli = Cli::try_parse_from(["krops-bootstrap", "aws"]).unwrap();
         Config::from_env(&cli, repo_config(), |_| None).unwrap()
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn quota_preflight_filters_byoip_and_preserves_amazon_credit() {
+        use std::os::unix::fs::PermissionsExt;
+        let scenarios = [
+            ("foreign BYOIP", vec![("byoip-pool", "", 8)], true),
+            (
+                "owned BYOIP",
+                vec![("amazon", "", 2), ("byoip-pool", "eu-north-1-workload", 4)],
+                false,
+            ),
+            (
+                "Amazon ownership",
+                vec![("amazon", "", 2), ("amazon", "eu-north-1-workload", 2)],
+                true,
+            ),
+        ];
+        for (name, groups, succeeds) in scenarios {
+            let dir = tempfile::tempdir().unwrap();
+            let mut addresses = Vec::new();
+            for (pool, owner, count) in groups {
+                for _ in 0..count {
+                    addresses.push(serde_json::json!({"region": "eu-north-1", "domain": "vpc", "pool": pool, "owner": owner}));
+                }
+            }
+            addresses.push(serde_json::json!({"region": "eu-north-1", "domain": "standard", "pool": "amazon", "owner": "eu-north-1-workload"}));
+            std::fs::write(dir.path().join("fixture.json"), serde_json::json!({"limit": if name == "Amazon ownership" { 8 } else { 6 }, "addresses": addresses}).to_string()).unwrap();
+            let aws = dir.path().join("aws");
+            std::fs::write(&aws, concat!("#!/usr/bin/env python3\n", r###"import json
+import sys
+from pathlib import Path
+args = sys.argv[1:]
+root = Path(__file__).parent
+with (root / 'calls.jsonl').open('a') as log:
+    log.write(json.dumps(args) + '\n')
+region = args[args.index('--region') + 1]
+fixture = json.loads((root / 'fixture.json').read_text())
+if args[:2] == ['service-quotas', 'get-service-quota']:
+    print(fixture['limit'] if region == 'eu-north-1' else 100)
+elif args[:2] == ['ec2', 'describe-addresses']:
+    filters = args[args.index('--filters') + 1:args.index('--query')]
+    addresses = [a for a in fixture['addresses'] if a['region'] == region]
+    for item in filters:
+        name, value = item.removeprefix('Name=').split(',Values=')
+        if name.startswith('tag:'):
+            addresses = [a for a in addresses if a['owner'] == name.split('/cluster/')[1] and value == 'owned']
+        else:
+            key = {'domain': 'domain', 'public-ipv4-pool': 'pool'}[name]
+            addresses = [a for a in addresses if a[key] == value]
+    print(len(addresses))
+else:
+    raise SystemExit('unexpected AWS command')
+"###)).unwrap();
+            std::fs::set_permissions(&aws, std::fs::Permissions::from_mode(0o755)).unwrap();
+            let result =
+                preflight_aws_quotas_with(&teardown_minimal_config(), aws.to_str().unwrap()).await;
+            assert_eq!(result.is_ok(), succeeds, "{name}: {result:?}");
+            if !succeeds {
+                let error = result.unwrap_err().to_string();
+                assert!(error.contains("4 available to krops, 6 needed (2 short; limit 6, 2 allocated, 0 owned by krops)"), "{error}");
+                assert!(
+                    error.contains("--desired-value 8 --region eu-north-1"),
+                    "{error}"
+                );
+            }
+            let calls = std::fs::read_to_string(dir.path().join("calls.jsonl")).unwrap();
+            for line in calls.lines() {
+                let args: Vec<String> = serde_json::from_str(line).unwrap();
+                if args[0] == "ec2" {
+                    assert!(args.iter().any(|arg| arg == "Name=domain,Values=vpc"));
+                    assert!(args
+                        .iter()
+                        .any(|arg| arg == "Name=public-ipv4-pool,Values=amazon"));
+                }
+            }
+        }
     }
 
     const VALID_AGE_KEY: &str = "# created: 2026-01-01T00:00:00+02:00\n# public key: age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq\nAGE-SECRET-KEY-1SECRETSECRETSECRET\n";

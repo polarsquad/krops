@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
-"""Validate that bootstrap-common.sh REGION_PLAN matches bootstrap.toml."""
+"""Validate the shell region plan and offline EIP quota preflight behavior."""
 
+import json
+import os
+import subprocess
+import tempfile
 import re
 import sys
 from pathlib import Path
@@ -79,6 +83,72 @@ def parse_region_plan():
     return plan
 
 
+AWS_STUB = r'''
+import json
+import sys
+from pathlib import Path
+args = sys.argv[1:]
+root = Path(__file__).parent
+with (root / 'calls.jsonl').open('a') as log:
+    log.write(json.dumps(args) + '\n')
+region = args[args.index('--region') + 1]
+fixture = json.loads((root / 'fixture.json').read_text())
+if args[:2] == ['service-quotas', 'get-service-quota']:
+    print(fixture['limit'] if region == 'eu-north-1' else 100)
+elif args[:2] == ['ec2', 'describe-addresses']:
+    filters = args[args.index('--filters') + 1:args.index('--query')]
+    addresses = [a for a in fixture['addresses'] if a['region'] == region]
+    for item in filters:
+        name, value = item.removeprefix('Name=').split(',Values=')
+        if name.startswith('tag:'):
+            addresses = [a for a in addresses if a['owner'] == name.split('/cluster/')[1] and value == 'owned']
+        else:
+            key = {'domain': 'domain', 'public-ipv4-pool': 'pool'}[name]
+            addresses = [a for a in addresses if a[key] == value]
+    print(len(addresses))
+else:
+    raise SystemExit('unexpected AWS command')
+'''
+
+
+def check_quota_population():
+    """Execute the real preflight against address fixtures, without AWS access."""
+    script = Path(__file__).parent.parent / "bootstrap-common.sh"
+    scenarios = [
+        ("foreign BYOIP", 6, [("byoip-pool", "", 8)], True, "6 available to krops (need 6, 0 already owned)"),
+        ("owned BYOIP", 6, [("amazon", "", 2), ("byoip-pool", "eu-north-1-workload", 4)], False,
+         "4 available to krops, 6 needed (2 short; limit 6, 2 allocated, 0 owned by krops)"),
+        ("Amazon ownership", 8, [("amazon", "", 2), ("amazon", "eu-north-1-workload", 2)], True,
+         "6 available to krops (need 6, 2 already owned)"),
+    ]
+    for name, limit, groups, succeeds, diagnostic in scenarios:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            addresses = [dict(region="eu-north-1", domain="vpc", pool=pool, owner=owner)
+                         for pool, owner, count in groups for _ in range(count)]
+            # Matching ownership outside the VPC domain must not produce credit.
+            addresses.append(dict(region="eu-north-1", domain="standard", pool="amazon",
+                                  owner="eu-north-1-workload"))
+            (root / "fixture.json").write_text(json.dumps(dict(limit=limit, addresses=addresses)))
+            executable = root / "aws"
+            executable.write_text(f"#!{sys.executable}\n" + AWS_STUB)
+            executable.chmod(0o755)
+            env = dict(os.environ, PATH=directory + os.pathsep + os.environ["PATH"])
+            result = subprocess.run(["bash", "-c", 'source "$1"; preflight_aws_quotas', "bash", str(script)],
+                                    env=env, capture_output=True, text=True, check=False)
+            output = result.stdout + result.stderr
+            assert (result.returncode == 0) == succeeds, (name, output)
+            assert diagnostic in output, (name, output)
+            if not succeeds:
+                assert "--desired-value 8 --region eu-north-1" in output, output
+            calls = [json.loads(line) for line in (root / "calls.jsonl").read_text().splitlines()]
+            for args in calls:
+                if args[:2] == ["ec2", "describe-addresses"]:
+                    assert "Name=domain,Values=vpc" in args, args
+                    assert "Name=public-ipv4-pool,Values=amazon" in args, args
+    print("✓ Shell EIP preflight excludes BYOIP and preserves Amazon ownership credit")
+
+
 def main():
     """Validate REGION_PLAN against bootstrap.toml."""
     toml_regions = parse_bootstrap_toml()
@@ -123,6 +193,7 @@ def main():
         sys.exit(1)
 
     print("✓ REGION_PLAN matches bootstrap.toml")
+    check_quota_population()
 
 
 if __name__ == "__main__":

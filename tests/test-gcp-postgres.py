@@ -7,6 +7,7 @@ Requires PyYAML (`uv run`). Rationale for each check lives in
 docs/workload-resources.md.
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -47,8 +48,25 @@ def main() -> int:
     for needed in ("edition: ENTERPRISE", "built-in `postgres` user"):
         if needed not in texts[DOC]:
             failures.append(f"{DOC.relative_to(REPO_ROOT)}: must document `{needed}`")
-    if "built-in" not in texts[REPO_ROOT / "docs/gcp.md"]:
-        failures.append(f"docs/gcp.md: must document `built-in` in Known limitations")
+    gcp_text = texts[REPO_ROOT / "docs/gcp.md"]
+    section = re.search(r"^## Known limitations\s*$", gcp_text, re.MULTILINE)
+    if section is None:
+        failures.append("docs/gcp.md: missing ## Known limitations section")
+    else:
+        limitations = gcp_text[section.end():]
+        next_section = re.search(r"^#{1,2}\s+", limitations, re.MULTILINE)
+        if next_section:
+            limitations = limitations[:next_section.start()]
+        bullets = re.findall(
+            r"^[-+*] [^\n]*(?:\n(?:[ \t]+[^\n]*|[ \t]*$))*",
+            limitations, re.MULTILINE,
+        )
+        required = ("Cloud SQL", "built-in `postgres` user with no password", "cannot log in")
+        if not any(all(claim in " ".join(bullet.split()) for claim in required)
+                   for bullet in bullets):
+            failures.append("docs/gcp.md: Known limitations must document in one bullet that "
+                            "Cloud SQL creates the built-in `postgres` user with no password "
+                            "and it cannot log in")
 
     if failures:
         print("gcp postgres FAILED:")

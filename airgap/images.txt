@@ -45,7 +45,7 @@ docker.io/kindest/local-path-helper:v20260131-7181c60a@sha256:ac7c7f08e86f7bef7d
 kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
 kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
 kindest/haproxy:v20230606-42a2262b@sha256:001a06433666046dea44567c7d7c6adfc2ac0edb556576f6da507ff0b0f063d3
-docker.io/library/registry:2.8.3@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+docker.io/library/registry:3.1.2@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8
 
 # ── Workload node containerd store [W] (v1.36.4 generation) ──────────────────
 # Pulled by the workload node's OWN containerd; must be pre-seeded or reachable

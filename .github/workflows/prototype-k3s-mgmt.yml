@@ -59,7 +59,7 @@ jobs:
 
       - name: Store deployment evidence
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: k3s-prototype-results
           path: |

@@ -58,7 +58,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install mise
-        uses: jdx/mise-action@v5.1.1
+        uses: jdx/mise-action@v5.1.2
         with:
           version: 2026.10.8
         env:
@@ -114,7 +114,7 @@ jobs:
       # The sops-keygen and local-host kubeconfig tests (#423) run mise tasks,
       # so mise and the pinned tools (age, kubectl) must be available here.
       - name: Install mise
-        uses: jdx/mise-action@v5.1.1
+        uses: jdx/mise-action@v5.1.2
         with:
           version: 2026.10.8
         env:

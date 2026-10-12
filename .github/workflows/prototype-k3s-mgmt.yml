@@ -22,7 +22,7 @@ jobs:
     timeout-minutes: 45
     services:
       registry:
-        image: registry:2
+        image: registry:3
         ports:
           - 5001:5000
         options: >-

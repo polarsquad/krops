@@ -13,8 +13,8 @@ operator (ACK on AWS, Azure Service Operator, Config Connector on GCP)
 reconciling cloud resources. One API, one RBAC model, one audit trail for
 infrastructure and workloads. See
 [Architecture](docs/architecture.md) for how the pieces fit, and
-[Crossplane as a resource plane](docs/crossplane.md) for the planned
-alternative resource plane inside the same pattern.
+[Crossplane as a resource plane](docs/crossplane.md) for where Crossplane
+overlaps the pattern and where its scope differs.
 
 The repository demonstrates the pattern end to end on AWS EKS, Azure AKS,
 Google GKE, local Docker clusters, and a Tinkerbell-provisioned

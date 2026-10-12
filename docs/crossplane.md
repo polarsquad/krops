@@ -6,6 +6,18 @@ alternative to each cloud's native operator. It is the accepted outcome of the
 [Crossplane management-cluster proposal](proposals/crossplane-management-cluster.md)
 (tracking issue [#313](https://github.com/polarsquad/krops/issues/313)).
 
+Landscape note: the composition use case, turning provider resources into
+higher-level platform APIs, no longer belongs to Crossplane alone. Flux
+ResourceSets serve it from plain templated Kubernetes resources, which makes
+Crossplane a sort-of competitor to the krops pattern in that use case. The
+overlap is the use case, not the scope: Crossplane brings its own provider
+packages, XRDs, and composition machinery, a second reconciliation plane to
+operate, while the krops pillars are the least abstraction that still
+reconciles and a single reconciliation loop. The decision below stays scoped
+to the one place Crossplane remains under evaluation: the per-environment
+alternative resource plane, replacing the cloud's native operator, never
+running beside it.
+
 Status: decided, not yet implemented. Nothing on this page is reconciled
 today; every environment runs its native operator. The slices below land it
 one at a time, and each one updates this page when it merges.

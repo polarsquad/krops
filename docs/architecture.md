@@ -589,11 +589,20 @@ manages what runs inside it.
 krops ships no controller of its own: it combines Cluster API for clusters,
 each cloud's native operator ([ACK](https://aws-controllers-k8s.github.io/docs/)
 on AWS) for cloud resources, and Flux for GitOps. If those resource APIs
-already say what you mean, krops does not wrap them to say it again.
-[Crossplane](https://www.crossplane.io/) is therefore not a competitor to the
-pattern but a planned alternative resource plane inside it: an environment
-will be able to select Crossplane instead of its native operator, never both,
-with Flux still delivering everything from Git. See
+already say what you mean, krops does not wrap them to say it again. Least
+abstraction and one reconciliation loop are the pillars the pattern is held
+to.
+
+[Crossplane](https://www.crossplane.io/) is the closer comparison, and in
+one use case it is now a sort-of competitor: the composition story, turning
+provider resources into higher-level platform APIs, is served by Flux
+ResourceSets templating plain Kubernetes resources. The overlap is that use
+case; the scope still differs. Crossplane brings its own provider packages,
+XRDs, and composition machinery, a second reconciliation plane to operate,
+while krops keeps one reconciliation loop over the upstream APIs of the
+components it already runs. Crossplane remains the evaluated alternative
+resource plane, selectable per environment instead of the native operator,
+never both, with Flux still delivering everything from Git. See
 [Crossplane as a resource plane](crossplane.md).
 
 The management cluster is not a long-lived local kind cluster: the bootstrap

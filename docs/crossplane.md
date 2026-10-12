@@ -51,12 +51,15 @@ Each environment gets a selector directory next to both planes:
 
 ```
 mgmt/<env>/infrastructure/resource-plane/
-  kustomization.yaml   # resources: [native] or [crossplane], the only line that changes
+  kustomization.yaml   # resources: [native] or [crossplane], selects the manifests
   native/              # the cloud's native operator and its CRs
   crossplane/          # Crossplane providers, XRDs, Compositions, XRs
 ```
 
-Choosing a plane is a one-line pull request, which konflate renders as a
+Choosing a plane at setup requires a pull request that changes
+`mgmt/<env>/infrastructure/resource-plane/kustomization.yaml` and the matching
+environment's `resource-plane` key in `bootstrap.toml` together. The Git
+selector drives installation; konflate renders its manifest changes as a
 diff. Rejected alternatives: one sync path per plane (`mgmt/aws` beside
 `mgmt/aws-crossplane`, duplicating the tree), toggling Kustomizations with
 Flux `suspend` or patches (does not remove what is installed, unclear prune
@@ -65,7 +68,8 @@ behavior), and having the CLI rewrite manifests from its configuration file
 
 Each environment also gets a `resource-plane = "native" | "crossplane"` key
 in `bootstrap.toml`, defaulting to `native`. It is the operator-facing place
-to read the choice, not a second source of truth:
+to read the choice and validate consistency, not a second source of truth.
+Changing the key alone cannot select different manifests:
 `tests/test-bootstrap-config.py` fails when the key and the selector
 directory disagree.
 
@@ -143,9 +147,10 @@ Crossplane, a composition function, and an XRD, Composition and XR that
 compose a plain `Namespace` and `ConfigMap`, plus the aggregated RBAC that
 lets Crossplane create them. The XR reaches Ready without any cloud.
 
-It is opt-in through the local-host `resource-plane` key, not part of every
-bootstrap. A dedicated CI matrix leg selects it, so the default local-host
-bootstrap stays as fast as it is today.
+It is opt-in at setup by changing the local-host Git selector and matching
+`resource-plane` key in `bootstrap.toml` together, not part of every bootstrap.
+A dedicated CI matrix leg uses that same consistent selection, so the default
+local-host bootstrap stays as fast as it is today.
 
 ## Out of scope
 
@@ -162,7 +167,7 @@ The proposal left these open for review:
 | Question | Decision |
 |---|---|
 | Plane per environment or per resource kind | Per environment |
-| Local-host Crossplane always on or opt-in | Opt-in through the `resource-plane` key, on a CI matrix leg |
+| Local-host Crossplane always on or opt-in | Opt-in at setup through the Git selector and matching `bootstrap.toml` key together; a dedicated CI matrix leg uses the same consistent selection |
 | What the local-host XR composes | A plain `Namespace` and `ConfigMap` |
 | Must the guarded switch (slice 9) land before the AWS plane (slice 5) | No: the plane is chosen at setup only, and this page says so until slice 9 lands |
 | Provider packages per cloud (Upbound families or community equivalents) | Deferred to slice 5, after a check of licensing, package sizes and release cadence |

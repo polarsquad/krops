@@ -10,10 +10,10 @@ from renovate_harness import run_renovate
 
 PACKAGE_FILE = "airgap/zarf.yaml"
 DEP_NAME = "kubernetes-sigs/cluster-api"
-OLD_VERSION = "v1.14.1"
+OLD_VERSION = "v1.14.2"
 OLD_DIGESTS = {
-    "ea2285445da861b2ec96e948563cf158f4e0fd89a36238267b62e43a1bb00da8": "bce7a27ee9dd3f3cbdd3b463203a706ec31ea6ee98926045fbd9dfbe9c020f4b",
-    "83976008aa9ddb81dab01443c646aaa125e4993e17bf24e790e29779f712d79d": "16ec2d3ab39338e94dfa9ddb070c4f37073683db517fa6052ffc38d6702d7d8b",
+    "5915523f13949884d29d5254445b8d294ba314b5dacb3e8eff9e42f1c9d2e684": "ea2285445da861b2ec96e948563cf158f4e0fd89a36238267b62e43a1bb00da8",
+    "eea3a3ecc64ae155c57eea35378d833285a92cb549c3298a18765bc40a7a3f7b": "83976008aa9ddb81dab01443c646aaa125e4993e17bf24e790e29779f712d79d",
 }
 DIGEST = re.compile(r"^[a-f0-9]{64}$")
 
@@ -21,7 +21,7 @@ DIGEST = re.compile(r"^[a-f0-9]{64}$")
 def older_clusterctl_fixture(relative: str, text: str) -> str:
     if relative != PACKAGE_FILE:
         return text
-    text = text.replace("/releases/download/v1.14.2/clusterctl-", f"/releases/download/{OLD_VERSION}/clusterctl-")
+    text = text.replace("/releases/download/v1.14.3/clusterctl-", f"/releases/download/{OLD_VERSION}/clusterctl-")
     for current, old in OLD_DIGESTS.items():
         text = text.replace(current, old)
     return text

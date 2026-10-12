@@ -479,6 +479,10 @@ needs:
   `spec.controlPlaneEndpoint.host` (the machine's stable IP) and the
   `TinkerbellMachineTemplate` `hardwareName` (the Hardware CR name).
 
+`talosctl` (pinned in `mise.local-talos.toml`) is an operator convenience for
+the machine itself, not a lifecycle dependency; install it on the host with
+`mise -E local-talos install` if you want it.
+
 ## Configuration
 
 Copy the env template and fill it in. Both the lifecycle wrapper

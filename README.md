@@ -1,486 +1,172 @@
 # krops
-## kubernetes resource operations
 
 ![krops logo](docs/krops-logo.svg)
 
-krops is a GitOps pattern for managing infrastructure through the Kubernetes API
-with plain declarative YAML. Terraform and OpenTofu use HCL, a state file, and
-discrete plan/apply runs; krops stores desired state as Kubernetes resources in
-Git. [Flux](https://fluxcd.io/) delivers those resources, and controllers
-continuously reconcile the infrastructure to match them. Kubernetes provides
-one API, RBAC model, policy surface, and audit trail for infrastructure and
-workloads. No HCL, no `.tfstate`, no second toolchain.
+krops is a working reference that manages cloud infrastructure the way you
+manage workloads: everything is declarative YAML in Git, and controllers
+continuously reconcile the clusters to match. No Terraform, no HCL, no state
+file, no second toolchain.
 
-[Crossplane](https://www.crossplane.io/) is the closer comparison because it
-also runs infrastructure reconciliation inside Kubernetes. Its providers expose
-managed resources, while XRDs and compositions can turn them into higher-level
-platform APIs. krops ships no controller of its own: it combines
-[Cluster API](https://cluster-api.sigs.k8s.io/) for clusters, each cloud's
-native operator ([ACK](https://aws-controllers-k8s.github.io/docs/) on AWS)
-for cloud resources, and Flux for GitOps. If those resource APIs already say
-what you mean, krops does not wrap them to say it again. Crossplane is not a
-competitor to that pattern but a planned alternative resource plane inside it:
-an environment will be able to select Crossplane instead of its native
-operator, never both, with Flux still delivering everything from Git. See
-[Crossplane as a resource plane](docs/crossplane.md).
+You get a Kubernetes platform with Cluster API building the clusters, Flux
+delivering every resource from this repository, and each cloud's native
+operator (ACK on AWS, Azure Service Operator, Config Connector on GCP)
+reconciling cloud resources. One API, one RBAC model, one audit trail for
+infrastructure and workloads. See
+[Architecture](docs/architecture.md) for how the pieces fit, and
+[Crossplane as a resource plane](docs/crossplane.md) for the planned
+alternative resource plane inside the same pattern.
 
-This repository demonstrates the pattern end to end on AWS EKS, Azure AKS,
+The repository demonstrates the pattern end to end on AWS EKS, Azure AKS,
 Google GKE, local Docker clusters, and a Tinkerbell-provisioned
 [Talos Linux](https://www.talos.dev/) machine. A disposable
-[kind](https://kind.sigs.k8s.io/) cluster bootstraps Flux,
-CAPI pivots control to a self-managed management cluster, and the Rust
-[`krops-bootstrap`](docs/bootstrap-cli.md) CLI handles bootstrap, pivot, and
-teardown. After that, everything is declared in Git, with a
-[Zarf](https://zarf.dev/) bundle for air-gapped local installs. It is a working
-reference implementation, not a product, so fork it, strip it down, and adapt
+[kind](https://kind.sigs.k8s.io/) cluster bootstraps Flux, Cluster API pivots
+control to a self-managed management cluster, and the
+[`krops-bootstrap`](docs/bootstrap-cli.md) CLI runs bootstrap, pivot, and
+teardown. It is a reference, not a product: fork it, strip it down, and adapt
 it to your own cloud and clusters.
 
-## Who this is for
+## What you get
 
-Platform engineers who already run Kubernetes and want to manage their own
-cloud infrastructure with the same API, RBAC, audit trail, and GitOps workflow
-they use for workloads. If you're reaching for Terraform/OpenTofu or Pulumi
-to stand up cloud resources for Kubernetes, this pattern is the alternative:
-the cluster you already operate becomes the control plane. It is
-not a developer self-service portal; you are the consumer.
-
-## Problems the pattern solves
-
-- **State files**: drift, locking, corruption. Controllers reconcile actual
-  state continuously instead of diffing a snapshot.
-- **The plan/apply gap**: PRs are reviewed as **rendered** Flux diffs (blast
-  radius, image changes, render failures) by
-  [konflate](https://github.com/home-operations/konflate): a GitHub Actions
-  workflow runs it on every PR push as a merge gate, and an in-cluster
-  instance posts the summary to the PR. You review byte-for-byte what
-  reconciles. See [docs/konflate.md](docs/konflate.md).
-- **Two toolchains**: HCL for infra, YAML for workloads. One control plane
-  means RBAC, policy, and audit cover both.
-- **Lifecycle split**: Terraform builds the cluster but can't manage what's
-  in it. CAPI + Flux is one dependency graph from cluster to workload.
-- **A control plane on a laptop**: the management cluster is not a long-lived
-  local kind cluster. The bootstrap kind cluster is disposable, and after the
-  pivot the management cluster manages itself through the same GitOps flow it
-  drives.
-
-![krops aws architecture](docs/aws-infra.svg)
-
-The other environments' diagrams are linked from their [Environments](#environments) sections below.
-
-## Prerequisites
-
-All krops interactions happen through the prereq
-`krops-toolbox` container, driven by Docker or Podman. A container user
-needs only the repository checkout and a running engine:
-
-- Docker, or Podman 5.5+; kind creates clusters through the mounted engine
-  socket
-- The toolbox image, `ghcr.io/polarsquad/krops-toolbox:<version>` (Linux
-  amd64 and arm64, published as `X.Y.Z`, `X.Y`, and stable `latest` on
-  matching `v*` tags, with a keyless signature and SPDX SBOM attestation),
-  or build the current checkout with
-  `docker build -f bootstrap-rs/Dockerfile -t krops-toolbox:dev .`
-
-The toolbox carries `krops-bootstrap` plus every tool the lifecycle and the
-helper tasks use, so no host toolchain is required for bootstrap, pivot,
-teardown, cloud preparation, SOPS key work, kubeconfig exports, or
-`oci-push`. Those helpers are mise tasks that run in the same image with
-`--entrypoint mise`; the run shapes are defined once in
-[Operations](docs/operations.md#helper-tasks-in-the-toolbox) and shown per
-environment below.
-
-The `aws` environment additionally requires a GitHub PAT with read access,
-AWS credentials and service quotas, and an age private key. The
-`local-talos` environment needs the PAT and age key too (it syncs from
-GitHub), plus a reachable Tinkerbell stack and the site values in
-`mgmt/local-talos/clusters/management/cluster.yaml`; see
-[Operations](docs/operations.md).
-
-Two steps stay host-side on purpose and use [mise](https://mise.jdx.dev/):
-`mise run validate` (repository development) and
-`mise -E local-host run podinfo-port-forward` (the browser is on the host).
-`mise.toml` and the `mise.<env>.toml` layers remain the toolbox image's
-tool-pin source and the helper task definitions.
+- Self-managed management and workload clusters on AWS, Azure, GCP, your
+  laptop (Docker), or bare-metal Talos, all from one repository shape.
+- One Git repository as the source of truth: change a file, merge it, and the
+  clusters converge to match.
+- Every pull request reviewed as a rendered Flux diff by
+  [konflate](docs/konflate.md): you approve byte-for-byte what will reconcile.
+- Secrets encrypted in Git with [SOPS + age](docs/secrets.md); cloud
+  credentials never sit on workload clusters.
+- An [air-gapped bundle](docs/airgap.md) of the local environment for fully
+  disconnected installs.
 
 ## Quickstart
 
-Build the current checkout and run the complete local-host lifecycle with only
-Docker installed:
+You need only a container engine: Docker, or Podman 5.5+. The
+`krops-toolbox` container carries every lifecycle tool, so nothing else is
+installed on the host.
 
 ```sh
-docker build -f bootstrap-rs/Dockerfile -t krops-toolbox:dev .
-mkdir -p .kube
-docker run --rm -it \
-  -v "$PWD:/workspace" -w /workspace \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v "$PWD/.kube:/root/.kube" \
-  -e KUBECONFIG=/workspace/.kube/kind.yaml \
-  krops-toolbox:dev local-host
-
-# Teardown uses the same mounts and the teardown subcommand:
-docker run --rm -it \
-  -v "$PWD:/workspace" -w /workspace \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v "$PWD/.kube:/root/.kube" \
-  -e KUBECONFIG=/workspace/.kube/kind.yaml \
-  krops-toolbox:dev teardown local-host
-```
-
-Use `ghcr.io/polarsquad/krops-toolbox:<version>` instead of the local image
-for a published release. The AWS form must also pass the Git source, PAT, age
-key path, and any AWS credential variables. Podman socket paths vary by host.
-`scripts/toolbox-run.sh` handles those mounts, loads `.env` without preserving
-quote characters, and persists kubeconfigs under `.kube/`; see
-[Operations](docs/operations.md) for both forms.
-
-The lifecycle runs through `scripts/toolbox-run.sh`, the Docker/Podman
-wrapper that handles the mounts, `.env` loading, and socket resolution. The
-helper tasks run the same image with `--entrypoint mise`:
-
-```sh
-docker build -f bootstrap-rs/Dockerfile -t krops-toolbox:dev .
-export TOOLBOX_IMAGE=krops-toolbox:dev
-cp .env.example .env        # aws, azure, gcp, local-talos: fill in the Git source and PAT
-docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/tmp \
-  -v "$PWD:/workspace" -w /workspace -e MISE_AUTO_INSTALL=0 \
-  --entrypoint mise "$TOOLBOX_IMAGE" run sops-keygen   # first time only: age key for SOPS
-scripts/toolbox-run.sh bootstrap aws      # no profile = the aws reference environment
-export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
-flux get kustomizations --watch
-mise run validate            # host: shell syntax, bootstrap.toml cross-check, overlays
-scripts/toolbox-run.sh teardown aws      # toolbox: reverse-order lifecycle cleanup
-```
-
-On macOS, a `local-host` run leaves the exported management kubeconfig
-pointing at the `kind` Docker network, which Docker Desktop does not
-route; rewrite a host copy before the `export` line above. See
-[Host-side access after a toolbox local-host run (macOS)](docs/operations.md#host-side-access-after-a-toolbox-local-host-run-macos).
-Linux hosts route the `kind` network directly and need no rewrite.
-
-Dependency versions are managed by Renovate
-([renovate.json5](renovate.json5)) running as the hosted GitHub App; they live
-in their native consumer files and update PRs open weekly. See
-[Dependencies](docs/dependencies.md).
-
-### Environments
-
-Five management environments share one shape: a disposable kind bootstrap
-cluster runs Flux, a CAPI infrastructure provider builds the self-managed
-management cluster, the pivot moves the management objects into it, and the
-management cluster then reconciles itself and its workload clusters from this
-repository. The shared toolchain is defined in `mise.toml`; each environment
-layers its own tools and tasks in a `mise.<env>.toml`.
-
-| Environment | Management cluster | CAPI provider | Workload operator | Config sync |
-|---|---|---|---|---|
-| `aws` | EKS `eu-north-1-management` | CAPA | ACK (S3, RDS, IAM) | GitHub |
-| `azure` | AKS `swedencentral-management` | CAPZ (bundles ASO) | Azure Service Operator | GitHub |
-| `gcp` | GKE `europe-north1-management` | CAPG | Config Connector | GitHub |
-| `local-host` | CAPD `local-management` (Docker) | CAPD | Flux + Podinfo | local OCI registry |
-| `local-talos` | single-node Talos on bare metal | CAPT + CABPT + CACPPT | none (management-only) | GitHub |
-
-Each environment has its own reference page; the ones below summarize it and
-link to the full guide.
-
-#### AWS
-
-The reference environment. CAPA provisions an EKS management cluster in
-`eu-north-1` plus workload EKS clusters in `eu-north-1` and `eu-west-1`; the
-management cluster runs the ACK S3, RDS, and IAM operators reconciling the
-per-cluster AWS resources, so workload clusters hold no credentials and run
-no controllers. Credentials are a
-SOPS-encrypted CAPA profile in Git (the same static pattern authenticates
-the ACK controllers). It needs a GitHub PAT, an age key,
-AWS credentials, and the `clusterawsadm` CloudFormation stack. Before any
-provisioning, bootstrap runs an EIP quota preflight (6 free EIPs in
-`eu-north-1`, 3 in `eu-west-1`) and stops if the account is short; see
-[Operations](docs/operations.md).
-
-![krops aws architecture](docs/aws-infra.svg)
-
-```sh
-export TOOLBOX_IMAGE=ghcr.io/polarsquad/krops-toolbox:latest
-docker run --rm -it -v "$PWD:/workspace" -w /workspace -e MISE_AUTO_INSTALL=0 \
-  --entrypoint mise "$TOOLBOX_IMAGE" -E aws run aws-bootstrap   # once: clusterawsadm IAM CloudFormation stack
-docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/tmp \
-  -v "$PWD:/workspace" -w /workspace -e MISE_AUTO_INSTALL=0 \
-  --entrypoint mise "$TOOLBOX_IMAGE" run sops-keygen              # first time only: age key for SOPS
-scripts/toolbox-run.sh bootstrap aws   # kind + Flux + CAPA; then pivot
-export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"                    # written by the pivot
-docker run --rm -it -v "$PWD:/workspace" -w /workspace -v "$PWD/.kube:/root/.kube" \
-  -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml -e KUBECONFIG_FILE=/root/.kube/krops-workloads.yaml \
-  -e MISE_AUTO_INSTALL=0 --entrypoint mise "$TOOLBOX_IMAGE" -E aws run kubeconfigs   # workload kubeconfigs per region
-scripts/toolbox-run.sh teardown aws    # full AWS + EKS + kind cleanup
-```
-
-Full guide: [AWS environment](docs/aws.md) (clusters, credentials, commit the
-identifiers, reconciliation order, upgrades, known limitations). IAM and
-per-cluster reader roles: [AWS authentication & IAM](docs/aws-iam.md). S3/RDS
-posture: [Workload resources](docs/workload-resources.md).
-
-#### Azure
-
-CAPZ v1.27.0 provisions an AKS management cluster in `swedencentral` plus a
-workload AKS cluster; the workload Azure resources (VNet, storage account,
-PostgreSQL Flexible Server) reconcile on the management cluster through the
-ASO bundled with CAPZ. No Azure secret exists at rest: CAPZ and the bundled
-ASO authenticate with workload identity against the `krops-capz`
-user-assigned identity. It needs a GitHub PAT, an age key, and a
-subscription where you hold Owner.
-
-![krops azure architecture](docs/azure-infra.svg)
-
-```sh
-mkdir -p "$HOME/.krops-azure"
-docker run --rm -it -v "$HOME/.krops-azure:/root/.azure" \
-  --entrypoint az "$TOOLBOX_IMAGE" login --use-device-code
-docker run --rm -it -v "$PWD:/workspace" -w /workspace -v "$HOME/.krops-azure:/root/.azure" \
-  -e AZURE_SUBSCRIPTION_ID -e MISE_AUTO_INSTALL=0 \
-  --entrypoint mise "$TOOLBOX_IMAGE" -E azure run azure-bootstrap   # once: providers, resource group, identities
-scripts/toolbox-run.sh bootstrap azure   # kind + Flux + CAPZ; then pivot
-export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
-docker run --rm -it -v "$PWD:/workspace" -w /workspace -v "$PWD/.kube:/root/.kube" \
-  -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml -e KUBECONFIG_FILE=/root/.kube/krops-workloads.yaml \
-  -e MISE_AUTO_INSTALL=0 --entrypoint mise "$TOOLBOX_IMAGE" -E azure run kubeconfigs
-```
-
-Full guide: [Azure environment](docs/azure.md). Teardown is manual for now;
-the CLI prints the steps.
-
-#### GCP
-
-CAPG v1.13.1 provisions a GKE management cluster in `europe-north1` plus a
-workload GKE cluster; the management cluster's Config Connector (KCC)
-reconciles the workload GCP resources from
-`mgmt/gcp/infrastructure/workload-resources/` (issue #560). No GCP secret
-exists at rest: CAPG and the management-side Config Connector
-authenticate with
-Workload Identity Federation against the `krops` pool (no service-account
-keys). It needs a
-GitHub PAT, an age key, and a project with a billing account where you hold
-Owner.
-
-![krops gcp architecture](docs/gcp-infra.svg)
-
-```sh
-docker run --rm -it -v "$PWD:/workspace" -w /workspace -e CLOUDSDK_CONFIG=/workspace/.gcloud \
-  --entrypoint gcloud "$TOOLBOX_IMAGE" auth login --no-launch-browser
-docker run --rm -it -v "$PWD:/workspace" -w /workspace \
-  -e CLOUDSDK_CONFIG=/workspace/.gcloud -e GCP_PROJECT -e MISE_AUTO_INSTALL=0 \
-  --entrypoint mise "$TOOLBOX_IMAGE" -E gcp run gcp-bootstrap   # once: APIs, service accounts, WIF pool
-scripts/toolbox-run.sh bootstrap gcp     # kind + Flux + CAPG; then pivot
-export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
-docker run --rm -it -v "$PWD:/workspace" -w /workspace -v "$PWD/.kube:/root/.kube" \
-  -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml -e KUBECONFIG_FILE=/root/.kube/krops-workloads.yaml \
-  -e CLOUDSDK_CONFIG=/workspace/.gcloud -e MISE_AUTO_INSTALL=0 \
-  --entrypoint mise "$TOOLBOX_IMAGE" -E gcp run kubeconfigs
-```
-
-Full guide: [GCP environment](docs/gcp.md). Teardown is manual for now; the
-CLI prints the steps.
-
-#### Local host
-
-The end-to-end local environment: no cloud at all. It creates the management
-kind cluster, a local OCI registry, and the Flux Operator and FluxInstance. It
-publishes the `mgmt/local-host/` and `workload/local-host/` folders as the
-`krops:latest` OCI artifact, and Flux syncs from that artifact (not GitHub).
-Flux installs CAPI with its Docker provider (CAPD), provisions a
-one-control-plane/one-worker workload cluster, and installs a separate Flux
-instance there. That workload Flux instance reconciles Podinfo, giving a
-complete local path from management bootstrap through workload delivery and
-application access, with no GitHub or AWS credentials.
-
-![krops local-host architecture](docs/local-host-infra.svg)
-
-```sh
+git clone https://github.com/polarsquad/krops.git
+cd krops
 scripts/toolbox-run.sh bootstrap local-host
+```
+
+That one command starts a local registry and a kind cluster, publishes this
+checkout to it, installs Flux and Cluster API, pivots into a self-managed
+management cluster, and reconciles a workload cluster running the Podinfo
+demo app. When it exits, watch what landed:
+
+```sh
 export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
-# republish local management and workload paths, then export the CAPD workload
-# kubeconfig; both runs stay on the kind network (full commands in Operations)
-docker run --rm -it -v "$PWD:/workspace" -w /workspace -v /var/run/docker.sock:/var/run/docker.sock \
-  -v "$PWD/.kube:/root/.kube" -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml \
-  -e MISE_AUTO_INSTALL=0 --network kind -e REGISTRY_HOST=krops-registry -e REGISTRY_PORT=5000 \
-  --entrypoint mise "$TOOLBOX_IMAGE" -E local-host run oci-push
-docker run --rm -it -v "$PWD:/workspace" -w /workspace -v /var/run/docker.sock:/var/run/docker.sock \
-  -v "$PWD/.kube:/root/.kube" -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml \
+flux get kustomizations
+```
+
+Then open the workload app (the port-forward publishes the port from the
+toolbox, so a host browser reaches it):
+
+```sh
+export TOOLBOX_IMAGE=ghcr.io/polarsquad/krops-toolbox:latest   # or krops-toolbox:dev
+docker run --rm -it \
+  -v "$PWD:/workspace" -w /workspace \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "$PWD/.kube:/root/.kube" \
+  -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml \
   -e MISE_AUTO_INSTALL=0 --network kind -e KROPS_TOOLBOX=1 \
   --entrypoint mise "$TOOLBOX_IMAGE" -E local-host run kubeconfigs
-docker run --rm -it --network kind -p 9898:9898 -v "$PWD:/workspace" -w /workspace \
+docker run --rm --network kind -p 9898:9898 -v "$PWD:/workspace" -w /workspace \
   --entrypoint kubectl "$TOOLBOX_IMAGE" --kubeconfig local-workload.kubeconfig \
-  port-forward -n podinfo --address 0.0.0.0 service/podinfo 9898:9898   # http://localhost:9898
+  port-forward --namespace podinfo --address 0.0.0.0 service/podinfo 9898:9898
+```
+
+Browse to <http://localhost:9898>.
+
+Tear the whole stack down again with:
+
+```sh
 scripts/toolbox-run.sh teardown local-host
 ```
 
-On macOS, rewrite a host copy of the management kubeconfig and export
-that copy in place of `.kube/krops-mgmt.yaml` above: Docker Desktop does
-not route the `kind` network address the file carries. See
+On macOS, the exported management kubeconfig points at the `kind` Docker
+network, which Docker Desktop does not route; rewrite a host copy before the
+`export` above. Linux hosts need no rewrite. See
 [Host-side access after a toolbox local-host run (macOS)](docs/operations.md#host-side-access-after-a-toolbox-local-host-run-macos).
-Linux hosts need no rewrite.
 
-With a host `mise` and `kubectl`, `mise -E local-host run kubeconfigs` followed
-by `mise -E local-host run podinfo-port-forward` is the host-side equivalent
-of the last two runs (the host task rewrites the endpoint to `127.0.0.1`).
+To try a cloud environment instead, prepare the account once (an AWS
+CloudFormation stack, an Azure resource group, or a GCP workload identity
+pool), fill in `.env` from `.env.example`, and run the same two commands with
+`aws`, `azure`, or `gcp`. Each cloud page walks its preparation:
 
-`scripts/toolbox-run.sh bootstrap local-host` waits for both the management and workload
-Flux reconciliation chains and surfaces workload errors; a successful
-bootstrap plus the Podinfo port-forward verifies the end-to-end flow.
-Teardown deletes the CAPD workload cluster first, then the pre-pivot kind
-cluster or the post-pivot self-managed management containers, and removes the
-local registry last.
+| Environment | Management cluster | Guide |
+|---|---|---|
+| `aws` (reference) | EKS in `eu-north-1` | [docs/aws.md](docs/aws.md) |
+| `azure` | AKS in `swedencentral` | [docs/azure.md](docs/azure.md) |
+| `gcp` | GKE in `europe-north1` | [docs/gcp.md](docs/gcp.md) |
+| `local-host` | kind (Docker) | [docs/operations.md](docs/operations.md) |
+| `local-talos` | Talos on bare metal | [docs/operations.md](docs/operations.md) |
+| air-gapped `local-host` | kind, zero external traffic | [docs/airgap.md](docs/airgap.md) |
 
-#### Local Talos
+## Who this is for
 
-Targets a physical machine through Tinkerbell: a PXE install of Talos Linux,
-then the same bootstrap, pivot, and self-management flow, synced from GitHub.
-Scope fence: management-only, no workload clusters. It needs the GitHub PAT
-and age key, a reachable Tinkerbell stack with a `Hardware` resource for the
-machine, and the site values in
-`mgmt/local-talos/clusters/management/cluster.yaml`. The hardware acceptance
-run (issue #105) has been executed end to end on operator-owned hardware; the
-documented PXE/Tinkerbell-Workflow provisioning transport still needs a live
-run (issue #225).
+Platform engineers who already run Kubernetes and want to manage cloud
+infrastructure with the same API, RBAC, and GitOps workflow they use for
+workloads. If you reach for Terraform or Pulumi to stand up cloud resources
+for Kubernetes, this pattern is the alternative: the cluster you already
+operate becomes the control plane. You do not need to be a Kubernetes expert
+to run the quickstart; the deep guides assume you are comfortable operating
+clusters.
 
-![krops local-talos architecture](docs/local-talos-infra.svg)
+## Going deeper
 
-```sh
-scripts/toolbox-run.sh bootstrap local-talos
-export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"   # written by the pivot; the machine is reached directly
-kubectl get nodes
-scripts/toolbox-run.sh teardown local-talos  # releases the Hardware; never wipes the machine
-```
-
-`talosctl` (`mise.local-talos.toml`) is an operator convenience for the
-machine itself, not a lifecycle dependency; install it on the host with
-`mise -E local-talos install` if you want it.
-
-#### Air-gapped local host
-
-The `local-host` profile packaged with [Zarf](https://zarf.dev) for
-completely disconnected deployments: a connected build machine renders the
-GitOps tree, pulls the images and charts, signs the package, and a
-disconnected deploy host runs it with zero external traffic. Validated with
-the radio off. See [Air-gapped krops](docs/airgap.md) for build, offline
-deploy, and the update drill.
-
-![krops air-gap architecture](docs/air-gap-infra.svg)
-
-## The bootstrap CLI
-
-The single `krops-bootstrap` binary implements bootstrap, the default pivot, and
-`krops-bootstrap teardown`. Repository-owned cluster names, paths, chart
-versions, provider manifests, and teardown targets come from
-[`bootstrap.toml`](bootstrap.toml); `mise run validate` cross-checks that file
-against the Git manifests. Sequence-level behavior and generic fallback
-defaults remain in the binary.
-
-`scripts/toolbox-run.sh bootstrap`, `pivot`, and `teardown` run the CLI in
-the toolbox container. The shell scripts remain native reference and
-fallback paths until all environments complete parity runs; local-host has
-passed the full lifecycle, while AWS parity still gates retirement. See
-[The bootstrap CLI](docs/bootstrap-cli.md) for the interface, configuration,
-teardown controls, toolbox release, and current parity status.
-
-## Documentation
-
-| Page | Contents |
-|---|---|
-| [docs/bootstrap-cli.md](docs/bootstrap-cli.md) | The `krops-bootstrap` lifecycle CLI: toolbox distribution, interface, `bootstrap.toml`, pivot, teardown, parity status |
-| [docs/dependencies.md](docs/dependencies.md) | Renovate-managed dependency updates: covered surfaces, update procedure, intentional differences |
-| [docs/architecture.md](docs/architecture.md) | Architecture diagram, reconciliation order, how workload apps are delivered |
-| [docs/aws.md](docs/aws.md) | AWS environment: clusters, credentials, identifiers, reconciliation order, upgrades, known limitations |
-| [docs/wiremock-e2e-spike-findings-aws.md](docs/wiremock-e2e-spike-findings-aws.md) | WireMock e2e Phase 0 spike findings (AWS): CAPA/ACK honor `AWS_ENDPOINT_URL`, no network-layer interception needed |
-| [docs/wiremock-e2e-spike-findings-azure.md](docs/wiremock-e2e-spike-findings-azure.md) | WireMock e2e Phase 0 spike findings (Azure): ASO honors endpoint settings, CAPZ needs the CoreDNS rewrite, `HTTPS_PROXY` is not viable |
-| [docs/wiremock-e2e-spike-findings-gcp.md](docs/wiremock-e2e-spike-findings-gcp.md) | WireMock e2e Phase 0 spike findings (GCP): REST and gRPC both interceptable via CoreDNS rewrite + SAN certs; HTTPS_PROXY covers REST only; CAPG v1.13.1 `serviceEndpoints` covers REST compute only |
-| [docs/aws-iam.md](docs/aws-iam.md) | Management-cluster ACK controllers (static SOPS credentials, union scope), per-cluster reader roles, the `krops-reader` console user, CI OIDC role, e2e account incident and credential revocation |
-| [docs/workload-resources.md](docs/workload-resources.md) | S3 bucket security posture, RDS instances, known limitations |
-| [docs/troubleshooting-ack.md](docs/troubleshooting-ack.md) | ACK controller failure modes for the CRs krops ships: Terminal after the pivot, non-retrying Terminal, Recoverable backoff |
-| [docs/konflate.md](docs/konflate.md) | Rendered Flux PR review: GitHub Actions gate, in-cluster instance, write-back to PRs, tokens |
-| [docs/secrets.md](docs/secrets.md) | SOPS + age secret management, key setup, credential rotation |
-| [docs/operations.md](docs/operations.md) | Toolbox runtime, prerequisites, e2e AWS account designation and budget, quotas, bootstrap, pivot recovery, teardown, validation |
-| [docs/extending.md](docs/extending.md) | Adding a workload cluster, adding apps to the workload clusters, adding other providers (Azure, Talos, k0smotron) |
-| [docs/azure.md](docs/azure.md) | Azure environment: subscription prep, credentials, AKS clusters, ASO on workload clusters, upgrades |
-| [docs/gcp.md](docs/gcp.md) | GCP environment: project prep, WIF credentials (no keys), GKE clusters, Config Connector on the management cluster, upgrades |
-| [docs/airgap.md](docs/airgap.md) | Zarf air-gap bundle: package build, offline deploy, verification checklist, update drill |
-| [docs/crossplane.md](docs/crossplane.md) | Crossplane as an alternative resource plane on the management cluster: selector design, ownership rules, slices (decided, not yet implemented) |
-| [docs/proposals/](docs/proposals/README.md) | Design proposals, under review or accepted |
+- [Architecture](docs/architecture.md): pillars, reconciliation order, per-environment detail
+- [Operations](docs/operations.md): toolbox, prerequisites, bootstrap, pivot recovery, teardown, validation
+- [Bootstrap CLI](docs/bootstrap-cli.md): the `krops-bootstrap` engine and its configuration
+- [Secrets](docs/secrets.md): SOPS + age key setup and credential rotation
+- [Dependencies](docs/dependencies.md): Renovate-managed updates across the repository
+- [Extending](docs/extending.md): adding clusters, apps, and providers
+- [AWS IAM](docs/aws-iam.md), [Workload resources](docs/workload-resources.md),
+  [ACK troubleshooting](docs/troubleshooting-ack.md)
+- [konflate](docs/konflate.md): rendered PR review, the Actions gate, and write-back
+- [Air-gapped krops](docs/airgap.md): Zarf bundle build, offline deploy, update drill
+- [Proposals](docs/proposals/README.md): design proposals, under review or accepted
 
 ## Repository layout
 
 ```
-├── .github/workflows/             Validation, Rust/toolbox CI, docs CI and
-│                                  Pages deploy, the konflate PR render gate,
-│                                  the nightly air-gapped bundle build, and
-│                                  signed toolbox releases
-├── airgap/                        Zarf air-gap bundle, image inventory, scripts
-├── virtualized-e2e/               WireMock-virtualized e2e harness (#355):
-│                                  lib/ shared components + one arm per
-│                                  cloud (aws/ is the reference); not
-│                                  Flux-reconciled, no mise task yet
-├── bootstrap-rs/                  Lifecycle CLI, toolbox Dockerfile, Rust tests
-├── bootstrap.toml                 Repository-owned lifecycle configuration
-├── bootstrap.sh / pivot.sh /      Native shell references and fallback paths;
-│   teardown.sh                    retained until both parity gates pass
-├── scripts/toolbox-run.sh         Docker/Podman wrapper: the lifecycle entry
-│                                  point (bootstrap, pivot, teardown)
-├── tests/                         Config and Renovate coverage cross-checks
-├── mkdocs.yml                     MkDocs Material config for the docs site
-├── pyproject.toml / uv.lock       Python project for the docs site build
-├── tools/assemble_docs.py         Assembles build/docs/ from README.md + docs/
-├── website/                       Docs site assets: colour scheme CSS, CNAME
-├── docs/                          Detailed documentation (see table above)
-├── mise.toml / mise.*.toml        Pinned toolchain (the toolbox image is
-│                                  built from these pins) and the helper
-│                                  task definitions (run in the toolbox with
-│                                  --entrypoint mise; validate and the
-│                                  podinfo port-forward stay host tasks)
-├── renovate.json5                 Hosted Renovate discovery and grouping rules
-├── mgmt/aws/                      Synced by the MANAGEMENT cluster's Flux
-│   ├── infrastructure/           cert-manager, CAPI operator, CAPA identity,
-│   │                              ACK controllers (S3, RDS, IAM) and the
-│   │                              per-cluster Bucket/DBInstance/reader Role
-│   │                              CRs, account-global IAM (reader console
-│   │                              user), konflate (rendered Flux PR review)
-│   ├── capi-providers/           capi-system, capa-system (SOPS creds),
-│   │                              caaph-system
-│   ├── addons/flux-apps/         Installs Flux on each workload cluster
-│   │                              (HelmChartProxy + ResourceSet)
-│   └── clusters/                 EKS cluster defs: eu-north-1, eu-west-1
-│                                  (x86 + ARM MachinePools); eu-north-1 also
-│                                  carries the self-managed management cluster
-├── mgmt/local-host/              OCI-synced CAPI/CAPD local workload cluster
-│   │                              and its management cluster definition
-│   ├── infrastructure/           capi-operator, cert-manager
-│   ├── capi-providers/           caaph-system, capd-system, capi-system
-│   ├── addons/                   kindnet CNI, flux-apps
-│   └── clusters/                 docker (workload), management (self-managed)
-├── mgmt/local-talos/             Single-node Talos management cluster on
-│   │                              bare metal via Tinkerbell (CAPT);
-│   │                              GitHub-synced like mgmt/aws
-│   ├── infrastructure/           capi-operator, cert-manager
-│   ├── capi-providers/           cabpt-system, cacppt-system, capi-system,
-│   │                              capt-system (Tinkerbell)
-│   └── clusters/                 management (self-managed)
-├── mgmt/azure/                    AKS management cluster (CAPZ + ASO)
-├── mgmt/gcp/                      GKE management cluster (CAPG + Config
-│   │                              Connector operator + WIF identities)
-└── workload/                     Synced by each WORKLOAD cluster's Flux
-    ├── base/                     Intentionally empty since #346 (ACK moved
-    │                              to the management cluster); ready for a
-    │                              future application workload
-    ├── azure-base/               cert-manager only (the Azure workload
-    │                              resources moved to the management cluster,
-    │                              #559)
-    ├── gcp-base/                 intentionally empty (issue #560: KCC and
-    │                              the GCP resources moved to the management
-    │                              cluster's workload-resources)
-    ├── local-host/               OCI-synced Podinfo workload overlay
-    ├── eu-north-01/              Per-cluster overlay (sync target)
-    ├── eu-west-01/               Per-cluster overlay (sync target)
-    ├── swedencentral-01/         Per-cluster overlay -> azure-base
-    └── europe-north1-01/         Per-cluster overlay -> gcp-base
+.
+├── mgmt/<env>/                Reconciled by the MANAGEMENT cluster's Flux
+│   ├── infrastructure/        Platform components and cloud-resource controllers
+│   ├── capi-providers/        Cluster API and its infrastructure providers
+│   ├── addons/                What gets installed on workload clusters
+│   └── clusters/              Cluster definitions (workload + self-managed management)
+├── workload/<env>/            Reconciled by each WORKLOAD cluster's Flux
+├── airgap/                    Zarf offline bundle for the local-host profile
+├── bootstrap-rs/              The krops-bootstrap CLI and the toolbox image
+├── bootstrap.toml             Repository-owned lifecycle configuration
+├── scripts/toolbox-run.sh     Docker/Podman wrapper: the lifecycle entry point
+├── docs/                      Detailed documentation (links above)
+├── tests/                     Validation gates (run by `mise run validate`)
+└── .github/workflows/         CI: validate, toolbox release, docs, konflate
 ```
+
+`mgmt/` and `workload/` carry one folder per environment (`aws`, `azure`,
+`gcp`, `local-host`, `local-talos`); each component pairs a plain kustomize
+root with a Flux `Kustomization`. The
+[Operations](docs/operations.md) and
+[Architecture](docs/architecture.md) pages walk the full tree.
+
+## Validation
+
+Every change is gated by `mise run validate` (host) and CI: shell scripts
+parse, `bootstrap.toml` cross-checks against the Git manifests, every
+kustomization under `mgmt/` and `workload/` builds, air-gap image pins hold,
+and the docs site assembles with strict link checking. The Rust CLI has its
+own fmt/clippy/test gate. See [Operations: Validation](docs/operations.md#validation).
+
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for the branch and commit
+conventions, and [AGENTS.md](AGENTS.md) for the rules AI coding agents
+follow. Flux tracks `main`: nothing reconciles until it is merged.
 
 ## License
 
-This repository is licensed under the [Apache License 2.0](LICENSE).
+Apache-2.0. See [LICENSE](LICENSE).

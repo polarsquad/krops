@@ -54,6 +54,9 @@ plus one ARM (Graviton2) `AWSManagedMachinePool` at the cheapest offered
   AZ (one EIP each), so it needs at least 6 free EIPs in `eu-north-1` and 3 in
   `eu-west-1`. The default regional limit is 5, so request the increase before
   the first run (see [Operations](./operations.md#aws-service-quotas-common-first-run-blockers)).
+  Bootstrap enforces this before any provisioning: the EIP quota preflight
+  counts one EIP per AZ (three per cluster, management cluster included) and
+  stops the run when the account is short.
 
 ## Credentials
 

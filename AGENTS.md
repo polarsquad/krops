@@ -229,7 +229,11 @@ resources. There is no app source code here, only declarative infrastructure.
   Helper tasks run inside the toolbox image via `--entrypoint mise`
   (issue #423); `validate` and `podinfo-port-forward` stay host tasks by
   design; `MISE_AUTO_INSTALL=0` is mandatory for in-toolbox runs and mise's
-  `env_file` makes `/workspace/.env` override `-e` values.
+  `env_file` makes `/workspace/.env` override `-e` values. Direct toolbox calls
+  parse supported single-line dotenv quotes, escapes, and variable references
+  without shell evaluation; `tests/test-toolbox-run-env-precedence.py` checks
+  parity against isolated real mise (required in CI). See docs/operations.md
+  for syntax limits.
 - `renovate.json5`: Renovate config. Dependency versions live in the native
   files that consume them (mise configs, manifests, workflows, airgap
   inventory); Renovate discovers and updates them weekly and tracks pending

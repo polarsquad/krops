@@ -189,7 +189,7 @@ jobs:
         run: |
           bash -n scripts/toolbox-run.sh
           python3 tests/test-toolbox-run-exec.py
-          python3 tests/test-toolbox-run-env-precedence.py
+          python3 tests/test-toolbox-run-env-precedence.py --require-mise
           python3 tests/test-oci-push-worktree.py
           python3 tests/test-toolbox-run-azure-session.py
 

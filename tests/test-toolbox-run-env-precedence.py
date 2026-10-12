@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """scripts/toolbox-run.sh must load .env before resolving the engine/socket
 (issue #257), and must resolve .env the way mise's env_file does: .env wins
-over the process environment, with the same line syntax. Otherwise
+over the process environment, for the supported single-line syntax. Otherwise
 `scripts/toolbox-run.sh` and `mise run bootstrap` hand the container
 different values for the same checkout."""
 import os
@@ -38,8 +38,8 @@ case "$1" in
       esac
       shift
     done
-    echo "ENGINE=ENGINE_NAME" > "$STUB_LOG"
-    env >> "$STUB_LOG"
+    printf 'ENGINE=ENGINE_NAME\\0' > "$STUB_LOG"
+    env -0 >> "$STUB_LOG"
     exit 0
     ;;
   *) exit 1 ;;
@@ -47,7 +47,7 @@ esac
 """
 
 # One case per mise env_file behavior the wrapper must reproduce; the values
-# are what mise 2026.9.12 exports for these lines.
+# are cross-checked against real mise (verified with 2026.10.5 and 2026.10.8).
 PARSE_CASES = {
     "export KP_EXPORT=exported": ("KP_EXPORT", "exported"),
     "KP_COMMENT=bar # note": ("KP_COMMENT", "bar"),
@@ -60,6 +60,31 @@ PARSE_CASES = {
     'KP_EQ="a=b"': ("KP_EQ", "a=b"),
     "KP_EMPTY=": ("KP_EMPTY", ""),
 }
+PARSE_CASES.update({
+    r"AGE_KEY_FILE=keys\ private.txt": ("AGE_KEY_FILE", "keys private.txt"),
+    r'GITHUB_USER="foo\"bar"': ("GITHUB_USER", 'foo"bar'),
+    "KP_PARENT=alice": ("KP_PARENT", "alice"),
+    "OCI_REPOSITORY=ghcr.io/${KP_PARENT}/krops": ("OCI_REPOSITORY", "ghcr.io/alice/krops"),
+    "KP_BARE=$KP_PARENT/path": ("KP_BARE", "alice/path"),
+    'KP_DOUBLE="$KP_PARENT/${KP_PARENT}"': ("KP_DOUBLE", "alice/alice"),
+    r'KP_DOUBLE_LITERAL="\$KP_PARENT"': ("KP_DOUBLE_LITERAL", "$KP_PARENT"),
+    "KP_INHERITED=${KP_EXTERNAL}": ("KP_INHERITED", "inherited"),
+    "KP_UNSET=${KP_NOT_SET}": ("KP_UNSET", ""),
+    r"KP_LITERAL=\$KP_PARENT": ("KP_LITERAL", "$KP_PARENT"),
+    "KP_SINGLE='${KP_PARENT}'": ("KP_SINGLE", "${KP_PARENT}"),
+    r'KP_BACKSLASH="a\\b"': ("KP_BACKSLASH", r"a\b"),
+    r'KP_NEWLINE="a\nb"': ("KP_NEWLINE", "a\nb"),
+    r'KP_CONTROL="a\tb\rc"': ("KP_CONTROL", "a\tb\rc"),
+    r'KP_TRAILING_NEWLINE="tail\n"': ("KP_TRAILING_NEWLINE", "tail\n"),
+    r'KP_UNKNOWN="a\qb"': ("KP_UNKNOWN", r"a\qb"),
+    'KP_QUOTED_SPACE="a " # note': ("KP_QUOTED_SPACE", "a "),
+    r"KP_ESCAPED_COMMENT=foo\ # note": ("KP_ESCAPED_COMMENT", "foo "),
+    "KP_ESCAPED_TRAIL=foo\\  ": ("KP_ESCAPED_TRAIL", "foo "),
+    "KP_REPEAT=first": ("KP_REPEAT", "second"),
+    "KP_REPEAT=second": ("KP_REPEAT", "second"),
+    "KP_AFTER=$KP_REPEAT": ("KP_AFTER", "second"),
+})
+
 TEST_KEYS = ["CONTAINER_ENGINE", "ENGINE_SOCK", "GITHUB_USER", "TOOLBOX_IMAGE"] + [
     key for key, _ in PARSE_CASES.values()
 ]
@@ -82,8 +107,8 @@ def run_wrapper(env_lines: list[str], extra_env=None) -> dict:
             stub.write_text(STUB_TEMPLATE.replace("ENGINE_NAME", name))
             os.chmod(stub, 0o755)
         log = tmp / "stub.log"
-        env = {k: v for k, v in os.environ.items() if k not in TEST_KEYS}
-        env.update(PATH=f"{bin_dir}:{env['PATH']}", STUB_LOG=str(log), HOME=str(tmp / "home"))
+        env = {k: v for k, v in os.environ.items() if k not in TEST_KEYS and not k.startswith("KP_")}
+        env.update(KP_EXTERNAL="inherited", PATH=f"{bin_dir}:{env['PATH']}", STUB_LOG=str(log), HOME=str(tmp / "home"))
         env.update(extra_env or {})
         result = subprocess.run(
             ["bash", str(wrapper), "bootstrap"],
@@ -94,7 +119,7 @@ def run_wrapper(env_lines: list[str], extra_env=None) -> dict:
                 f"wrapper exited {result.returncode} without running the engine\n"
                 f"stdout={result.stdout}\nstderr={result.stderr}"
             )
-        return dict(line.split("=", 1) for line in log.read_text().splitlines() if "=" in line)
+        return dict(line.split("=", 1) for line in log.read_bytes().decode().split("\0") if "=" in line)
 
 
 def expect(seen: dict, key: str, want: str) -> None:
@@ -140,29 +165,53 @@ def test_malformed_lines_are_skipped() -> None:
         raise AssertionError(f"malformed .env lines were exported: {leaked}")
 
 
+def test_shell_content_is_not_executed() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        sentinel = Path(tmp) / "executed"
+        command = f"$(touch {sentinel})"
+        backticks = f"`touch {sentinel}`"
+        seen = run_wrapper(["CONTAINER_ENGINE=docker", f"KP_COMMAND={command}",
+                            f"KP_BACKTICKS={backticks}", "KP_LITERAL_REF=${KP_COMMAND}"])
+        expect(seen, "KP_COMMAND", command)
+        expect(seen, "KP_BACKTICKS", backticks)
+        expect(seen, "KP_LITERAL_REF", command)
+        if sentinel.exists():
+            raise AssertionError("dotenv content executed a command")
+
+
+def test_unsupported_single_quote_escape_is_skipped() -> None:
+    seen = run_wrapper(["CONTAINER_ENGINE=docker", r"KP_UNSUPPORTED='foo\'bar'"])
+    if "KP_UNSUPPORTED" in seen:
+        raise AssertionError("unsupported single-quoted escape was exported")
+
+
 def test_mise_agrees() -> None:
     """Cross-check PARSE_CASES and precedence against the real mise, when
     installed (CI's renovate job has it; the expectations above stand alone)."""
     mise = shutil.which("mise")
     if not mise:
+        if "--require-mise" in sys.argv:
+            raise AssertionError("mise is required but not on PATH")
         print("   (skipped: mise not on PATH)")
         return
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         (tmp / ".env").write_text("\n".join([*PARSE_CASES, "GITHUB_USER=from-dotenv"]) + "\n")
         (tmp / "mise.toml").write_text(
-            '[settings]\nenv_file = ".env"\n[tasks.dump]\nrun = "env"\n'
+            '[settings]\nenv_file = ".env"\n[tasks.dump]\nrun = "env -0"\n'
         )
-        env = {k: v for k, v in os.environ.items() if k not in TEST_KEYS}
-        env.update(GITHUB_USER="from-shell", MISE_AUTO_INSTALL="0")
+        env = {k: v for k, v in os.environ.items() if k not in TEST_KEYS and not k.startswith("KP_")}
+        env.update(GITHUB_USER="from-shell", KP_EXTERNAL="inherited", MISE_AUTO_INSTALL="0",
+                   MISE_CONFIG_DIR=str(tmp / "config"), MISE_DATA_DIR=str(tmp / "data"),
+                   MISE_CACHE_DIR=str(tmp / "cache"), MISE_STATE_DIR=str(tmp / "state"))
         subprocess.run([mise, "trust", "-q", str(tmp)], env=env, check=True, capture_output=True)
         out = subprocess.run(
             [mise, "run", "-q", "dump"], cwd=tmp, env=env,
-            capture_output=True, text=True, check=True,
-        ).stdout
-    seen = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
+            capture_output=True, check=True,
+        ).stdout.decode()
+    seen = dict(line.split("=", 1) for line in out.split("\0") if "=" in line)
     for key, want in PARSE_CASES.values():
-        expect(seen, key, want)
+        expect(seen, key, "from-dotenv" if key == "GITHUB_USER" else want)
     expect(seen, "GITHUB_USER", "from-dotenv")
 
 
@@ -174,6 +223,8 @@ def main() -> int:
         test_engine_and_socket_are_consistent,
         test_line_syntax_matches_mise,
         test_malformed_lines_are_skipped,
+        test_shell_content_is_not_executed,
+        test_unsupported_single_quote_escape_is_skipped,
         test_mise_agrees,
     ]
     failed = 0

@@ -30,9 +30,96 @@ shift
 # environment, as it does under mise. Never log these values.
 ltrim() { printf '%s' "${1#"${1%%[![:space:]]*}"}"; }
 rtrim() { printf '%s' "${1%"${1##*[![:space:]]}"}"; }
+# Parse one physical line without shell evaluation. The result stays in a
+# variable (not command substitution), preserving escaped trailing newlines.
+parse_dotenv_value() {
+  local input="$1" state=unquoted c next name replacement pending="" i=0 n=${#1}
+  DOTENV_VALUE=""
+  while [ "$i" -lt "$n" ]; do
+    c="${input:i:1}"
+    i=$((i + 1))
+    # Only unquoted, unescaped whitespace is syntactic. Keep it pending
+    # until another value character arrives; discard it at end or a comment.
+    if [ "$state" = unquoted ]; then
+      if [[ "$c" = [[:space:]] ]]; then
+        pending+="$c"
+        continue
+      fi
+      if [ "$c" = '#' ] && { [ -n "$pending" ] || [ "$i" -eq 1 ] || [[ "${input:i-2:1}" = [[:space:]] ]]; }; then
+        break
+      fi
+      DOTENV_VALUE+="$pending"
+      pending=""
+    fi
+    case "$c" in
+      "\\")
+        # mise changed single-quote escape semantics in 2026.10.8.
+        # Reject that unsupported form instead of changing its value silently.
+        [ "$state" != single ] || return 1
+        if [ "$i" -lt "$n" ]; then
+          next="${input:i:1}"
+          case "$next" in
+            n) DOTENV_VALUE+=$'\n' ;;
+            r) DOTENV_VALUE+=$'\r' ;;
+            t) DOTENV_VALUE+=$'\t' ;;
+            "\\"|\"|\'|'$'|' ') DOTENV_VALUE+="$next" ;;
+            *) DOTENV_VALUE+="\\$next" ;;
+          esac
+          i=$((i + 1))
+        else
+          DOTENV_VALUE+="\\"
+        fi
+        ;;
+      \")
+        case "$state" in
+          unquoted) state=double ;;
+          double) state=unquoted ;;
+          single) DOTENV_VALUE+="$c" ;;
+        esac
+        ;;
+      \')
+        case "$state" in
+          unquoted) state=single ;;
+          single) state=unquoted ;;
+          double) DOTENV_VALUE+="$c" ;;
+        esac
+        ;;
+      '$')
+        if [ "$state" = single ]; then
+          DOTENV_VALUE+="$c"
+          continue
+        fi
+        name=""
+        if [ "${input:i:1}" = '{' ]; then
+          i=$((i + 1))
+          while [ "$i" -lt "$n" ] && [ "${input:i:1}" != '}' ]; do
+            name+="${input:i:1}"
+            i=$((i + 1))
+          done
+          [ "$i" -lt "$n" ] || return 1
+          i=$((i + 1))
+        else
+          while [ "$i" -lt "$n" ]; do
+            case "${input:i:1}" in
+              [A-Za-z0-9_]) name+="${input:i:1}"; i=$((i + 1)) ;;
+              *) break ;;
+            esac
+          done
+        fi
+        case "$name" in
+          '') DOTENV_VALUE+='$' ;;
+          [0-9]*|*[!A-Za-z0-9_]*) return 1 ;;
+          *) replacement="${!name:-}"; DOTENV_VALUE+="$replacement" ;;
+        esac
+        ;;
+      *) DOTENV_VALUE+="$c" ;;
+    esac
+  done
+  [ "$state" = unquoted ]
+}
 if [ -f .env ]; then
   while IFS= read -r line || [ -n "$line" ]; do
-    line="$(rtrim "$(ltrim "$line")")"
+    line="$(ltrim "$line")"
     case "$line" in
       ''|'#'*) continue ;;
       export[[:space:]]*) line="$(ltrim "${line#export}")" ;;
@@ -42,18 +129,15 @@ if [ -f .env ]; then
       *) continue ;;
     esac
     key="$(rtrim "${line%%=*}")"
-    value="$(ltrim "${line#*=}")"
-    case "$value" in
-      \"*) value="${value#\"}"; value="${value%%\"*}" ;;
-      \'*) value="${value#\'}"; value="${value%%\'*}" ;;
-      *)   value="$(rtrim "${value%%[[:space:]]#*}")" ;;
-    esac
-    # Only accept valid, non-empty identifiers not starting with a digit;
-    # skip garbage lines instead of exporting them.
     case "$key" in
       ''|[0-9]*|*[!A-Za-z0-9_]*) continue ;;
     esac
-    export "$key=$value"
+    value="$(ltrim "${line#*=}")"
+    if parse_dotenv_value "$value"; then
+      export "$key=$DOTENV_VALUE"
+    else
+      printf 'WARNING: Unsupported or malformed dotenv value for %s; skipped\n' "$key" >&2
+    fi
   done < .env
 fi
 

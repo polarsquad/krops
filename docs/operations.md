@@ -96,7 +96,7 @@ TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh bootstrap aws
 verb, which reaches `krops-bootstrap`) selects the environment. It loads
 `.env` before detecting the engine or resolving a socket for it, so a
 `.env`-selected `CONTAINER_ENGINE` takes effect from the start (issue #257).
-It resolves `.env` exactly as mise's `env_file` does, so
+For the supported single-line dotenv syntax, it follows mise's `env_file`, so
 `scripts/toolbox-run.sh` and `mise run bootstrap` hand the container the same
 values:
 
@@ -105,12 +105,20 @@ values:
   `.env` does not set `NAME`. The helper tasks follow the same rule inside
   the container (see [Helper tasks in the toolbox](#helper-tasks-in-the-toolbox)).
 - Line syntax: an optional `export` prefix, whitespace trimmed around keys
-  and values, `"..."` / `'...'` values taken verbatim up to the closing
-  quote, and a `#` after whitespace starting a comment in an unquoted
-  value. Lines without `=` or with an invalid key are skipped.
+  and values, single and double quotes, escaped spaces/quotes/backslashes,
+  `\n` / `\r` / `\t` escapes, and a `#` after whitespace starting a comment
+  in an unquoted value. `$VAR` and `${VAR}` expand inherited variables or
+  earlier assignments outside single quotes; unset references become empty.
+  Escaped dollars stay literal. Repeated assignments use the last value.
+  Lines without `=` or with an invalid key are skipped. Backslash escapes
+  inside single quotes (whose mise semantics vary by version), multiline
+  values, and parameter operators such as `${VAR:-default}` are outside the
+  wrapper's supported syntax; use simple assignments instead. Unsupported
+  or malformed parsed values are skipped with a warning that names only the key.
 
 `tests/test-toolbox-run-env-precedence.py` pins this behavior and, when mise
-is installed, checks it against mise itself. The wrapper then passes only a fixed set of
+is installed, checks it against mise itself in isolated temporary state. CI requires
+that cross-check. Parsing never evaluates shell commands. The wrapper then passes only a fixed set of
 values into the container, built by `build_env_args` from the
 `TOOLBOX_ENV_SPEC` list, split into two groups: mutable (forwarded from
 whatever `.env` or the shell set) and immutable (a value the wrapper

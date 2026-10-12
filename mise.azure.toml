@@ -10,7 +10,7 @@
 KROPS_PROFILE = "azure"
 
 [tools]
-"pipx:azure-cli" = "2.90.0"
+"pipx:azure-cli" = "2.91.0"
 
 [tasks.azure-bootstrap]
 description = "One-time subscription prep: register providers (incl. Arc), create the shared resource group and the krops-capz user-assigned identity with its role grants; prints the values to commit. No service principal (issue #236)."

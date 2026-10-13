@@ -30,6 +30,7 @@ use std::process::Stdio;
 use std::time::Duration;
 
 use anyhow::{bail, ensure, Context, Result};
+use base64::Engine;
 use clap::Parser;
 use serde_json::json;
 use tokio::io::AsyncWriteExt;
@@ -1375,6 +1376,100 @@ async fn install_flux_operator(
     run("helm", &arg_refs).await
 }
 
+/// Decode and validate base64-encoded AWS credentials profile.
+/// Ensures the decoded content is valid UTF-8 and contains a [default] section
+/// with aws_access_key_id.
+fn ack_credentials_from_profile(b64: &str) -> Result<String> {
+    use std::str;
+
+    if b64.trim().is_empty() {
+        bail!("AWS credentials profile is empty: check AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY in .env");
+    }
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(b64.trim())
+        .context("failed to base64-decode AWS credentials")?;
+    let content = str::from_utf8(&decoded)
+        .context("AWS credentials are not valid UTF-8")?
+        .to_string();
+
+    // Validate the profile contains a [default] section and aws_access_key_id
+    if !content.contains("[default]") {
+        bail!("AWS credentials profile does not contain a [default] section");
+    }
+    if !content.contains("aws_access_key_id") {
+        bail!("AWS credentials profile does not contain aws_access_key_id");
+    }
+
+    Ok(content)
+}
+
+/// Create AWS credential secrets in both capa-system and ack-system namespaces.
+/// The CAPA secret stores the base64-encoded credentials (AWS_B64ENCODED_CREDENTIALS).
+/// The ACK secret stores the decoded INI-format credentials (credentials).
+async fn create_aws_credential_secrets(
+    kube_context: Option<&str>,
+    encoded_credentials: &str,
+) -> Result<()> {
+    let decoded_credentials = ack_credentials_from_profile(encoded_credentials)?;
+
+    // Pre-create namespaces before applying secrets (idempotent pattern:
+    // kubectl create namespace X --dry-run=client -o yaml | kubectl apply -f -)
+    println!(">>> Ensuring capa-system and ack-system namespaces exist...");
+    for namespace in &["capa-system", "ack-system"] {
+        let namespace_yaml = capture(
+            "kubectl",
+            &kubectl_cmd(
+                kube_context,
+                &[
+                    "create",
+                    "namespace",
+                    namespace,
+                    "--dry-run=client",
+                    "-o",
+                    "yaml",
+                ],
+            ),
+        )
+        .await?;
+        run_with_stdin(
+            "kubectl",
+            &kubectl_cmd(kube_context, &["apply", "-f", "-"]),
+            &namespace_yaml,
+        )
+        .await?;
+    }
+
+    // CAPA secret: stores the base64-encoded credentials
+    println!(">>> Creating AWS credentials secret in capa-system...");
+    kubectl_apply(
+        kube_context,
+        &json!({
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": { "name": "aws-credentials", "namespace": "capa-system" },
+            "type": "Opaque",
+            "stringData": { "AWS_B64ENCODED_CREDENTIALS": encoded_credentials.trim_end() },
+        }),
+    )
+    .await?;
+
+    // ACK secret: stores the decoded INI-format credentials
+    println!(">>> Creating AWS credentials secret in ack-system...");
+    kubectl_apply(
+        kube_context,
+        &json!({
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": { "name": "aws-credentials", "namespace": "ack-system" },
+            "type": "Opaque",
+            "stringData": { "credentials": decoded_credentials },
+        }),
+    )
+    .await?;
+
+    Ok(())
+}
+
 async fn create_github_secrets(
     repo: &BootstrapConfig,
     github: &GithubContext,
@@ -2306,27 +2401,14 @@ async fn pivot_install_capi_in_target(
     }
 
     if cfg.profile == "aws" {
-        // CAPA credentials: the InfrastructureProvider above references the
-        // aws-credentials secret (configSecret.name). On the bootstrap
-        // cluster Flux decrypts aws-credentials.sops.yaml; here it is
-        // created directly with the same shape. Do NOT pre-apply
-        // mgmt/aws/infrastructure/aws-identity/: the
-        // AWSClusterControllerIdentity carries a move hook and comes over
-        // with the Phase 4 move. The credential travels in a stdin
-        // manifest, never on argv.
-        println!(">>> Creating CAPA credentials secret in capa-system...");
+        // AWS credentials: the InfrastructureProvider above references the
+        // aws-credentials secret in capa-system (configSecret.name), and ACK
+        // controllers reference it in ack-system. Both are created imperatively
+        // from ambient credentials. Do NOT pre-apply mgmt/aws/infrastructure/aws-identity/:
+        // the AWSClusterControllerIdentity carries a move hook and comes over
+        // with the Phase 4 move. Credentials travel in a stdin manifest, never on argv.
         let credentials = capture("mise", &["-E", &cfg.profile, "run", "aws-credentials"]).await?;
-        kubectl_apply(
-            Some(kc),
-            &json!({
-                "apiVersion": "v1",
-                "kind": "Secret",
-                "metadata": { "name": "aws-credentials", "namespace": "capa-system" },
-                "type": "Opaque",
-                "stringData": { "AWS_B64ENCODED_CREDENTIALS": credentials.trim_end() },
-            }),
-        )
-        .await?;
+        create_aws_credential_secrets(Some(kc), &credentials).await?;
     }
 
     // Config-driven pivot secrets (issue #71): decrypt each declared
@@ -2943,6 +3025,12 @@ async fn run_bootstrap(cfg: &Config, http: &reqwest::Client) -> Result<()> {
     // Step 3: GitHub PAT + SOPS age secrets (github-sync environments).
     if let Some(github) = preflight.github.as_ref() {
         create_github_secrets(&cfg.repo, github, None).await?;
+    }
+
+    // Step 3.5: AWS credentials (AWS profile only).
+    if cfg.profile == "aws" {
+        let credentials = capture("mise", &["-E", &cfg.profile, "run", "aws-credentials"]).await?;
+        create_aws_credential_secrets(None, &credentials).await?;
     }
 
     // Step 4: install the FluxInstance via Helm.
@@ -4226,5 +4314,72 @@ else:
         let foreign = 7u32.saturating_sub(0u32);
         assert_eq!(foreign, 7);
         assert_eq!(foreign + 3, 10);
+    }
+
+    // AWS documentation canonical example values (verified plain ASCII; named to
+    // prevent secret scanners from tripping on the AKIA prefix).
+    const EXAMPLE_KEY_ID: &str = "AKIAIOSFODNN7EXAMPLE";
+    const EXAMPLE_SECRET_KEY: &str = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
+
+    #[test]
+    fn credentials_profile_rejects_empty_input() {
+        let result = ack_credentials_from_profile("");
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("empty"),
+            "expected 'empty' in error message, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn credentials_profile_decode_round_trip() {
+        let original = format!(
+            "[default]\naws_access_key_id={EXAMPLE_KEY_ID}\naws_secret_access_key={EXAMPLE_SECRET_KEY}\n"
+        );
+        let encoded = base64::engine::general_purpose::STANDARD.encode(&original);
+        let decoded = ack_credentials_from_profile(&encoded).unwrap();
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn credentials_profile_preserves_session_token() {
+        let original = format!(
+            "[default]\naws_access_key_id={EXAMPLE_KEY_ID}\naws_secret_access_key={EXAMPLE_SECRET_KEY}\naws_session_token=AQoDYXdzEJr...\n"
+        );
+        let encoded = base64::engine::general_purpose::STANDARD.encode(&original);
+        let decoded = ack_credentials_from_profile(&encoded).unwrap();
+        assert_eq!(decoded, original);
+        assert!(decoded.contains("aws_session_token"));
+    }
+
+    #[test]
+    fn credentials_profile_rejects_no_default_section() {
+        let no_default = format!("[other]\naws_access_key_id={EXAMPLE_KEY_ID}\n");
+        let encoded = base64::engine::general_purpose::STANDARD.encode(&no_default);
+        let result = ack_credentials_from_profile(&encoded);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("[default]"));
+    }
+
+    #[test]
+    fn credentials_profile_rejects_no_access_key() {
+        let no_key = format!("[default]\naws_secret_access_key={EXAMPLE_SECRET_KEY}\n");
+        let encoded = base64::engine::general_purpose::STANDARD.encode(&no_key);
+        let result = ack_credentials_from_profile(&encoded);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("aws_access_key_id"));
+    }
+
+    #[test]
+    fn credentials_profile_rejects_invalid_utf8() {
+        let invalid_utf8 = [0xFF, 0xFE, 0xFD];
+        let encoded = base64::engine::general_purpose::STANDARD.encode(invalid_utf8);
+        let result = ack_credentials_from_profile(&encoded);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("UTF-8"));
     }
 }

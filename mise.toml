@@ -202,6 +202,11 @@ if ! uv run python tests/test-aws-iam-doc-scope-regressions.py; then
   echo "    FAILED: ACK CR scope regressions" >&2
   fail=1
 fi
+echo "==> AWS credentials: none at rest (#379)"
+if ! python3 tests/test-aws-no-static-credentials.py; then
+  echo "    FAILED: AWS credentials are static" >&2
+  fail=1
+fi
 echo "==> AWS account ID literals match flux-instance.yaml"
 if ! uv run python tests/test-aws-account-id-consistency.py; then
   echo "    FAILED: AWS account ID consistency" >&2
@@ -308,7 +313,7 @@ echo "Use with: KUBECONFIG=${MGMT_KUBECONFIG} kubectl get clusters"
 '''
 
 [tasks.aws-credentials]
-description = "Export AWS credentials as a profile string for SOPS-encrypted secrets"
+description = "Export AWS credentials as a base64 profile string for imperative Secret seeding"
 run = "clusterawsadm bootstrap credentials encode-as-profile"
 
 [tasks.teardown]

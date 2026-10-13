@@ -1,8 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-# The `aws-credentials` Secret is stored SOPS-encrypted (aws-credentials.sops.yaml)
-# and decrypted in-cluster by Flux's kustomize-controller. See docs/secrets.md.
+# The `aws-credentials` Secret is created imperatively by bootstrap/pivot from
+# ambient credentials (AWS_B64ENCODED_CREDENTIALS). See docs/secrets.md.
 resources:
   - namespace.yaml
   - providers.yaml
-  - aws-credentials.sops.yaml

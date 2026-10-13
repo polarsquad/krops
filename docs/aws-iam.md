@@ -1,17 +1,55 @@
 # AWS authentication & IAM
 
-## ACK controllers on the management cluster (static SOPS credentials)
+## ACK controllers on the management cluster (ambient credentials)
 
 All ACK controllers (S3, RDS, IAM) run on the **management** cluster only
 (issue #346). ACK controllers talk to the AWS API directly, so they do not
 need to run inside the cluster whose resources they manage; the workload
 clusters run no controllers and hold no credentials at all.
 
-The controllers authenticate with the same SOPS-encrypted static credential
-pattern as CAPA
-(`mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml`). The
-kind management cluster runs on kind (not EKS), so IRSA/Pod Identity is not
-available there; static credentials via SOPS is the established pattern.
+The controllers authenticate with credentials seeded imperatively from the
+ambient `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (optionally `AWS_SESSION_TOKEN`),
+which the `aws-credentials` mise task encodes into `AWS_B64ENCODED_CREDENTIALS`
+for `capa-system`; the bootstrap/pivot code decodes it into a shared-credentials
+file for `ack-system`, at bootstrap/pivot time (issue #379). This mirrors the Azure and GCP posture
+("none at rest"): no static credentials are stored in Git. The kind management
+cluster runs on kind (not EKS), so IRSA/Pod Identity is not available;
+credentials are created imperatively by the bootstrap and pivot phases.
+
+### One-time migration for a running management cluster
+
+This step is needed only if a management cluster is already running with the
+`aws-credentials` Secrets created by Flux from the now-deleted SOPS files.
+Fresh bootstraps from the new `main` need no migration.
+
+The two Flux Kustomizations use `prune: true`. Flux strips `kubectl`-written
+annotations on its next apply, so adding the prune-disable annotation while
+the old revision is still reconciled does not help. Suspend both
+Kustomizations, annotate the live Secrets, merge to `main`, then resume:
+
+```sh
+flux suspend kustomization capa-system -n flux-system
+flux suspend kustomization ack-controllers -n flux-system
+kubectl annotate secret aws-credentials -n capa-system \
+  kustomize.toolkit.fluxcd.io/prune=disabled --overwrite
+kubectl annotate secret aws-credentials -n ack-system \
+  kustomize.toolkit.fluxcd.io/prune=disabled --overwrite
+# after merging to main:
+flux reconcile source git flux-system -n flux-system
+flux resume kustomization capa-system -n flux-system
+flux resume kustomization ack-controllers -n flux-system
+kubectl get secret aws-credentials -n capa-system
+kubectl get secret aws-credentials -n ack-system
+```
+
+If the Secrets were already pruned before this runbook ran, re-create them by
+re-running `bootstrap.sh` (or the equivalent `pivot.sh` path) with the
+correct ambient credentials.
+
+> Note: this is a deliberate, one-time exception to golden rule 1 (never
+> mutate the clusters); the annotation is harmless and persists after
+> bootstrap/pivot; it only prevents Flux from pruning the Secret during the
+> transition.
 
 ### Least-privilege trade-off: the static principal's union scope
 
@@ -134,7 +172,7 @@ imperatively, additive only.
 - OIDC provider:
   `arn:aws:iam::120392301094:oidc-provider/token.actions.githubusercontent.com`
   (audience `sts.amazonaws.com`).
-- Role: `arn:aws:iam::120392301094:role/krops-ci-e2e` (max session 4 hours).
+- Role: `arn:aws:iam::120392301094:role/krops-ci-e2e` (max session duration 4 hours; e2e runs must complete within this window).
 - Five customer-managed policies, grouped by concern:
   `krops-ci-e2e-capa-ec2`, `krops-ci-e2e-capa-eks`, `krops-ci-e2e-ack-mgmt`,
   `krops-ci-e2e-sweep`, `krops-ci-e2e-self-deny`.
@@ -208,11 +246,12 @@ IPAM/IPv6 actions (IPv4 clusters), no launch-template writes (the
 - Service-quota increases (see [Operations](./operations.md)) and the
   one-time `iam:CreateLoginProfile` for `krops-reader` (above) stay operator
   steps.
-- The committed `aws-credentials.sops.yaml` secrets (CAPA and the management
-  ACK controllers after the pivot) still hold the `capi-demo` credential
-  profile; the OIDC role covers the ambient/script surface and the
-  pre-pivot bootstrap cluster. Replacing the committed secret is part of
-  the #185 wiring.
+- CAPA and ACK data-plane actions: the `krops-ci-e2e` role must hold the same
+  AWS action grants that were previously held by the `capi-demo` user principal,
+  covering the full S3, RDS, and IAM action sets documented
+  [above](#least-privilege-trade-off-the-static-principals-union-scope)
+  for a successful full e2e reconciliation. These actions are account-side
+  prerequisites the operator must add to the role policies.
 
 ### Assuming the role from a workflow
 
@@ -251,21 +290,14 @@ If a credential is suspected compromised, contain it immediately, then assess im
 
 ### Containment
 
-**(a) `capi-demo` long-lived IAM key** (stored in `.env`, `mgmt/aws/capi-providers/capa-system/aws-credentials.sops.yaml`, and `mgmt/aws/infrastructure/ack-controllers/aws-credentials.sops.yaml`):
+**(a) `capi-demo` long-lived IAM key** (stored in `.env` only; used by ambient credential flow):
 
 1. Disable the key immediately:
    ```sh
    aws iam update-access-key --user-name capi-demo --access-key-id <ACCESS_KEY_ID> --status Inactive
    ```
-2. Issue and validate a replacement key for the intended account and principal.
-   Update the gitignored `.env` and re-encrypt both CAPA and management ACK
-   SOPS secrets, following [Setting / rotating AWS credentials](./secrets.md#setting-rotating-aws-credentials).
-   Merge to `main` so Flux can reconcile; a merged manifest alone does not
-   establish that controllers have adopted the replacement.
-3. Verify Flux reconciliation and successful AWS operations from CAPA and all
-   management ACK controllers (S3, RDS, IAM), plus replacement adoption by any
-   running bootstrap process. Keep the compromised key disabled throughout
-   recovery, then delete it once those checks pass.
+2. Issue a new key and update `.env`, following [Setting / rotating AWS credentials](./secrets.md#setting-rotating-aws-credentials). No re-encryption of SOPS secrets is needed: credentials are seeded imperatively from `.env` at bootstrap/pivot time.
+3. Delete the old key once the new one is live and bootstrap has been re-run with the new credential.
 
 **(b) `krops-ci-e2e` OIDC role** (normally covers itself; see [CI access](#ci-access-github-actions-oidc-and-the-krops-ci-e2e-role)):
 

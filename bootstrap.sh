@@ -142,6 +142,28 @@ cleanup_bootstrap() {
 trap cleanup_bootstrap EXIT
 resolve_run_tags
 prepare_flux
+
+# ── Step 3.5: AWS credentials (AWS profile only) ──────────────────────────────
+if [ "$PROFILE" = aws ]; then
+  echo ">>> Ensuring capa-system and ack-system namespaces exist..."
+  kubectl create namespace capa-system --dry-run=client -o yaml | kubectl apply -f -
+  kubectl create namespace ack-system --dry-run=client -o yaml | kubectl apply -f -
+  echo ">>> Creating AWS credential secrets..."
+  aws_b64_credentials="$(mise -E aws run aws-credentials)"
+  kubectl create secret generic aws-credentials \
+    --namespace capa-system \
+    --from-literal="AWS_B64ENCODED_CREDENTIALS=${aws_b64_credentials}" \
+    --dry-run=client -o yaml | kubectl apply -f -
+  ack_credentials="$(printf '%s' "${aws_b64_credentials}" | base64 --decode)" \
+    || { echo "ERROR: failed to decode AWS credentials profile" >&2; exit 1; }
+  [[ -n "${ack_credentials}" ]] \
+    || { echo "ERROR: decoded AWS credentials profile is empty" >&2; exit 1; }
+  kubectl create secret generic aws-credentials \
+    --namespace ack-system \
+    --from-literal="credentials=${ack_credentials}" \
+    --dry-run=client -o yaml | kubectl apply -f -
+fi
+
 apply_run_tags
 activate_flux
 

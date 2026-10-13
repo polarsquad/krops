@@ -31,6 +31,7 @@ resources. There is no app source code here, only declarative infrastructure.
   - `clusters/`: EKS cluster definitions per region (`eu-north-1`,
     `eu-west-1`); `eu-north-1` also defines the self-managed management
     cluster (`clusters/management/`).
+  Credentials: none at rest (issue #379); CAPA and ACK credentials are seeded imperatively at bootstrap/pivot time from the ambient `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (optional `AWS_SESSION_TOKEN`, from `.env`), which the `aws-credentials` mise task encodes into `AWS_B64ENCODED_CREDENTIALS`; the bootstrap/pivot code stores that value for `capa-system` and decodes it into an INI shared-credentials file for `ack-system`, matching the Azure/GCP posture.
 - `mgmt/local-host/`: the local-host management variant (kind-based).
   Same layout as `mgmt/aws/` (`clusters/docker`, `capi-providers/`,
   `addons/`, `infrastructure/`) with no cloud dependencies.
@@ -254,10 +255,10 @@ resources. There is no app source code here, only declarative infrastructure.
 3. Secrets via SOPS + age. Encrypted manifests are named `*.sops.yaml` and
    only `data`/`stringData` fields are encrypted (per `.sops.yaml`). Never
    commit plaintext secrets; `age.agekey` and `.env` are gitignored and must
-   stay that way. Encrypt with `mise run sops-encrypt <file>`. AWS key rotation
-   must cover CAPA, management ACK, and `.env` together; follow
-   `docs/secrets.md` and verify both controller consumers after merge before
-   declaring replacement adoption.
+   stay that way. Encrypt with `mise run sops-encrypt <file>`. AWS credentials
+   are not stored in Git: AWS key rotation means updating `.env` and re-running
+   bootstrap/pivot, which seed the CAPA and ACK secrets imperatively; see
+   `docs/secrets.md` for the procedure.
 4. Run `mise run validate` before pushing. PRs are reviewed as rendered Flux
    diffs by the konflate GitHub Actions workflow (backed by an in-cluster
    instance), so what you push is what gets reviewed.

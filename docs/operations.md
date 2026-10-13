@@ -10,7 +10,10 @@ intentionally omits the development-only Go toolchain and the Zarf CLI; a
 pinned Python and uv are present only as a runtime backend for azure-cli and
 gcloud.
 The host needs the repository checkout and a running Docker engine or Podman
-5.5+.
+5.5+. Lifecycle runs also download the pinned `go` and `zarf` tools through mise
+at runtime (the toolbox container is ephemeral, so this repeats on every
+run); outbound access to their release hosts is needed. This is unintended
+and tracked in #601.
 
 The toolbox image is published to `ghcr.io/polarsquad/krops-toolbox` for
 Linux amd64 and arm64 as `X.Y.Z`, `X.Y`, and stable `latest`, signed with
@@ -116,7 +119,13 @@ values:
   wrapper's supported syntax; use simple assignments instead. Unsupported
   or malformed parsed values are skipped with a warning that names only the key.
 
-`tests/test-toolbox-run-env-precedence.py` pins this behavior and, when mise
+Engine detection tries `docker info` first; if that fails (for example because
+the current user cannot access the socket), it silently falls back to
+`podman info`. On Linux, see
+[Host-side access after a toolbox local-host run (Linux)](#host-side-access-after-a-toolbox-local-host-run-linux)
+for socket permission steps.
+
+`tests/test-toolbox-run-env-precedence.py` pins the `.env`-precedence behavior above and, when mise
 is installed, checks it against mise itself in isolated temporary state. CI requires
 that cross-check. Parsing never evaluates shell commands. The wrapper then passes only a fixed set of
 values into the container, built by `build_env_args` from the
@@ -202,7 +211,10 @@ Rules that apply to every helper run:
   together with `--network kind`: they then keep the CAPD-recorded
   kind-network endpoint instead of rewriting it to `127.0.0.1`, which inside
   a container is the container itself. A kubeconfig exported that way works
-  from later toolbox runs on the kind network, not from host `kubectl`.
+  from later toolbox runs on the kind network. On macOS, the kind-network
+  address is not routable from the host (use the macOS section below for the
+  port-mapped form). On Linux with a rootful engine, it works from the host
+  after fixing file ownership (see the Linux section).
 - `MISE_AUTO_INSTALL=0` is required. The mounted `mise.toml` pins dev-only
   tools (`zarf`, `go`) that the image does not carry; without the flag mise
   tries to install them, and as a non-root user that fails with `Permission
@@ -228,6 +240,28 @@ Host-side on purpose: `mise run validate` (repository development, see
 [Validation](#validation)) and `mise -E local-host run podinfo-port-forward`
 (the browser is on the host; a toolbox form is shown with the local-host
 chain below).
+
+**Host mise version.** Host mise is only needed for `mise run validate` and
+`mise -E local-host run podinfo-port-forward`; everything else runs inside the
+toolbox, whose mise is pinned in the image. `mise.toml` sets `min_version`;
+distribution packages often lag behind it, causing the mise shell hook to
+error on every `cd` into the checkout. To use those two tasks, install a
+current mise (see <https://mise.jdx.dev>; or `mise self-update` for
+installer-based installs). To silence the hook on a host that does not need
+those tasks, ignore the checkout's config:
+
+```sh
+# In your shell rc (portable; works on all mise versions):
+export MISE_IGNORED_CONFIG_PATHS="/abs/path/to/krops"
+
+# Or in ~/.config/mise/miserc.toml (current mise only):
+ignored_config_paths = ["/abs/path/to/krops"]
+```
+
+Note: `mise settings add ignored_config_paths <path>` is rejected on current
+mise; that setting must be written to `~/.config/mise/miserc.toml` or set via the env var, not via the CLI.
+Ignoring the checkout also disables `validate` and `podinfo-port-forward` from
+within it.
 
 ### Verifying a toolbox release
 
@@ -794,8 +828,10 @@ kubeconfig carries.
 With Podman on macOS the same limitation applies inside the podman machine
 VM; use `podman port` in place of `docker port`.
 
-On Linux the host routes to the `kind` network directly, so
-`.kube/krops-mgmt.yaml` works as-is and no rewrite is needed.
+On Linux with a rootful engine, the host routes to the `kind` network directly
+and no kubeconfig rewrite is needed. See
+[Host-side access after a toolbox local-host run (Linux)](#host-side-access-after-a-toolbox-local-host-run-linux)
+for file ownership and Docker socket access.
 
 The unaffected alternative is a one-off toolbox container attached to the
 `kind` network, where the recorded address resolves with no rewrite:
@@ -813,6 +849,86 @@ host forms; run them against the rewritten copy.
 
 Teardown is unaffected: it reads the management kubeconfig from inside the
 toolbox, which is attached to the `kind` network.
+
+### Host-side access after a toolbox local-host run (Linux)
+
+**Scope.** This section applies to native Docker Engine or rootful Podman on
+Linux. With Docker Desktop for Linux (which runs the engine in a VM), follow
+the macOS section instead. Rootless engines keep container networks in their
+own namespace, so the `kind` address does not route from the host there either.
+
+#### Docker socket access
+
+If the current user cannot access `/var/run/docker.sock`, `docker info` fails
+and `scripts/toolbox-run.sh` silently falls back to `podman info`, which then
+fails on the rootful Podman socket (`/run/podman/podman.sock`).
+
+Fix: add your user to the `docker` group and log out and back in:
+
+```sh
+sudo usermod -aG docker "$USER"
+newgrp docker  # or log out and back in
+docker info    # confirm it works without sudo
+```
+
+Note: `docker` group membership is root-equivalent (the daemon runs as root and
+accepts commands from group members).
+
+As an alternative, pin the engine in `.env` so a socket problem fails on Docker
+instead of falling back silently:
+
+```sh
+CONTAINER_ENGINE=docker
+```
+
+#### File ownership
+
+The toolbox runs as root; on a rootful engine its writes into the checkout are
+root-owned. Affected files: `.kube/kind.yaml`, `.kube/krops-mgmt.yaml` (mode
+0600, so host `kubectl` gets a permission denied), and
+`local-workload.kubeconfig` if you have run the `kubeconfigs` cluster task.
+
+Fix:
+
+```sh
+sudo chown -R "$(id -u):$(id -g)" .kube
+sudo chown "$(id -u):$(id -g)" local-workload.kubeconfig 2>/dev/null || true
+```
+
+Repeat when a later lifecycle run recreates those files (teardown and
+re-bootstrap, for example). Rewrites of an existing file keep your ownership.
+
+This is not needed on Docker Desktop for Linux or rootless engines.
+
+#### Management cluster access
+
+After fixing ownership, the management kubeconfig works directly from the host:
+
+```sh
+export KUBECONFIG="$PWD/.kube/krops-mgmt.yaml"
+flux get kustomizations --watch
+```
+
+#### Workload cluster access
+
+Linux hosts route the `kind` network directly. Export the CAPD workload
+kubeconfig with its kind-network endpoint and use it from host `kubectl`
+without a port mapping:
+
+```sh
+docker run --rm --network kind -v "$PWD:/workspace" -w /workspace \
+  -e KUBECONFIG=/workspace/.kube/krops-mgmt.yaml \
+  --entrypoint clusterctl "$TOOLBOX_IMAGE" get kubeconfig local-workload -n default > local-workload.kubeconfig
+kubectl --kubeconfig local-workload.kubeconfig port-forward -n podinfo service/podinfo 9898:9898
+```
+
+The redirect runs in the host shell, so the file is owned by you. Use
+`local-workload.kubeconfig` (gitignored; the default for
+`mise -E local-host run podinfo-port-forward`). The `workload.kubeconfig` name
+from some earlier examples is not gitignored; avoid it.
+
+`mise -E local-host run podinfo-port-forward` then works unchanged once
+ownership and kubeconfig export are done.
 
 ### Verifying the full chain
 

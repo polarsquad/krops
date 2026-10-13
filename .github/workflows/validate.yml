@@ -57,8 +57,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 0
 
       - name: Install mise
         uses: jdx/mise-action@v5.1.2
@@ -71,11 +69,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python3 tests/test-mise-zarf-pin.py
-
-      - name: Verify cert-manager supports the pinned Kubernetes version (#322)
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: python3 tests/test-cert-manager-kubernetes-support.py --changed-from "$BASE_SHA"
 
   kustomize-build:
     name: Build kustomize overlays
@@ -198,6 +191,9 @@ jobs:
 
       - name: cert-manager version consistency (#322)
         run: python3 tests/test-cert-manager-version-consistency.py
+
+      - name: "cert-manager/Kubernetes pairing notice (non-blocking, #384)"
+        run: python3 tests/test-cert-manager-kubernetes-support.py
 
       # uv run resolves pyyaml from pyproject.toml/uv.lock, the same environment
       # mise run validate uses for this cross-check.

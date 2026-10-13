@@ -581,7 +581,7 @@ the [Air-gapped krops guide](./airgap.md).
 Terraform and OpenTofu store desired state in HCL and a state file and apply
 it in discrete plan/apply runs; krops stores it as Kubernetes resources in Git
 that controllers reconcile continuously, so there is no snapshot to drift,
-lock, or corrupt. One control plane covers infrastructure and workloads, so
+no locks to fight or corrupt. One control plane covers infrastructure and workloads, so
 RBAC, policy, and audit span both, and cluster lifecycle and workload delivery
 form one dependency graph instead of a Terraform-built cluster that no longer
 manages what runs inside it.

@@ -18,7 +18,7 @@ Flux or CAPI reconciliation architecture.
 ## Architecture pillars
 
 These principles guide every change to krops. A change that departs from
-one states why in its pull request or in a `docs/proposals/` entry.
+one states why in its pull request.
 
 ### One reconciliation loop, minimal abstractions
 
@@ -576,3 +576,119 @@ See the architecture diagram in [docs/air-gap-infra.svg](air-gap-infra.svg) and
 the [Air-gapped krops guide](./airgap.md).
 
 ![krops air-gap architecture](air-gap-infra.svg)
+
+## Pattern comparisons
+
+Terraform and OpenTofu store desired state in HCL and a state file and apply
+it in discrete plan/apply runs; krops stores it as Kubernetes resources in Git
+that controllers reconcile continuously, so there is no snapshot to drift,
+no locks to fight or corrupt. One control plane covers infrastructure and workloads, so
+RBAC, policy, and audit span both, and cluster lifecycle and workload delivery
+form one dependency graph instead of a Terraform-built cluster that no longer
+manages what runs inside it.
+
+krops ships no controller of its own: it combines Cluster API for clusters,
+each cloud's native operator ([ACK](https://aws-controllers-k8s.github.io/docs/)
+on AWS) for cloud resources, and Flux for GitOps. If those resource APIs
+already say what you mean, krops does not wrap them to say it again. Least
+abstraction and one reconciliation loop are the pillars the pattern is held
+to.
+
+[Crossplane](https://www.crossplane.io/) is the closer comparison, and in
+one use case it is now a sort-of competitor: the composition story, turning
+provider resources into higher-level platform APIs, is served by Flux
+ResourceSets templating plain Kubernetes resources. The overlap is that use
+case; the scope still differs. Crossplane brings its own provider packages,
+XRDs, and composition machinery, a second reconciliation plane to operate,
+while krops keeps one reconciliation loop over the upstream APIs of the
+components it already runs. Crossplane remains the evaluated alternative
+resource plane, selectable per environment instead of the native operator,
+never both, with Flux still delivering everything from Git. See
+[Crossplane as a resource plane](crossplane.md).
+
+The management cluster is not a long-lived local kind cluster: the bootstrap
+kind cluster is disposable, and after the pivot the management cluster manages
+itself through the same GitOps flow it drives.
+
+Pull requests are reviewed as **rendered** Flux diffs (blast radius, image
+changes, render failures) by [konflate](konflate.md): a GitHub Actions
+workflow runs it on every PR push as a merge gate, and an in-cluster instance
+posts the summary to the PR, so what you review is byte-for-byte what
+reconciles.
+
+## Repository layout
+
+```
+.
+├── .github/workflows/             Validation, Rust/toolbox CI, docs CI and
+│                                  Pages deploy, the konflate PR render gate,
+│                                  the nightly air-gapped bundle build, and
+│                                  signed toolbox releases
+├── airgap/                        Zarf air-gap bundle, image inventory, scripts
+├── virtualized-e2e/               WireMock-virtualized e2e harness (#355):
+│                                  lib/ shared components + one arm per
+│                                  cloud (aws/ is the reference); not
+│                                  Flux-reconciled, no mise task yet
+├── bootstrap-rs/                  Lifecycle CLI, toolbox Dockerfile, Rust tests
+├── bootstrap.toml                 Repository-owned lifecycle configuration
+├── bootstrap.sh / pivot.sh /      Native shell references and fallback paths;
+│   teardown.sh                    retained until both parity gates pass
+├── scripts/toolbox-run.sh         Docker/Podman wrapper: the lifecycle entry
+│                                  point (bootstrap, pivot, teardown)
+├── tests/                         Config and Renovate coverage cross-checks
+├── mkdocs.yml                     MkDocs Material config for the docs site
+├── pyproject.toml / uv.lock       Python project for the docs site build
+├── tools/assemble_docs.py         Assembles build/docs/ from README.md + docs/
+├── website/                       Docs site assets: colour scheme CSS, CNAME
+├── docs/                          Detailed documentation (linked from README.md)
+├── mise.toml / mise.*.toml        Pinned toolchain (the toolbox image is
+│                                  built from these pins) and the helper
+│                                  task definitions (run in the toolbox with
+│                                  --entrypoint mise; validate and the
+│                                  podinfo port-forward stay host tasks)
+├── renovate.json5                 Hosted Renovate discovery and grouping rules
+├── mgmt/aws/                      Synced by the MANAGEMENT cluster's Flux
+│   ├── infrastructure/           cert-manager, CAPI operator, CAPA identity,
+│   │                              ACK controllers (S3, RDS, IAM) and the
+│   │                              per-cluster Bucket/DBInstance/reader Role
+│   │                              CRs, account-global IAM (reader console
+│   │                              user), konflate (rendered Flux PR review)
+│   ├── capi-providers/           capi-system, capa-system (SOPS creds),
+│   │                              caaph-system
+│   ├── addons/flux-apps/         Installs Flux on each workload cluster
+│   │                              (HelmChartProxy + ResourceSet)
+│   └── clusters/                 EKS cluster defs: eu-north-1, eu-west-1
+│                                  (x86 + ARM MachinePools); eu-north-1 also
+│                                  carries the self-managed management cluster
+├── mgmt/local-host/              OCI-synced CAPI/CAPD local workload cluster
+│   │                              and its management cluster definition
+│   ├── infrastructure/           capi-operator, cert-manager
+│   ├── capi-providers/           caaph-system, capd-system, capi-system
+│   ├── addons/                   kindnet CNI, flux-apps
+│   └── clusters/                 docker (workload), management (self-managed)
+├── mgmt/local-talos/             Single-node Talos management cluster on
+│   │                              bare metal via Tinkerbell (CAPT);
+│   │                              GitHub-synced like mgmt/aws
+│   ├── infrastructure/           capi-operator, cert-manager
+│   ├── capi-providers/           cabpt-system, cacppt-system, capi-system,
+│   │                              capt-system (Tinkerbell)
+│   └── clusters/                 management (self-managed)
+├── mgmt/azure/                    AKS management cluster (CAPZ + ASO)
+├── mgmt/gcp/                      GKE management cluster (CAPG + Config
+│   │                              Connector operator + WIF identities)
+└── workload/                     Synced by each WORKLOAD cluster's Flux
+    ├── base/                     Intentionally empty since #346 (ACK moved
+    │                              to the management cluster); ready for a
+    │                              future application workload
+    ├── azure-base/               cert-manager only (the Azure workload
+    │                              resources moved to the management cluster,
+    │                              #559)
+    ├── gcp-base/                 intentionally empty (issue #560: KCC and
+    │                              the GCP resources moved to the management
+    │                              cluster's workload-resources)
+    ├── local-host/               OCI-synced Podinfo workload overlay
+    ├── eu-north-01/              Per-cluster overlay (sync target)
+    ├── eu-west-01/               Per-cluster overlay (sync target)
+    ├── swedencentral-01/         Per-cluster overlay -> azure-base
+    └── europe-north1-01/         Per-cluster overlay -> gcp-base
+```

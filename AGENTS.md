@@ -219,10 +219,7 @@ resources. There is no app source code here, only declarative infrastructure.
   in `.env`; mise reloads it inside the container. The regression gate
   `tests/test-oci-push-worktree.py` runs in validate and CI; the scripts remain the native path
   for development.
-- `docs/`: detailed documentation (see the table in README.md).
-  `docs/proposals/` holds design proposals, under review or accepted (an
-  accepted one points at the `docs/` page that records its decisions); the
-  docs site assembler includes that folder.
+- `docs/`: detailed documentation.
 - `mise.toml`: pinned tool versions and all task entrypoints.
   `mise.aws.toml` is the AWS tool layer (aws-cli, clusterawsadm),
   activated with `MISE_ENV=aws`. `mise.azure.toml` (azure-cli) and

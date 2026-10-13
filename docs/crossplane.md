@@ -2,9 +2,20 @@
 
 This page records the decisions for running
 [Crossplane](https://www.crossplane.io/) on the management cluster as an
-alternative to each cloud's native operator. It is the accepted outcome of the
-[Crossplane management-cluster proposal](proposals/crossplane-management-cluster.md)
-(tracking issue [#313](https://github.com/polarsquad/krops/issues/313)).
+alternative to each cloud's native operator (tracking issue
+[#313](https://github.com/polarsquad/krops/issues/313)).
+
+Landscape note: the composition use case, turning provider resources into
+higher-level platform APIs, no longer belongs to Crossplane alone. Flux
+ResourceSets serve it from plain templated Kubernetes resources, which makes
+Crossplane a sort-of competitor to the krops pattern in that use case. The
+overlap is the use case, not the scope: Crossplane brings its own provider
+packages, XRDs, and composition machinery, a second reconciliation plane to
+operate, while the krops pillars are the least abstraction that still
+reconciles and a single reconciliation loop. The decision below stays scoped
+to the one place Crossplane remains under evaluation: the per-environment
+alternative resource plane, replacing the cloud's native operator, never
+running beside it.
 
 Status: decided, not yet implemented. Nothing on this page is reconciled
 today; every environment runs its native operator. The slices below land it
@@ -162,7 +173,7 @@ local-host bootstrap stays as fast as it is today.
 
 ## Decided open questions
 
-The proposal left these open for review:
+The design evaluation addressed these review questions:
 
 | Question | Decision |
 |---|---|

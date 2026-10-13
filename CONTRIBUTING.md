@@ -28,8 +28,10 @@ Two facts follow from that table and shape what a contributor can rely on:
   native reference path. They are retired only after the CLI passes a live
   parity run on every environment. `local-host` has passed; the `aws` run
   (#143) has not happened yet because it provisions a billed EKS cluster.
-- No semver toolbox release exists yet. Until a `v*` tag is pushed, build the
-  image from your checkout as the README shows.
+- No semver toolbox release exists yet. Published images live at
+  `ghcr.io/polarsquad/krops-toolbox` (`X.Y.Z`, `X.Y`, and `latest`); build
+  the image from your checkout only for unreleased changes
+  (`docs/operations.md`).
 
 Outside the milestones, the open backlog groups into four themes. These are
 the best places to start if you are new to the repository.

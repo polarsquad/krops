@@ -88,7 +88,7 @@ OUT = ROOT / "build" / "docs"
 
 
 def assemble(krops: Path = KROPS, src: Path = SRC, out: Path = OUT) -> Path:
-    """Recreate `out`: README -> index.md, docs/*.md, docs/*.svg and docs/proposals/*.md, then the src/ overlay."""
+    """Recreate `out`: README -> index.md, docs/*.md, docs/*.svg, then the src/ overlay."""
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)

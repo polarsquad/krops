@@ -177,7 +177,6 @@ deployment:
 - [AWS IAM](docs/aws-iam.md), [Workload resources](docs/workload-resources.md), and [ACK troubleshooting](docs/troubleshooting-ack.md)
 - [konflate](docs/konflate.md): rendered pull request reviews and GitHub Actions gating
 - [Air-gapped krops](docs/airgap.md): Zarf bundle generation, offline installation, and update drills
-- [Proposals](docs/proposals/README.md): design proposals under review or accepted
 
 ## Repository layout
 

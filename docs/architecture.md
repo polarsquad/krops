@@ -18,7 +18,7 @@ Flux or CAPI reconciliation architecture.
 ## Architecture pillars
 
 These principles guide every change to krops. A change that departs from
-one states why in its pull request or in a `docs/proposals/` entry.
+one states why in its pull request.
 
 ### One reconciliation loop, minimal abstractions
 

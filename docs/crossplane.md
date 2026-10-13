@@ -2,9 +2,8 @@
 
 This page records the decisions for running
 [Crossplane](https://www.crossplane.io/) on the management cluster as an
-alternative to each cloud's native operator. It is the accepted outcome of the
-[Crossplane management-cluster proposal](proposals/crossplane-management-cluster.md)
-(tracking issue [#313](https://github.com/polarsquad/krops/issues/313)).
+alternative to each cloud's native operator (tracking issue
+[#313](https://github.com/polarsquad/krops/issues/313)).
 
 Landscape note: the composition use case, turning provider resources into
 higher-level platform APIs, no longer belongs to Crossplane alone. Flux
@@ -169,7 +168,7 @@ bootstrap stays as fast as it is today.
 
 ## Decided open questions
 
-The proposal left these open for review:
+The design evaluation addressed these review questions:
 
 | Question | Decision |
 |---|---|

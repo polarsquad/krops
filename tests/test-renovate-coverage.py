@@ -34,6 +34,8 @@ EXPECTED = {
     "mgmt/local-host/clusters/management/cluster.yaml": {
         "kindest/node",
     },
+    "mgmt/local-host/clusters/docker/cluster-class.yaml": {"kindest/node"},
+    "mgmt/local-host/clusters/management/cluster-class.yaml": {"kindest/node"},
     "mgmt/local-talos/capi-providers/capi-system/providers.yaml": {
         "kubernetes-sigs/cluster-api",
     },
@@ -112,6 +114,30 @@ def assert_single_registry_per_helm_package(result) -> list[str]:
     return errors
 
 
+KINDEST_NODE_DIGEST_FILES = [
+    "mgmt/local-host/clusters/docker/cluster-class.yaml",
+    "mgmt/local-host/clusters/management/cluster-class.yaml",
+]
+
+
+def assert_kindest_node_digests_extracted(result) -> list[str]:
+    """Every kindest/node pin in the cluster classes must carry its digest.
+
+    A tag-only match would let Renovate bump the tag while leaving the old
+    sha256 in place, producing an image that no longer matches its tag.
+    """
+    errors = []
+    for package_file in KINDEST_NODE_DIGEST_FILES:
+        for dep in result.deps_by_file.get(package_file, []):
+            if dep.get("depName") != "kindest/node":
+                continue
+            if not str(dep.get("currentDigest") or "").startswith("sha256:"):
+                errors.append(
+                    f"{package_file}: kindest/node extracted without currentDigest (tag-only bump would leave a stale digest)"
+                )
+    return errors
+
+
 def assert_no_repo_registry_warnings() -> list[str]:
     """Regression for the full repo dry-run that triggered #187.
 
@@ -156,14 +182,17 @@ def main() -> int:
         if deps - result.dep_names(path)
     }
     registry_errors = assert_single_registry_per_helm_package(result)
+    digest_errors = assert_kindest_node_digests_extracted(result)
     repo_registry_errors = assert_no_repo_registry_warnings()
-    if result.returncode or missing or registry_errors or repo_registry_errors:
+    if result.returncode or missing or registry_errors or digest_errors or repo_registry_errors:
         print("Renovate coverage check failed", file=sys.stderr)
         print(f"exit code: {result.returncode}", file=sys.stderr)
         if missing:
             for path, deps in sorted(missing.items()):
                 print(f"{path}: missing detection for {deps}", file=sys.stderr)
         for message in registry_errors:
+            print(message, file=sys.stderr)
+        for message in digest_errors:
             print(message, file=sys.stderr)
         for message in repo_registry_errors:
             print(message, file=sys.stderr)

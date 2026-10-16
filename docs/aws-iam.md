@@ -296,13 +296,22 @@ If a credential is suspected compromised, contain it immediately, then assess im
    ```sh
    aws iam update-access-key --user-name capi-demo --access-key-id <ACCESS_KEY_ID> --status Inactive
    ```
-2. Issue a new key and update `.env`, following [Setting / rotating AWS credentials](./secrets.md#setting-rotating-aws-credentials). No re-encryption of SOPS secrets is needed: credentials are seeded imperatively from `.env` at bootstrap/pivot time.
-3. Delete the old key once the new one is live and bootstrap has been re-run with the new credential.
+2. Issue a new key and update `.env`, following [Setting / rotating AWS credentials](./secrets.md#setting--rotating-aws-credentials). No re-encryption of SOPS secrets is needed: credentials are seeded imperatively from `.env` at bootstrap/pivot time.
+3. Verify Flux reconciliation and successful AWS operations from CAPA and all
+   management ACK controllers (S3, RDS, IAM), plus replacement adoption by any
+   running bootstrap process. Keep the compromised key disabled throughout
+   recovery, then delete it once those checks pass.
 
 **(b) `krops-ci-e2e` OIDC role** (normally covers itself; see [CI access](#ci-access-github-actions-oidc-and-the-krops-ci-e2e-role)):
 
-1. Delete or update the OIDC provider to break new assumptions.
-2. To cut in-flight sessions (which otherwise survive up to 4 hours), attach an inline Deny to the role:
+1. Delete or update the OIDC provider to block new assumptions; verify that
+   attempts to obtain new sessions fail after IAM propagation.
+2. Attach the following inline Deny to the role to revoke existing sessions.
+   Use an explicit UTC cutoff (`YYYY-MM-DDTHH:MM:SSZ`) covering sessions issued
+   while the assumption block was propagating. Refresh the cutoff if later
+   sessions were issued before the block became effective. See
+   [AWS role-session revocation](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_revoke-sessions.html)
+   for the cutoff and propagation behavior:
    ```json
    {
      "Version": "2012-10-17",
@@ -320,7 +329,16 @@ If a credential is suspected compromised, contain it immediately, then assess im
      ]
    }
    ```
-   Remove the inline Deny once the investigation is complete.
+3. Verify the deployed policy and denied access with affected session
+   credentials. Keep the Deny until **every affected session has expired**,
+   even if the investigation finishes sooner: removing it can restore access
+   to unexpired credentials. Read `MaxSessionDuration` with
+   `aws iam get-role --role-name krops-ci-e2e`; the documented maximum is four
+   hours, but use the maximum applicable when the affected sessions were
+   issued, not a newly lowered limit. If individual expiry times are unknown,
+   retain the Deny until at least the final cutoff plus that maximum duration.
+   Restore new assumptions only after fixing the compromise; new trusted
+   sessions issued after the cutoff can work while the Deny remains.
 
 **(c) `krops-reader` console login:**
 
@@ -328,11 +346,61 @@ If a credential is suspected compromised, contain it immediately, then assess im
    ```sh
    aws iam delete-login-profile --user-name krops-reader
    ```
-2. Recreate it when ready to restore access.
+2. Deleting a login profile prevents new password logins; it does not revoke
+   existing console or assumed-role credentials. In
+   `mgmt/aws/infrastructure/aws-global-iam/reader-user.yaml`, add an explicit
+   inline Deny of `sts:AssumeRole` on `arn:aws:iam::*:role/krops-*-reader`
+   to block new assumptions by the reader, including from existing user
+   sessions. Also add the timestamp-conditioned Deny from (b) as a separate
+   user inline policy in that same Git-owned file, with a UTC cutoff covering
+   all compromised IAM-user console sessions. This revokes their permissions
+   as described in [AWS user-session revocation](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_admin-change-user.html).
+   Preserve the unconditional assumption block through investigation and
+   password recovery. Refresh the user cutoff if sessions were issued during
+   containment propagation; verify the deployed user policy and that old user
+   credentials cannot call `sts:AssumeRole`. The user-session policy does not
+   revoke credentials already issued by a role, so step 3 is also required.
+3. In `mgmt/aws/infrastructure/workload-resources/role.yaml`, add the
+   timestamp-conditioned inline Deny from (b) to **both**
+   `krops-eu-north-1-workload-reader` and
+   `krops-eu-west-1-workload-reader`. A user-policy change alone does not
+   remove permissions from credentials already issued by those roles. This
+   role Deny affects all sessions before the cutoff, including other readers.
+   Merge these Git-owned policy changes to `main`; verify Flux readiness,
+   ACK `ResourceSynced` status, the actual AWS user/role policies, blocked new
+   assumptions, and denied access with pre-cutoff role credentials. Do not
+   patch the cluster or rely on an out-of-band IAM edit that ACK could undo.
+   Containment is not established while reconciliation or IAM propagation
+   remains incomplete. Refresh the UTC cutoff to cover sessions issued during
+   that interval.
+4. Check `MaxSessionDuration` on each deployed role with `aws iam get-role`.
+   Retain each role Deny until all affected sessions expire, using the final
+   cutoff plus the maximum duration applicable at issuance if exact expiries
+   are unknown. Investigation completion or password replacement is not a
+   reason to remove it early.
+5. Recreate the login profile with a new, unique password and required reset
+   only after addressing the compromise. Restore the user's assumption
+   permission through Git only after the user-session Deny has converged and
+   been verified to block pre-cutoff user credentials; retain that Deny so old
+   user sessions cannot obtain fresh role credentials after password recovery.
+   Verify a trusted post-cutoff login can assume the roles while an old user
+   session cannot. Keep the user-session Deny until **all affected IAM-user
+   sessions expire**: establish their expiry times or a verified upper bound
+   for the console/temporary credential sessions actually issued. A role's
+   `MaxSessionDuration` is not the IAM-user session lifetime. If user-session
+   expiry cannot be established, leave that Deny in place. Likewise retain
+   both role-session Denies until their separate expiry condition in step 4
+   passes. Remove each Deny through Git only after its respective user or role
+   credentials have expired, then verify Flux/ACK/AWS convergence.
 
 **(d) age key compromise:**
 
-An age-key compromise implies credential (a), because the age key decrypts both AWS credential SOPS secrets. Rotate per [Secrets management](./secrets.md).
+The age identity exposes both AWS profiles, regional GitHub pull PATs, and
+both konflate tokens, including still-valid values in historical ciphertext.
+Shared bootstrap credentials may also be affected. Follow
+[Age-key compromise recovery](./secrets.md#age-key-compromise-recovery) to
+revoke exposed credentials and replace the encryption identity and data keys;
+routine credential rotation alone is insufficient.
 
 ### Impact assessment
 

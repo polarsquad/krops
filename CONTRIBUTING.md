@@ -124,6 +124,10 @@ These come from `AGENTS.md` and are not negotiable.
 3. Secrets go through SOPS and age. Encrypted files are named `*.sops.yaml`
    and only `data`/`stringData` fields are encrypted. `age.agekey` and `.env`
    are gitignored and must stay that way. Never commit plaintext credentials.
+   For age-identity compromise, revoke all still-valid current/historical
+   exposed credentials, replace recipients and data keys, and coordinate
+   bootstrap-owned live secret replacement as described in
+   [Age-key compromise recovery](docs/secrets.md#age-key-compromise-recovery).
 4. Run `mise run validate` before pushing.
 
 Additional conventions:

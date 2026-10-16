@@ -258,7 +258,10 @@ resources. There is no app source code here, only declarative infrastructure.
    stay that way. Encrypt with `mise run sops-encrypt <file>`. AWS credentials
    are not stored in Git: AWS key rotation means updating `.env` and re-running
    bootstrap/pivot, which seed the CAPA and ACK secrets imperatively; see
-   `docs/secrets.md` for the procedure.
+   `docs/secrets.md` for the procedure. Age-identity compromise requires revoking
+   all still-valid current/historical exposed credentials, replacing the
+   recipient and data keys, and coordinating bootstrap-owned live secret
+   replacement; follow `docs/secrets.md` (Age-key compromise recovery).
 4. Run `mise run validate` before pushing. PRs are reviewed as rendered Flux
    diffs by the konflate GitHub Actions workflow (backed by an in-cluster
    instance), so what you push is what gets reviewed.

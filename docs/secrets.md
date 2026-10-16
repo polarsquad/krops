@@ -71,6 +71,8 @@ re-encrypt every `*.sops.yaml` under `mgmt/` so they target your key:
 krops_mise run sops-updatekeys
 ```
 
+<a id="setting--rotating-aws-credentials"></a>
+
 ## Setting / rotating AWS credentials
 
 AWS credentials are **not** stored in Git (issue #379): the CAPA and ACK
@@ -151,3 +153,74 @@ krops_mise run sops-encrypt mgmt/aws/infrastructure/konflate/konflate-token.sops
 Keep the two tokens separate: the read token (`KONFLATE_TOKEN`) should carry
 no write scope, and the write token is used only for konflate's write-back
 (the PR summary comment and the `Konflate` commit status).
+
+
+## Age-key compromise recovery
+
+Treat every value decryptable by the compromised identity as exposed, including
+historical Git revisions, clones, and backups. Re-encrypting the current tree
+cannot make historical ciphertext secret again. Use a trusted workstation and
+coordinate recovery with the account owner and repository maintainers.
+
+1. Inventory current and historical encrypted credentials without printing
+   plaintext into logs or tracked files. Immediately disable all still-valid
+   exposed AWS access keys (CAPA, ACK, and any shared bootstrap `.env` key),
+   and revoke exposed GitHub PATs: every regional workload pull secret across
+   AWS/Azure/GCP, `KONFLATE_TOKEN`, and `KONFLATE_WRITE_TOKEN`. Include older
+   values that remain valid. If bootstrap's `GITHUB_TOKEN` shares an exposed
+   PAT, revoke it too. Check other credentials accessible from the compromised
+   host or identity; do not assume the current Git tree bounds the exposure.
+   Follow [AWS containment](./aws-iam.md#e2e-account-incident-and-credential-revocation)
+   for affected AWS sessions and assess GitHub access and write activity.
+2. Generate a fresh age identity on the trusted workstation; securely replace
+   the gitignored `age.agekey` (keygen refuses to overwrite it). Update
+   `AGE_KEY_FILE` and any `AGE_PUBLIC_KEY` override to match. Replace the
+   compromised public recipient in `.sops.yaml` with the new recipient and
+   only other explicitly trusted recipients. Inventory **every** encrypted
+   manifest and its SOPS envelope; remove the compromised recipient everywhere,
+   including envelopes carrying recipients not present in `.sops.yaml`.
+3. Use the old identity only in the isolated recovery process when necessary
+   to decrypt existing files, never as a recipient of new ciphertext. Rewrap
+   every envelope with `sops updatekeys --yes <file>` against the new
+   configuration, then use `sops rotate --in-place <file>` with the trusted
+   replacement identity for each manifest to generate a fresh data key.
+   `sops-updatekeys` alone changes recipients, not data keys. Complete both
+   operations **before** inserting replacement credentials, so new values are
+   never encrypted for the compromised recipient. See
+   [SOPS key management](https://getsops.io/docs/usage/key-management/).
+   Then replace exposed credential values with newly issued, validated values:
+   update AWS `.env`, CAPA, and ACK together using the rotation procedure above;
+   update every regional pull secret and both konflate tokens using their
+   respective procedures. Preserve encryption of all `data`/`stringData`
+   values; leave no plaintext in Git.
+4. Coordinate live replacement **before activating the new ciphertext**.
+   Management `flux-system/flux-github-pat` is bootstrap-owned, not Git-owned;
+   editing regional manifests or `.env` does not update it. Management
+   `flux-system/sops-age` and `default/sops-age` are also bootstrap-owned;
+   the latter decrypts the remote-apply workload pull secrets. Inventory active
+   bootstrap and post-pivot management clusters and any additional copies of
+   these identities. Have the operator replace these bootstrap-owned inputs
+   through a scoped, coordinated recovery operation, removing every entry
+   containing the compromised private identity. Confirm the new Git credential
+   can fetch the recovery commit and the new age identity is available in both
+   namespaces before merge/reconciliation. Do not blindly rerun bootstrap: it
+   performs lifecycle operations beyond secret replacement. Git-owned Secrets
+   must still change in Git and converge through Flux; the operator-owned
+   bootstrap prerequisites require this separate recovery step.
+5. In isolated local processes, verify every resulting manifest decrypts with
+   only the replacement identity and **fails** with only the compromised
+   identity (exclude other identity files/environment inputs from that check).
+   Check each SOPS envelope contains only trusted recipients and compare
+   replacement credential values without printing them. Run `mise run validate`
+   and review the encrypted diff before merging to `main`.
+6. After merge, verify management GitRepository fetches and Flux decryption in
+   both namespaces, CAPA and each ACK controller's successful AWS operations,
+   each workload Flux GitRepository fetch with the replacement regional PAT,
+   and konflate's read and write-back access with their separate tokens.
+   Verify running bootstrap processes and local `.env` inputs use replacements.
+   Secret readiness alone does not prove credential reload; keep old credentials
+   revoked even if reconciliation stalls. Remove compromised private-key copies
+   from live bootstrap-owned Secrets, workstations, and recovery material;
+   retain only protected incident evidence as required. Confirm provider-side
+   revocation for current and historical exposed credentials before declaring
+   recovery complete.

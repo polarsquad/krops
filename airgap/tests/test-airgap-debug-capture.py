@@ -38,6 +38,7 @@ def main() -> int:
         block for block in upload_blocks
         if "actions/upload-artifact" in block and "krops-airgap-" in block
         and "-results" in block
+        and "name: krops-airgap-update-rollback-results" not in block
     ]
     if not upload_steps:
         failures.append(f"{AIR_GAPPED_YML}: found no deployment-evidence upload steps")

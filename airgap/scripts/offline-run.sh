@@ -39,18 +39,7 @@ KUBECTL=$(command -v kubectl)
 DOCKER=$(command -v docker)
 export KUBECONFIG="$HOME/.kube/config"
 
-VERIFY_ARGS=()
-if [ -n "${ZARF_VERIFY_KEY:-}" ]; then
-  VERIFY_ARGS+=(--key "$ZARF_VERIFY_KEY")
-else
-  # AIRGAP_VERIFY_WORKFLOW_REF: see docs/airgap.md#empirical-findings.
-  VERIFY_ARGS+=(
-    --certificate-identity
-    "https://github.com/${AIRGAP_VERIFY_WORKFLOW_REF:-polarsquad/krops/.github/workflows/air-gapped.yml@refs/heads/main}"
-    --certificate-oidc-issuer
-    'https://token.actions.githubusercontent.com'
-  )
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/verify-package.sh"
 
 export CLUSTER_NAME=airgap-mgmt
 export REGISTRY_NAME=krops-registry-airgap
@@ -87,31 +76,12 @@ fi
 
 step "1. verify package signature, checksums, and embedded SBOMs"
 SBOM_OUTPUT=$(mktemp -d "${TMPDIR:-/tmp}/airgap-sbom.XXXXXX")
-# zarf verifies the signature and the checksum manifest (sboms.tar included)
-# and extracts the SBOM archive, but never parses the documents: a package
-# whose SBOM entries are not valid Syft JSON would extract cleanly. Decode
-# each document with syft's own decoder (vendored inside the zarf binary)
-# and fail unless at least one document was found and all decoded.
-sbom_found=0
-if "$ZARF" package verify "$PACKAGE" "${VERIFY_ARGS[@]}" && \
-   "$ZARF" package inspect sbom "$PACKAGE" \
-     --output "$SBOM_OUTPUT" --verify=always "${VERIFY_ARGS[@]}"; then
-  while IFS= read -r -d '' doc; do
-    sbom_found=1
-    "$ZARF" tools sbom convert "$doc" -o syft-json >/dev/null || {
-      fail "SBOM document failed to decode as Syft: $doc"
-      exit 1
-    }
-  done < <(find "$SBOM_OUTPUT" -type f -name '*.json' -print0)
+if airgap_verify_package "$PACKAGE" "$SBOM_OUTPUT"; then
+  pass "package signature, checksums, and embedded SBOMs verified offline ($SBOM_OUTPUT)"
 else
-  fail "package signature, checksums, or SBOM extraction"
+  fail "package signature, checksums, or SBOM verification (reason above)"
   exit 1
 fi
-if [ "$sbom_found" -eq 0 ]; then
-  fail "no SBOM documents extracted to $SBOM_OUTPUT"
-  exit 1
-fi
-pass "package signature, checksums, and embedded SBOMs verified offline ($SBOM_OUTPUT)"
 
 step "2. stage: docker load + kind create + seed registry"
 if CLUSTER_NAME=$CLUSTER_NAME REGISTRY_NAME=$REGISTRY_NAME REGISTRY_PORT=$REGISTRY_PORT \

@@ -47,6 +47,8 @@ jobs:
         run: python3 airgap/tests/test-airgap-host-image-tags.py
       - name: Verify the air-gapped workflow triggers, guards, and timeouts
         run: python3 airgap/tests/test-airgap-workflow-config.py
+      - name: Verify staged update rejection and offline rollback (#369)
+        run: python3 airgap/tests/test-airgap-update-rollback.py
 
       - name: Verify aws-orphan-report workflow (#380)
         run: python3 tests/test-aws-orphan-report-workflow.py

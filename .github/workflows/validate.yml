@@ -212,9 +212,6 @@ jobs:
           uv sync --locked
           uv run python tests/test-gcp-postgres.py
 
-      - name: KCC operator pin cross-check
-        run: python3 tests/test-kcc-operator-pin.py
-
       - name: kind Corefile pin vs mise.toml (#355)
         run: python3 tests/test-kind-corefile-pin.py
 

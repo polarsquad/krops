@@ -119,7 +119,7 @@ than adding CAPG to another environment:
   `wif-federate` task creates, and the pivot pins `mgmt` through
   `pivot-manifest-vars`). No service-account key exists anywhere.
 - Cloud resources for the workload cluster are reconciled by the
-  management cluster's Config Connector (pinned release bundle,
+  management cluster's Config Connector (Helm chart via OCIRepository,
   `mgmt/gcp/infrastructure/kcc-operator/`) from
   `mgmt/gcp/infrastructure/workload-resources/` (issue #560: no second
   Config Connector on the workload cluster), not by a CAPI add-on.

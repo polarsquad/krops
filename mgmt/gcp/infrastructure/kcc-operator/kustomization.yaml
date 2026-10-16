@@ -1,7 +1,5 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-# The Config Connector operator, versioned bundle manifest committed verbatim
-# (issue #72). Only the 16 operator objects are synced; the bundle samples are
-# not part of this repo.
 resources:
-  - configconnector-operator.yaml
+  - ocirepository.yaml
+  - helmrelease.yaml

@@ -81,14 +81,11 @@ resources. There is no app source code here, only declarative infrastructure.
   layout as `mgmt/aws/` (`infrastructure/`, `capi-providers/`, `addons/`,
   `clusters/`), synced from GitHub. CAPG v1.13.1
   (`capi-providers/capg-system/`) provisions GKE clusters
-  (`GCPManaged*`); the Config Connector operator ships as a pinned verbatim
-  release bundle (`infrastructure/kcc-operator/`, version comment
-  `kcc-operator-version:`) and `tests/test-kcc-operator-pin.py` (in
-  `mise run validate` and CI) keeps the committed copy byte-identical and
-  matching the version comment: Renovate bumps the comment and the operator
-  image tag, and the gate then goes red until the whole release bundle is
-  re-downloaded (same "Renovate opens, human completes" posture as the
-  Talos images). The management Config Connector also reconciles the GCP
+  (`GCPManaged*`); the Config Connector operator (`infrastructure/kcc-operator/`)
+  is deployed via Flux HelmRelease consuming the published Helm chart from
+  `lioramilbaum/config-connector-helm` (the OCIRepository pins both `ref.tag`
+  and `ref.digest`; Renovate's native Flux manager bumps them in one edit). The
+  management Config Connector also reconciles the GCP
   workload cloud CRs (`infrastructure/workload-resources/`: PSA range,
   storage bucket, Cloud SQL, per-cluster reader GSA), ordered after
   `kcc-identity` in `infrastructure/flux-ks.yaml` (issue #560). Credentials:

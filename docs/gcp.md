@@ -149,13 +149,12 @@ CAPG minors: merge one at a time and let the management cluster settle
 before the next (GKE and MachinePool are feature-gated, see
 `capi-providers/capg-system/capg-variables.yaml`).
 
-The Config Connector operator is a pinned, verbatim release bundle
-(`mgmt/gcp/infrastructure/kcc-operator/configconnector-operator.yaml`,
-version comment `kcc-operator-version:`). Renovate bumps the version
-comment and the operator image tag, but it does not rewrite the ~3500-line
-manifest: `tests/test-kcc-operator-pin.py` (in `mise run validate`) then
-goes red on purpose. Complete the bump by hand: download the new
-`release-bundle.tar.gz`, replace the file, and commit.
+The Config Connector operator is deployed via Flux HelmRelease, consuming
+the published Helm chart from `lioramilbaum/config-connector-helm`. The
+OCIRepository (`mgmt/gcp/infrastructure/kcc-operator/ocirepository.yaml`) pins
+both `ref.tag` and `ref.digest`; Renovate's native Flux manager bumps them
+together in one edit. The chart is fetched and installed automatically on the
+next Flux reconciliation.
 
 ## Known limitations
 

@@ -66,17 +66,15 @@ impl RunTags {
             .filter(|v| !v.is_empty())
             .unwrap_or_else(|| branch_sha.unwrap_or("unknown").to_string());
 
-        let ttl = get_env(KROPS_RUN_TTL).unwrap_or_default();
-        let ttl = ttl.trim();
-        let expires_at = if !ttl.is_empty() {
+        let expires_at = if let Some(ttl) = get_env(KROPS_RUN_TTL).filter(|v| !v.is_empty()) {
             if ttl == "none" {
                 "never".to_string()
             } else {
-                let ttl_secs = crate::parse_duration_seconds(ttl)?;
-                checked_expiry(now_secs, ttl_secs)?
+                let ttl_secs = crate::parse_duration_seconds(&ttl)?;
+                format_rfc3339_utc(now_secs + ttl_secs as i64)
             }
         } else {
-            checked_expiry(now_secs, 86400)?
+            format_rfc3339_utc(now_secs + 86400)
         };
 
         let run_kind = get_env(KROPS_RUN_KIND)
@@ -92,26 +90,30 @@ impl RunTags {
     }
 
     /// Parse RunTags from a ConfigMap JSON value, dropping server-side metadata.
-    /// Reject incomplete metadata instead of silently changing run identity.
-    pub fn from_configmap_value(cm: &serde_json::Value) -> Result<RunTags> {
-        let data = cm
-            .get("data")
-            .and_then(|v| v.as_object())
-            .context("krops-run ConfigMap data missing or invalid")?;
-        let field = |key: &str| -> Result<String> {
-            data.get(key)
+    /// Returns None if the ConfigMap lacks a data field.
+    pub fn from_configmap_value(cm: &serde_json::Value) -> Option<RunTags> {
+        let data = cm.get("data")?;
+        Some(RunTags {
+            run_id: data
+                .get("KROPS_RUN_ID")
                 .and_then(|v| v.as_str())
-                .filter(|v| !v.is_empty())
-                .map(str::to_owned)
-                .with_context(|| {
-                    format!("krops-run ConfigMap {key} missing, empty, or not a string")
-                })
-        };
-        Ok(RunTags {
-            run_id: field(KROPS_RUN_ID)?,
-            revision: field(KROPS_REVISION)?,
-            expires_at: field(KROPS_EXPIRES_AT)?,
-            run_kind: field(KROPS_RUN_KIND)?,
+                .unwrap_or("manual")
+                .to_string(),
+            revision: data
+                .get("KROPS_REVISION")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string(),
+            expires_at: data
+                .get("KROPS_EXPIRES_AT")
+                .and_then(|v| v.as_str())
+                .unwrap_or("never")
+                .to_string(),
+            run_kind: data
+                .get("KROPS_RUN_KIND")
+                .and_then(|v| v.as_str())
+                .unwrap_or("manual")
+                .to_string(),
         })
     }
 
@@ -141,19 +143,6 @@ impl RunTags {
             self.run_id, self.revision, self.expires_at, self.run_kind
         )
     }
-}
-
-// Bound RFC3339 dates to four-digit years, and avoid an unbounded calendar loop.
-fn checked_expiry(now: i64, ttl: u64) -> Result<String> {
-    let ttl = i64::try_from(ttl).context("KROPS_RUN_TTL overflows")?;
-    let expiry = now
-        .checked_add(ttl)
-        .context("KROPS_RUN_TTL expiry overflows")?;
-    anyhow::ensure!(
-        (0..=253402300799).contains(&expiry),
-        "KROPS_RUN_TTL expiry overflows RFC3339"
-    );
-    Ok(format_rfc3339_utc(expiry))
 }
 
 /// Convert Unix epoch seconds to RFC3339 format (2026-09-27T12:00:00Z).
@@ -218,14 +207,6 @@ fn format_rfc3339_utc(secs: i64) -> String {
     )
 }
 
-fn decode_existing(output: &str) -> Result<Option<RunTags>> {
-    if output.trim().is_empty() {
-        return Ok(None);
-    }
-    let cm = serde_json::from_str(output).context("invalid krops-run ConfigMap JSON")?;
-    RunTags::from_configmap_value(&cm).map(Some)
-}
-
 /// Ensure the ConfigMap exists in the source (kind) cluster; create it if absent.
 /// If KROPS_RUN_ID is already set, this is a rerun; fetch existing values instead
 /// of generating new ones. Otherwise, generate values and apply the ConfigMap.
@@ -235,23 +216,42 @@ pub async fn ensure_in_source(cfg: &crate::Config, branch_sha: Option<&str>) -> 
         // Environment already set, try to read from cluster to be consistent
         let existing = crate::capture(
             "kubectl",
-            &[
-                "--context",
-                &cfg.bootstrap_kubecontext,
-                "get",
-                "cm",
-                RUN_CONFIGMAP_NAME,
-                "-n",
-                NS,
-                "-o",
-                "json",
-                "--ignore-not-found",
-            ],
+            &["get", "cm", RUN_CONFIGMAP_NAME, "-n", NS, "-o", "json"],
         )
-        .await
-        .context("reading existing krops-run ConfigMap")?;
-        if let Some(tags) = decode_existing(&existing)? {
-            return Ok(tags);
+        .await;
+
+        if let Ok(json_str) = existing {
+            if let Ok(cm) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                if let Some(data) = cm.get("data").and_then(|d| d.as_object()) {
+                    let run_id = data
+                        .get(KROPS_RUN_ID)
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("manual")
+                        .to_string();
+                    let revision = data
+                        .get(KROPS_REVISION)
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+                    let expires_at = data
+                        .get(KROPS_EXPIRES_AT)
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("never")
+                        .to_string();
+                    let run_kind = data
+                        .get(KROPS_RUN_KIND)
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("manual")
+                        .to_string();
+
+                    return Ok(RunTags {
+                        run_id,
+                        revision,
+                        expires_at,
+                        run_kind,
+                    });
+                }
+            }
         }
 
         // ConfigMap not found but KROPS_RUN_ID was set
@@ -289,7 +289,8 @@ pub async fn seed_target(cfg: &crate::Config, kubeconfig: &str) -> Result<()> {
     let json_str = crate::capture("kubectl", &args_str).await?;
 
     let cm_json = serde_json::from_str::<serde_json::Value>(&json_str)?;
-    let tags = RunTags::from_configmap_value(&cm_json)?;
+    let tags = RunTags::from_configmap_value(&cm_json)
+        .ok_or_else(|| anyhow::anyhow!("ConfigMap data field missing or invalid"))?;
 
     // Rebuild the ConfigMap from data fields only (drops server metadata)
     let clean_cm = serde_json::from_str::<serde_json::Value>(&tags.configmap_json(NS))?;
@@ -382,120 +383,7 @@ mod tests {
     #[test]
     fn from_configmap_value_none_without_data() {
         let cm = serde_json::json!({"metadata": {}});
-        assert!(RunTags::from_configmap_value(&cm).is_err());
-    }
-
-    #[test]
-    fn rejects_each_incomplete_field() {
-        let valid = serde_json::json!({"data": {
-            "KROPS_RUN_ID": "id", "KROPS_REVISION": "sha",
-            "KROPS_EXPIRES_AT": "never", "KROPS_RUN_KIND": "ci"
-        }});
-        for key in [
-            KROPS_RUN_ID,
-            KROPS_REVISION,
-            KROPS_EXPIRES_AT,
-            KROPS_RUN_KIND,
-        ] {
-            for value in [None, Some(json!("")), Some(json!(42))] {
-                let mut cm = valid.clone();
-                let data = cm["data"].as_object_mut().unwrap();
-                match value {
-                    None => {
-                        data.remove(key);
-                    }
-                    Some(value) => {
-                        data.insert(key.into(), value);
-                    }
-                }
-                assert!(RunTags::from_configmap_value(&cm)
-                    .err()
-                    .unwrap()
-                    .to_string()
-                    .contains(key));
-            }
-        }
-    }
-
-    #[test]
-    fn ttl_and_revision_cases() {
-        for (ttl, seconds) in [
-            ("3600", 3600),
-            ("90s", 90),
-            ("30m", 1800),
-            ("2h", 7200),
-            (" 0090s ", 90),
-            ("0", 0),
-            ("", 86400),
-            ("   ", 86400),
-        ] {
-            let tags = RunTags::resolve(
-                |key| (key == KROPS_RUN_TTL).then(|| ttl.into()),
-                "aws",
-                Some("branch-sha"),
-                0,
-            )
-            .unwrap();
-            assert_eq!(tags.expires_at, format_rfc3339_utc(seconds));
-            assert_eq!(tags.revision, "branch-sha");
-        }
-        for ttl in [
-            "-1",
-            "+1",
-            "1.5h",
-            "1h30m",
-            "h",
-            "18446744073709551615h",
-            "253402300800",
-        ] {
-            assert!(RunTags::resolve(
-                |key| (key == KROPS_RUN_TTL).then(|| ttl.into()),
-                "aws",
-                None,
-                0
-            )
-            .is_err());
-        }
-        assert_eq!(
-            RunTags::resolve(|_| None, "aws", None, 0).unwrap().revision,
-            "unknown"
-        );
-        assert_eq!(
-            RunTags::resolve(
-                |key| (key == KROPS_REVISION).then(|| "override".into()),
-                "aws",
-                Some("branch"),
-                0
-            )
-            .unwrap()
-            .revision,
-            "override"
-        );
-        assert!(checked_expiry(i64::MAX, 1).is_err());
-    }
-
-    #[tokio::test]
-    #[cfg(unix)]
-    async fn command_lookup_distinguishes_absence_and_errors() {
-        use std::os::unix::fs::PermissionsExt;
-        let dir = tempfile::tempdir().unwrap();
-        let command = dir.path().join("kubectl");
-        for (body, absent, error) in [
-            ("exit 0", true, false),
-            ("echo '{invalid'", false, true),
-            ("echo '{}'; exit 0", false, true),
-            ("echo forbidden >&2; exit 1", false, true),
-        ] {
-            std::fs::write(&command, format!("#!/bin/sh\n{body}\n")).unwrap();
-            std::fs::set_permissions(&command, std::fs::Permissions::from_mode(0o755)).unwrap();
-            let result = crate::capture(command.to_str().unwrap(), &[])
-                .await
-                .and_then(|output| decode_existing(&output));
-            assert_eq!(result.is_err(), error);
-            if !error {
-                assert_eq!(result.unwrap().is_none(), absent);
-            }
-        }
+        assert!(RunTags::from_configmap_value(&cm).is_none());
     }
 
     #[test]

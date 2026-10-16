@@ -426,9 +426,7 @@ When `KROPS_RUN_ID` is set and non-empty, and the `krops-run` ConfigMap
 exists in kind's `flux-system`, all four values are reused without change
 (rerun-safe). If the ConfigMap is gone but `KROPS_RUN_ID` was set, a fresh
 ConfigMap is written with `KROPS_RUN_ID` from the environment and expires-at
-recalculated from `KROPS_RUN_TTL`. Only an absent ConfigMap permits this
-fallback; API failures, malformed JSON, and missing or empty data keys stop
-bootstrap. With `KROPS_RUN_ID` unset or empty, a
+recalculated from `KROPS_RUN_TTL`. With `KROPS_RUN_ID` unset or empty, a
 fresh run-id is generated (profile + timestamp) and the ConfigMap is
 overwritten.
 
@@ -440,32 +438,21 @@ optionally `KROPS_RUN_TTL`) before calling bootstrap.
 **Pivot (`pivot.sh` and the CLI's pivot phase)**:
 Never generates tag values. Copies the four data keys from the kind cluster's
 `krops-run` ConfigMap using the `BOOTSTRAP_KUBECONTEXT` (default `kind-mgmt`);
-fails if the ConfigMap is missing or any required data key is missing, empty,
-or invalid. API read failures also stop the pivot.
+fails if the ConfigMap is missing.
 
 #### TTL and expiry
 
 - Default: resources tagged with a 24-hour expiry
   (`krops.io/expires-at={now + 24h}`).
 - Override with `KROPS_RUN_TTL=<duration>`: parses durations like `2h`, `30m`,
-  `3600s`, or bare decimal seconds (`3600`). Leading zeros are decimal;
-  surrounding whitespace is trimmed. Empty or unset values default to 24h.
-  Negative, fractional, compound, malformed, overflowing durations and expiry
-  dates beyond year 9999 are rejected.
+  `3600s`.
 - `KROPS_RUN_TTL=none` tags with `krops.io/expires-at=never` (no auto-expiry).
 
 #### Post-pivot seeding
 
 The `krops-run` ConfigMap created in the kind bootstrap cluster is seeded to
-the management cluster before reconciliation starts: install the Flux Operator
-and bootstrap secrets, apply validated run metadata, then install the
-FluxInstance and wait for readiness. The shell pivot reads and validates source
-metadata before target preparation; Rust reads it after installing the operator
-and before installing the FluxInstance. Failed reads or writes prevent activation
-in both paths.
-
-Rust uses the discovered branch SHA as the default revision, falling back to
-`unknown`; shell defaults to `unknown`. Both honor `KROPS_REVISION`.
+the management cluster before Flux starts, so tags survive the pivot and
+workload reconciliation reads the same values.
 
 #### Lookup and cleanup
 
@@ -1143,49 +1130,3 @@ Renovate air-gap digest and managed-pin coverage tests, cross-checks
 `bootstrap.toml`, and lints YAML on pushes to `main` and on pull requests.
 `.github/workflows/bootstrap-rs.yml` runs Rust format, clippy, build, and tests,
 then builds and smokes the toolbox image when its inputs change.
-
-### Managed EKS worker lifecycle tags
-
-CAPA's ASG tags propagate to later workers; initial workers can launch before
-those ASG tags exist. The management `worker-run-tags` minute CronJob backfills
-or repairs the four lifecycle keys on currently discoverable managed workers,
-using each EKS cluster's own tags. It preserves other instance tags and does
-not replace pools. This is eventual tagging: API availability, the external
-IAM prerequisite in [AWS IAM](aws-iam.md#eks-worker-lifecycle-tag-reconciliation),
-and a successful Job are required. A worker that leaves its ASG before discovery
-can remain untagged. A cluster with missing or malformed metadata is skipped
-and the Job fails while independent clusters are still processed.
-
-Lifecycle values are decoded from AWS JSON and passed through NUL-delimited
-fields without whitespace splitting or trimming. Tag writes use a JSON array,
-preserving supported CAPA ASCII punctuation and whitespace exactly, including
-leading/trailing space, tab, LF, FF, and CR. Vertical tab and non-ASCII values
-are rejected; lifecycle values must contain 1–256 ASCII bytes.
-Expiry must be `never` or an exact UTC `YYYY-MM-DDTHH:MM:SSZ` timestamp with a
-valid calendar date and clock time (years 0001–9999); invalid dates stop that
-cluster's writes while other clusters continue.
-
-The Job uses AWS CLI pagination for nodegroups/ASGs, checks account and the
-three committed region/cluster pairs, deduplicates workers, then rechecks ASG
-membership and EKS ownership before applying drift-only changes. Disappearing
-or terminated workers are skipped. Jobs cannot overlap, have a 55-second
-execution deadline and no Kubernetes retries; the next minute retries failed
-work. At larger worker counts, monitor deadline failures before relying on the
-interval. IAM denials are errors, with no fallback to broader discovery.
-
-Live acceptance after merge and the operator's IAM grant:
-
-1. Verify the effective static-principal policy includes the documented scoped
-   reads and ownership/tag-key-restricted `ec2:CreateTags` permission.
-2. Observe a successful `worker-run-tags` Job on the management cluster.
-3. Discover an actual EC2 instance through each allowed EKS managed nodegroup's
-   ASG. Use `aws ec2 describe-instances --region <region> --instance-ids <id>`
-   to compare its four lifecycle tags with `aws eks describe-cluster --region
-   <region> --name <cluster>`. Include an initial worker with missing tags and a
-   new scale-out worker; verify unrelated tags remain unchanged.
-4. Repeat after a minute and verify unchanged instances receive no new writes
-   in Job logs/CloudTrail. Check that all three clusters' metadata stays distinct.
-
-Offline tests cover discovery and write guards; live acceptance has not been
-performed by this change. It does not establish tagging for orphaned workers,
-CloudFormation stacks, or other excluded resource kinds.

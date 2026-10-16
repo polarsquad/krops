@@ -32,6 +32,18 @@ def main() -> int:
     if "timeout-minutes: 30" not in job_block("isolated-deploy"):
         failures.append("the deploy job timeout must be 30 minutes")
 
+    deploy = job_block("isolated-deploy")
+    offline_run = deploy.find("airgap/scripts/offline-run.sh")
+    for needle in (
+        "sudo sysctl -w fs.inotify.max_user_watches=524288",
+        "sudo sysctl -w fs.inotify.max_user_instances=512",
+    ):
+        at = deploy.find(needle)
+        if at == -1:
+            failures.append(f"isolated-deploy must run `{needle}` (see docs/airgap.md: inotify limits)")
+        elif offline_run == -1 or at > offline_run:
+            failures.append(f"`{needle}` must run before offline-run.sh (see docs/airgap.md: inotify limits)")
+
     if "/tmp/airgap-workload-debug.txt" not in WORKFLOW:
         failures.append("the workflow must upload /tmp/airgap-workload-debug.txt")
 

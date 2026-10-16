@@ -310,7 +310,7 @@ cert-manager (the Azure resources moved to the management cluster in issue #559)
 The `gcp` environment mirrors `azure`: a disposable kind cluster bootstraps
 Flux, CAPG v1.13.1 provisions a GKE management cluster
 (`europe-north1-management`), the pivot moves the management objects into
-it, and the management cluster's Config Connector (KCC 1.158.0) reconciles
+it, and the management cluster's Config Connector (KCC 1.159.0) reconciles
 the GCP workload resources from
 `mgmt/gcp/infrastructure/workload-resources/` (issue #560: the workload
 cluster no longer runs its own KCC).
@@ -356,7 +356,7 @@ flowchart TD
         CAPIS[capi-system]
         CAPGS["capg-system (CAPG v1.13.1)<br/>WIF credential Secret, secret-free"]
         CAAPH[caaph-system]
-        KCCO["kcc-operator (1.158.0, pinned bundle)"]
+        KCCO["kcc-operator (1.159.0, Helm chart via OCIRepository)"]
         KCC["kcc (ConfigConnector in cnrm-system)<br/>WIF credential Secret"]
         KCCI["kcc-identity (KCC-managed)<br/>krops pool + mgmt provider + GSA grants"]
         WRES["workload-resources (KCC CRs, issue #560)<br/>networking / storage / postgres / iam"]

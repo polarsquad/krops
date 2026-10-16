@@ -91,3 +91,4 @@ nav:
   - Proposals:
       - Overview: proposals/README.md
       - Air-gap bundle update architectures: proposals/airgap-update-architectures.md
+      - WireMock e2e architecture proposal: proposals/wiremock-e2e-architecture.md

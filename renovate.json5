@@ -381,11 +381,10 @@
       "managerFilePatterns": [
         "/(^|/)mgmt/.+\\.ya?ml$/"
       ],
-      "matchStrings": ["kindest/node:v(?<currentValue>[0-9A-Za-z.\\-]+)"],
+      "matchStrings": ["kindest/node:v(?<currentValue>[0-9A-Za-z.\\-]+)(?:@(?<currentDigest>sha256:[a-f0-9]{64}))?"],
       "depNameTemplate": "kindest/node",
       "datasourceTemplate": "docker",
-      "versioningTemplate": "docker",
-      "autoReplaceStringTemplate": "kindest/node:v{{newValue}}"
+      "versioningTemplate": "docker"
     },
     {
       "customType": "regex",

@@ -378,7 +378,97 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
   AWS region the same package pattern covers CAPA/ACK/EKS via in-region
   endpoints; on-prem it maps to the provider-swap path in `docs/extending.md`.
 
-## Update drill
+## Updating a deployed bundle
+
+A staged update replaces the Zarf package archive in `archives/` only after
+the new archive is fully verified, keeps the prior archive until the operator
+confirms, and can restore it offline. Entry point:
+`airgap/scripts/update-package.sh`.
+
+```sh
+airgap/scripts/update-package.sh apply /path/to/new-package.tar.zst
+# exit 0: deployed, awaiting confirm
+airgap/scripts/update-package.sh confirm    # after the deployment is verified
+# or
+airgap/scripts/update-package.sh rollback   # restore the prior archive
+airgap/scripts/update-package.sh status     # digests, phase, leftovers
+```
+
+`apply` runs in order: copy the package into `archives/.staging/`, verify its
+signature, checksums, and SBOMs with `verify-package.sh` (the same check
+`offline-run.sh` uses), hard-link the active archive to `<active>.bak`, record
+its sha256, swap the staged archive in, then run the deploy command
+(`offline-run.sh` by default) against it. A rejection in staging leaves the
+active archive untouched. A failed deploy restores the prior archive and exits
+3. A successful deploy leaves `phase=awaiting-confirm`: a second `apply` is
+refused until you run `confirm` (drops the `.bak`) or `rollback` (restores the
+`.bak`).
+
+Files, all under `airgap/archives/` (gitignored):
+
+| Path | Purpose |
+| --- | --- |
+| `<active>` (`zarf-package-krops-airgap-arm64-0.1.0.tar.zst`) | Active package |
+| `<active>.bak` | Prior package, kept until `confirm` or `rollback` |
+| `<active>.bak.sha256` | Recorded digest of `.bak`, checked before any restore |
+| `.staging/` | Candidate package during verification; discarded by the next `apply` |
+| `.update-state` | `phase=cutover` or `phase=awaiting-confirm`, plus `first_install=1` for a first install |
+| `.update.lock` | Directory lock holding the owner pid; stale locks are reclaimed |
+
+The `*.tar` glob in `stage-and-create-cluster.sh` does not match any of these
+names, so staging and backups never get loaded as images.
+
+Exit codes:
+
+| Code | Meaning |
+| --- | --- |
+| 0 | Success (`apply` deployed and awaiting confirm; `confirm` and `rollback` done) |
+| 1 | Blocked by prior state, a lock held by another run, or bad input |
+| 2 | Package rejected during staging; active archive untouched |
+| 3 | Deploy failed; prior archive restored (or first install removed) |
+| 4 | Backup integrity check failed; active archive may have been swapped to the new package; manual recovery needed |
+| 64 | Usage error |
+
+Crash recovery:
+
+| State left behind | Meaning | Recovery |
+| --- | --- | --- |
+| `.staging/` only, no state | Crash during staging; active untouched | Nothing to do; the next `apply` discards it |
+| `phase=cutover` plus `.bak` | Crash between the swap and the deploy result | `rollback` restores the `.bak`; `confirm` is refused |
+| `phase=cutover` plus `first_install=1` | Crash during a first install | `rollback` removes the archive |
+| `phase=awaiting-confirm` | Deployed, not yet accepted | `confirm` to accept, or `rollback` to restore |
+| `.bak` present, `.bak.sha256` mismatch | Backup altered or corrupted | Exit 4; restore the archive from its source, then redeploy |
+| `.update.lock` with no live pid | Crash while holding the lock | Reclaimed automatically; with no pid recorded, remove it by hand after confirming no update runs |
+
+Scope: only the Zarf package archive is transactional. The host image tarballs,
+the init package, and the config artifact are not. Live cluster state is never
+rolled back. After a `rollback` or a restoring failure, redeploy the restored
+archive with `offline-run.sh` to bring the cluster back to it.
+
+`AIRGAP_DEPLOY_CMD` overrides the deploy command with a single executable path,
+called as `"$AIRGAP_DEPLOY_CMD" <active-archive>` and never evaluated. The
+tests use it to substitute a stub.
+
+Note that `offline-run.sh` creates the kind cluster and runs `zarf init`, so
+`apply` against a cluster that is already up is only as good as that script's
+behavior on an existing cluster. The staging, verification, and restore
+guarantees above hold regardless.
+
+Tests: `airgap/tests/test-airgap-update-rollback.py` runs in `mise run validate`
+and CI in stub mode, with a fake zarf and a fake deploy command. The nightly
+`update-rollback` job in `air-gapped.yml` runs the real-zarf mode with the
+signed bundle, inside `unshare --net`. To run it locally:
+
+```sh
+AIRGAP_VERIFY_WORKFLOW_REF=polarsquad/krops/.github/workflows/air-gapped.yml@refs/heads/main \
+  python3 airgap/tests/test-airgap-update-rollback.py \
+  --zarf-package airgap/zarf-package-krops-airgap-arm64-0.1.0.tar.zst
+```
+
+Real-zarf mode runs the truncated, byte-flipped, and deploy-failure scenarios
+only. The stub suite covers the full apply, confirm, and rollback cycle.
+
+### Config-only versus substrate changes
 
 A config-only change (edit the tree, re-run `build-config-artifact.sh`,
 re-push `krops:latest` to krops-registry) moves the workload Flux to a new

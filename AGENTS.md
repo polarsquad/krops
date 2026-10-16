@@ -159,7 +159,16 @@ resources. There is no app source code here, only declarative infrastructure.
   tracking issue titled "air-gapped: scheduled workflow is failing" when a
   needed job failed, and closes it when all succeeded; cancelled runs are
   ignored. `airgap/tests/test-airgap-failure-notification.py` parses the
-  workflow YAML to guard its wiring.
+  workflow YAML to guard its wiring. The `update-rollback` job is in the
+  `report-status` needs.
+  `airgap/scripts/update-package.sh` stages a new package archive, verifies it
+  before any swap, keeps `.bak` until `confirm`, and rolls back the archive
+  only (cluster state is not rolled back; see docs/airgap.md#updating-a-deployed-bundle).
+  `airgap/scripts/verify-package.sh` is the shared verification library sourced
+  by `offline-run.sh` and `update-package.sh`.
+  `airgap/tests/test-airgap-update-rollback.py` runs in stub mode in `mise run
+  validate` and CI; `--zarf-package` (real zarf) runs in the nightly
+  `update-rollback` job.
 - `virtualized-e2e/`: WireMock-virtualized e2e harness (issue #355), not
   Flux-reconciled and not wired into a mise task yet (Phase 4). `lib/`
   carries the shared components (WireMock manifest templates under

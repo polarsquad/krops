@@ -44,6 +44,19 @@ def main() -> int:
         elif offline_run == -1 or at > offline_run:
             failures.append(f"`{needle}` must run before offline-run.sh (see docs/airgap.md: inotify limits)")
 
+    update_rollback = job_block("update-rollback")
+    if not update_rollback:
+        failures.append("the update-rollback job is missing (#369)")
+    else:
+        if "timeout-minutes: 15" not in update_rollback:
+            failures.append("the update-rollback job timeout must be 15 minutes")
+        if "unshare --net" not in update_rollback:
+            failures.append("the update-rollback run step must run under unshare --net")
+        if "--zarf-package" not in update_rollback:
+            failures.append("the update-rollback run step must pass --zarf-package")
+        if re.search(r"^    if:", update_rollback, re.M):
+            failures.append("the update-rollback job must not carry an if: guard")
+
     if "/tmp/airgap-workload-debug.txt" not in WORKFLOW:
         failures.append("the workflow must upload /tmp/airgap-workload-debug.txt")
 

@@ -186,9 +186,56 @@ jobs:
           if-no-files-found: warn
           retention-days: 1
 
+  update-rollback:
+    name: Staged update rejection and offline rollback
+    needs: build
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Install mise
+        uses: jdx/mise-action@v5.1.2
+        with:
+          version: 2026.10.8
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Download air-gap bundle
+        uses: actions/download-artifact@v8.0.2
+        with:
+          name: krops-airgap-arm64
+          path: airgap
+
+      - name: Staged update rejection and offline rollback
+        env:
+          AIRGAP_VERIFY_WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          set -euo pipefail
+          zarf_bin=$(mise which zarf)
+          set -- airgap/zarf-package-krops-airgap-*.tar.zst
+          [ -f "$1" ] || { echo "no package found matching glob" >&2; exit 1; }
+          [ "$#" -eq 1 ] || { echo "expected exactly one package, found $#" >&2; exit 1; }
+          pkg=$1
+          sudo unshare --net -- env \
+            PATH="$(dirname "$zarf_bin"):$PATH" \
+            ZARF="$zarf_bin" \
+            AIRGAP_VERIFY_WORKFLOW_REF="$AIRGAP_VERIFY_WORKFLOW_REF" \
+            python3 airgap/tests/test-airgap-update-rollback.py --zarf-package "$pkg" \
+            2>&1 | tee /tmp/airgap-update-rollback.log
+
+      - name: Store update rollback results
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: krops-airgap-update-rollback-results
+          path: /tmp/airgap-update-rollback.log
+          retention-days: 1
+
   report-status:
     name: File or close failure issue
-    needs: [build, isolated-deploy]
+    needs: [build, isolated-deploy, update-rollback]
     if: always() && github.event_name == 'schedule'
     runs-on: ubuntu-latest
     permissions:

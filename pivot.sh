@@ -390,11 +390,46 @@ seed_target() {
     mise -E local-host run oci-push
   fi
 
-  # Validate source metadata before installing anything on the target.
-  read_source_run_tags
-  prepare_flux "$MGMT_KUBECONFIG"
-  apply_run_tags
-  activate_flux
+  seed_flux "$MGMT_KUBECONFIG"
+
+  # Copy run-identity ConfigMap from the kind bootstrap cluster to the target.
+  # Never regenerate: the bootstrap or CLI seeded the kind ConfigMap; pivot
+  # copies it verbatim to keep tags consistent across the pivot.
+  local kind_ctx="${BOOTSTRAP_KUBECONTEXT:-kind-mgmt}"
+  if ! kubectl --context "$kind_ctx" get configmap krops-run -n flux-system >/dev/null 2>&1; then
+    echo "ERROR: ConfigMap flux-system/krops-run not found in '${kind_ctx}'; re-run the bootstrap to seed it." >&2
+    exit 1
+  fi
+  local run_id revision expires_at run_kind
+  run_id="$(kubectl --context "$kind_ctx" get configmap krops-run -n flux-system -o "jsonpath={.data.KROPS_RUN_ID}")"
+  revision="$(kubectl --context "$kind_ctx" get configmap krops-run -n flux-system -o "jsonpath={.data.KROPS_REVISION}")"
+  expires_at="$(kubectl --context "$kind_ctx" get configmap krops-run -n flux-system -o "jsonpath={.data.KROPS_EXPIRES_AT}")"
+  run_kind="$(kubectl --context "$kind_ctx" get configmap krops-run -n flux-system -o "jsonpath={.data.KROPS_RUN_KIND}")"
+
+  for _key_name in KROPS_RUN_ID KROPS_REVISION KROPS_EXPIRES_AT KROPS_RUN_KIND; do
+    _key_val=""
+    case "$_key_name" in
+      KROPS_RUN_ID)    _key_val="$run_id" ;;
+      KROPS_REVISION)  _key_val="$revision" ;;
+      KROPS_EXPIRES_AT) _key_val="$expires_at" ;;
+      KROPS_RUN_KIND)  _key_val="$run_kind" ;;
+    esac
+    if [ -z "$_key_val" ]; then
+      echo "ERROR: ${_key_name} missing or empty in flux-system/krops-run on '${kind_ctx}'" >&2
+      exit 1
+    fi
+  done
+
+  kubectl --kubeconfig "$MGMT_KUBECONFIG" create namespace flux-system --dry-run=client -o yaml \
+    | kubectl --kubeconfig "$MGMT_KUBECONFIG" apply -f -
+  kubectl --kubeconfig "$MGMT_KUBECONFIG" create configmap krops-run -n flux-system \
+    --from-literal="KROPS_RUN_ID=${run_id}" \
+    --from-literal="KROPS_REVISION=${revision}" \
+    --from-literal="KROPS_EXPIRES_AT=${expires_at}" \
+    --from-literal="KROPS_RUN_KIND=${run_kind}" \
+    --dry-run=client -o yaml \
+    | kubectl --kubeconfig "$MGMT_KUBECONFIG" apply -f -
+  echo ">>> Run tags seeded from ${kind_ctx}: run-id=${run_id} revision=${revision} expires-at=${expires_at} run-kind=${run_kind}"
 
   echo ">>> Kustomizations on the management cluster:"
   kubectl --kubeconfig "$MGMT_KUBECONFIG" get kustomizations -n "$FLUX_NS"

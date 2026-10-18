@@ -15,16 +15,6 @@ resources. There is no app source code here, only declarative infrastructure.
   - `infrastructure/`: cert-manager, CAPI operator, CAPA identity, ACK
     controllers (S3, RDS, IAM), the per-cluster Bucket/DBInstance/reader
     Role CRs (`workload-resources/`), account-global IAM, konflate.
-  - `infrastructure/worker-run-tags/`: minute AWS CLI CronJob in ack-system
-    that eventually repairs four lifecycle tags on discoverable managed EKS
-    workers, using per-cluster EKS metadata. `tag_data.py` validates AWS JSON,
-    preserves supported tag characters/whitespace through NUL-delimited fields,
-    and checks exact UTC expiry calendar/time semantics before JSON tag writes.
-    Exact account/region/cluster guards
-    and fresh ASG membership/ownership checks precede writes. Requires an
-    external static-principal IAM grant; see docs/aws-iam.md. Offline regressions
-    (`tests/test-worker-run-tags.py`) run in validate and CI. Orphans that leave
-    their ASG before discovery are outside this guarantee.
   - `capi-providers/`: capi-system, capa-system, caaph-system.
   - `addons/flux-apps/`: installs Flux on each workload cluster
     (HelmChartProxy + ResourceSet).
@@ -202,11 +192,7 @@ resources. There is no app source code here, only declarative infrastructure.
   `run_tags.rs` writes and seeds the `krops-run` ConfigMap (four env knobs:
   `KROPS_RUN_ID`, `KROPS_RUN_TTL`, `KROPS_REVISION`, `KROPS_RUN_KIND`) during
   bootstrap/pivot for Flux `postBuild` substitution onto tagged AWS resources
-  (#381); the regression gates are `tests/test-aws-run-tags.py` and
-  `tests/test-shell-run-tags.py` (validate and CI). Flux preparation installs
-  the operator, validated run metadata is applied, then the FluxInstance
-  activates reconciliation. Pivot requires all four nonempty source data keys;
-  rerun bootstrap regenerates only when the ConfigMap is absent. See
+  (#381); the regression gate is `tests/test-aws-run-tags.py`; see
   `docs/operations.md` for the full tagging standard.
 - `.github/workflows/aws-orphan-report.yml`: Daily discovery of unowned AWS
   resources in the e2e account (no deletion; issue #380). The `discover` job

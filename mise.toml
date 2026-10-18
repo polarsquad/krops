@@ -178,6 +178,16 @@ if ! uv run python tests/test-aws-run-tags.py; then
   echo "    FAILED: AWS run-tag standard" >&2
   fail=1
 fi
+echo "==> shell run metadata"
+if ! python3 tests/test-shell-run-tags.py; then
+  echo "    FAILED: shell run metadata" >&2
+  fail=1
+fi
+echo "==> worker lifecycle tags"
+if ! uv run python tests/test-worker-run-tags.py; then
+  echo "    FAILED: worker lifecycle tags" >&2
+  fail=1
+fi
 echo "==> kind Corefile pin (virtualized-e2e CoreDNS patch vs mise kind)"
 if ! python3 tests/test-kind-corefile-pin.py; then
   echo "    FAILED: kind Corefile pin" >&2

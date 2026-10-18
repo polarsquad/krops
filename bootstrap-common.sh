@@ -217,8 +217,8 @@ detect_container_engine() {
 }
 
 # ── Flux seeding ──────────────────────────────────────────────────────────────
-# Installs the Flux Operator, the bootstrap secrets (aws), and the FluxInstance
-# that syncs the management tree, then waits for the instance to become Ready.
+# Prepares the Flux Operator and bootstrap secrets, then separately activates
+# the FluxInstance after run metadata has been applied.
 # Used by bootstrap.sh (against the kind cluster) and by pivot.sh (against the
 # management cluster). Reads the PROFILE global ("aws" or "local-host").
 
@@ -257,18 +257,16 @@ seed_helm() {
   fi
 }
 
-# seed_flux [kubeconfig]
+# prepare_flux [kubeconfig]
 # Requires (aws only): GITHUB_TOKEN, GIT_REPO_URL, AGE_KEY_FILE, AGE_PUBKEY
 # (run require_flux_env first). Requires the PROFILE global.
-seed_flux() {
+prepare_flux() {
   SEED_KUBECONFIG="${1:-}"
 
   local registry_name="${REGISTRY_NAME:-krops-registry}"
-  local registry_port="${REGISTRY_PORT:-5001}"
-  local anon_registry_config
-  anon_registry_config="$(mktemp)"
-  seed_register_cleanup "$anon_registry_config"
-  printf '{}\n' > "$anon_registry_config"
+  SEED_REGISTRY_CONFIG="$(mktemp)"
+  seed_register_cleanup "$SEED_REGISTRY_CONFIG"
+  printf '{}\n' > "$SEED_REGISTRY_CONFIG"
 
   # ── Install the Flux Operator ───────────────────────────────────────────────
   echo ">>> Installing Flux Operator..."
@@ -278,7 +276,7 @@ seed_flux() {
     --namespace flux-system \
     --create-namespace \
     --wait \
-    --registry-config "$anon_registry_config"
+    --registry-config "$SEED_REGISTRY_CONFIG"
 
   if [ "$PROFILE" = aws ]; then
     # ── GitHub PAT credentials secret ─────────────────────────────────────────
@@ -317,6 +315,11 @@ seed_flux() {
       --dry-run=client -o yaml | seed_kubectl apply -f -
   fi
 
+}
+
+# Activate reconciliation only after the run metadata has been applied.
+activate_flux() {
+  local registry_name="${REGISTRY_NAME:-krops-registry}"
   # ── Install the FluxInstance via Helm ───────────────────────────────────────
   echo ">>> Installing FluxInstance via Helm..."
   FLUX_INSTANCE_ARGS=(
@@ -325,7 +328,7 @@ seed_flux() {
     --set instance.cluster.multitenant=false
     --set instance.cluster.networkPolicy=true
     --set instance.cluster.domain=cluster.local
-    --registry-config "$anon_registry_config"
+    --registry-config "$SEED_REGISTRY_CONFIG"
   )
   if [ "$PROFILE" = aws ]; then
     FLUX_INSTANCE_ARGS+=(
@@ -366,4 +369,70 @@ seed_flux() {
   seed_kubectl wait --namespace flux-system --for=condition=ready pod \
     --selector='app.kubernetes.io/part-of=flux' \
     --timeout=90s || true
+}
+
+# Resolve values before preparing Flux; never evaluate user input as arithmetic.
+resolve_run_tags() {
+  _KROPS_RUN_ID="${KROPS_RUN_ID:-${PROFILE:-unknown}-$(date -u +%Y%m%dT%H%M%SZ)}"
+  _KROPS_REVISION="${KROPS_REVISION:-unknown}"
+  _KROPS_RUN_KIND="${KROPS_RUN_KIND:-manual}"
+  local ttl digits unit seconds now expiry digit
+  ttl="$(printf '%s' "${KROPS_RUN_TTL:-}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+  if [ "$ttl" = none ]; then
+    _KROPS_EXPIRES_AT=never
+    return
+  fi
+  ttl="${ttl:-24h}"
+  unit=1
+  case "$ttl" in
+    *h) unit=3600; digits="${ttl%h}" ;;
+    *m) unit=60; digits="${ttl%m}" ;;
+    *s) digits="${ttl%s}" ;;
+    *) digits="$ttl" ;;
+  esac
+  case "$digits" in
+    ''|*[!0-9]*) echo "ERROR: invalid KROPS_RUN_TTL '$ttl'" >&2; return 1 ;;
+  esac
+  seconds=0
+  while [ -n "$digits" ]; do
+    digit="${digits%"${digits#?}"}"
+    digits="${digits#?}"
+    if [ "$seconds" -gt 25340230079 ]; then
+      echo 'ERROR: KROPS_RUN_TTL expiry overflows RFC3339' >&2; return 1
+    fi
+    seconds=$((seconds * 10 + digit))
+  done
+  now="$(date -u +%s)"
+  if [ "$seconds" -gt $(((253402300799 - now) / unit)) ]; then
+    echo 'ERROR: KROPS_RUN_TTL expiry overflows RFC3339' >&2; return 1
+  fi
+  expiry=$((now + seconds * unit))
+  _KROPS_EXPIRES_AT="$(date -u -d "@$expiry" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -r "$expiry" '+%Y-%m-%dT%H:%M:%SZ')"
+}
+
+read_source_run_tags() {
+  local kind_ctx="${BOOTSTRAP_KUBECONTEXT:-kind-mgmt}" key value
+  for key in KROPS_RUN_ID KROPS_REVISION KROPS_EXPIRES_AT KROPS_RUN_KIND; do
+    value="$(kubectl --context "$kind_ctx" get configmap krops-run -n flux-system -o "jsonpath={.data.$key}")" || return 1
+    if [ -z "$value" ]; then
+      echo "ERROR: $key missing or empty in flux-system/krops-run on '$kind_ctx'" >&2
+      return 1
+    fi
+    case "$key" in
+      KROPS_RUN_ID) _KROPS_RUN_ID="$value" ;;
+      KROPS_REVISION) _KROPS_REVISION="$value" ;;
+      KROPS_EXPIRES_AT) _KROPS_EXPIRES_AT="$value" ;;
+      KROPS_RUN_KIND) _KROPS_RUN_KIND="$value" ;;
+    esac
+  done
+}
+
+apply_run_tags() {
+  seed_kubectl create configmap krops-run --namespace flux-system \
+    --from-literal="KROPS_RUN_ID=${_KROPS_RUN_ID}" \
+    --from-literal="KROPS_REVISION=${_KROPS_REVISION}" \
+    --from-literal="KROPS_EXPIRES_AT=${_KROPS_EXPIRES_AT}" \
+    --from-literal="KROPS_RUN_KIND=${_KROPS_RUN_KIND}" \
+    --dry-run=client -o yaml | seed_kubectl apply -f -
+  echo ">>> Run tags: run-id=${_KROPS_RUN_ID} revision=${_KROPS_REVISION} expires-at=${_KROPS_EXPIRES_AT} run-kind=${_KROPS_RUN_KIND}"
 }

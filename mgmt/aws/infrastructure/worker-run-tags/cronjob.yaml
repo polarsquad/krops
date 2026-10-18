@@ -1,0 +1,77 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: worker-run-tags
+  namespace: ack-system
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 30
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 55
+      backoffLimit: 0
+      ttlSecondsAfterFinished: 3600
+      template:
+        spec:
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: reconcile
+              image: public.ecr.aws/aws-cli/aws-cli:2.37.12@sha256:ce44b800602264c12298bbf3399055a4cefdb9ed4a098abe564afe26e7071bce
+              command: ["/bin/bash", "/scripts/reconcile.sh"]
+              env:
+                - name: AWS_SHARED_CREDENTIALS_FILE
+                  value: /credentials/credentials
+                - name: AWS_PROFILE
+                  value: default
+                - name: AWS_EC2_METADATA_DISABLED
+                  value: "true"
+                - name: AWS_PAGER
+                  value: ""
+                - name: HOME
+                  value: /tmp
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 250m
+                  memory: 256Mi
+              securityContext:
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: scripts
+                  mountPath: /scripts
+                  readOnly: true
+                - name: credentials
+                  mountPath: /credentials
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: scripts
+              configMap:
+                name: worker-run-tags
+                defaultMode: 0444
+            - name: credentials
+              secret:
+                secretName: aws-credentials
+                defaultMode: 0444
+                items:
+                  - key: credentials
+                    path: credentials
+            - name: tmp
+              emptyDir:
+                sizeLimit: 16Mi

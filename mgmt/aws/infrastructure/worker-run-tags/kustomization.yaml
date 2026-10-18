@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - flux-ks.yaml
+  - cronjob.yaml
+configMapGenerator:
+  - name: worker-run-tags
+    namespace: ack-system
+    files:
+      - reconcile.sh
+      - tag_data.py
+      - config.env

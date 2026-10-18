@@ -421,9 +421,11 @@ fn parse_duration_seconds(input: &str) -> Result<u64> {
     if digits.is_empty() || !digits.chars().all(|c| c.is_ascii_digit()) {
         bail!("invalid duration '{input}' (expected forms like 40m, 2h, 90s, or bare seconds)");
     }
-    digits
+    let value = digits
         .parse::<u64>()
-        .map(|n| n * unit)
+        .with_context(|| format!("duration '{input}' overflows"))?;
+    value
+        .checked_mul(unit)
         .with_context(|| format!("duration '{input}' overflows"))
 }
 

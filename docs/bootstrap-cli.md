@@ -153,7 +153,7 @@ pins together with their declarative counterparts. See
 | `BOOTSTRAP_KUBECONTEXT` | config value `kind-mgmt` | Source context required by pivot |
 | `PIVOT_SKIP_DELETE` | `0` | Literal `1` keeps kind after a successful pivot |
 | `KROPS_RUN_ID` | `{profile}-{timestamp}` | Bootstrap/pivot run identifier for resource tagging; set to override auto-generation |
-| `KROPS_RUN_TTL` | `86400s` (24h) | Resource time-to-live duration (e.g. `2h`, `30m`, `3600s`), or literal `none` for persistent tags |
+| `KROPS_RUN_TTL` | `86400s` (24h) | Unsigned decimal seconds with optional `s`, `m`, or `h` (e.g. `3600`, `2h`); whitespace trimmed, empty defaults to 24h; `none` disables expiry |
 | `KROPS_REVISION` | Git branch HEAD SHA | Git revision tag for resource tagging; auto-extracted from GitHub during bootstrap |
 | `KROPS_RUN_KIND` | `manual` | Bootstrap/pivot invocation kind for resource tagging (e.g. `manual`, `scheduled`, `emergency`) |
 
@@ -339,3 +339,10 @@ acceptance run (issue #105, closed) through the CLI; the documented
 PXE/Tinkerbell-Workflow provisioning transport still needs a run (issue #225).
 Toolbox releases are published (see above); no Podman-host acceptance run is
 recorded.
+
+Run metadata is validated before the FluxInstance activates reconciliation.
+Pivot copies all four nonempty data keys exactly; bootstrap regenerates metadata
+only when a rerun ConfigMap is absent, and propagates read or decoding failures.
+Rust discovers the branch SHA for the revision default; shell uses `unknown`.
+Both accept `KROPS_REVISION`. TTL arithmetic and RFC3339 expiry are checked
+for overflow (maximum year 9999).

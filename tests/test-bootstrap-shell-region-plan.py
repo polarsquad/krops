@@ -97,14 +97,24 @@ if args[:2] == ['service-quotas', 'get-service-quota']:
     print(fixture['limit'] if region == 'eu-north-1' else 100)
 elif args[:2] == ['ec2', 'describe-addresses']:
     filters = args[args.index('--filters') + 1:args.index('--query')]
+    query = args[args.index('--query') + 1]
+    # Mirror the live EC2 API: no pool filter exists, so the request
+    # fails instead of silently narrowing (issue #636).
+    if any(f.startswith('Name=public-ipv4-pool') for f in filters):
+        print("aws: [ERROR]: An error occurred (InvalidParameterValue) when calling the DescribeAddresses operation: The filter 'public-ipv4-pool' is invalid", file=sys.stderr)
+        raise SystemExit(255)
     addresses = [a for a in fixture['addresses'] if a['region'] == region]
     for item in filters:
         name, value = item.removeprefix('Name=').split(',Values=')
         if name.startswith('tag:'):
             addresses = [a for a in addresses if a['owner'] == name.split('/cluster/')[1] and value == 'owned']
         else:
-            key = {'domain': 'domain', 'public-ipv4-pool': 'pool'}[name]
+            key = {'domain': 'domain'}[name]
             addresses = [a for a in addresses if a[key] == value]
+    # The preflight narrows client-side to the Amazon pool via the
+    # documented PublicIpv4Pool response field.
+    if "PublicIpv4Pool=='amazon'" in query:
+        addresses = [a for a in addresses if a['pool'] == 'amazon']
     print(len(addresses))
 else:
     raise SystemExit('unexpected AWS command')
@@ -145,7 +155,10 @@ def check_quota_population():
             for args in calls:
                 if args[:2] == ["ec2", "describe-addresses"]:
                     assert "Name=domain,Values=vpc" in args, args
-                    assert "Name=public-ipv4-pool,Values=amazon" in args, args
+                    # The live API rejects the pool filter (issue #636); the
+                    # BYOIP exclusion must come from the PublicIpv4Pool field.
+                    assert "Name=public-ipv4-pool,Values=amazon" not in args, args
+                    assert "length(Addresses[?PublicIpv4Pool=='amazon'])" in args, args
     print("✓ Shell EIP preflight excludes BYOIP and preserves Amazon ownership credit")
 
 

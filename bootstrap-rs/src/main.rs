@@ -962,6 +962,9 @@ async fn preflight_aws_quotas_with(cfg: &Config, aws: &str) -> Result<()> {
             as u32;
 
         // BYOIP is exempt; both counts must cover the same quota population.
+        // DescribeAddresses has no pool filter (the EC2 API rejects
+        // 'public-ipv4-pool', issue #636), so the Amazon-pool count comes
+        // from the documented PublicIpv4Pool response field instead.
         let allocated_raw = capture(
             aws,
             &[
@@ -971,9 +974,8 @@ async fn preflight_aws_quotas_with(cfg: &Config, aws: &str) -> Result<()> {
                 region,
                 "--filters",
                 "Name=domain,Values=vpc",
-                "Name=public-ipv4-pool,Values=amazon",
                 "--query",
-                "length(Addresses)",
+                "length(Addresses[?PublicIpv4Pool=='amazon'])",
                 "--output",
                 "text",
             ],
@@ -996,10 +998,9 @@ async fn preflight_aws_quotas_with(cfg: &Config, aws: &str) -> Result<()> {
                     region,
                     "--filters",
                     "Name=domain,Values=vpc",
-                    "Name=public-ipv4-pool,Values=amazon",
                     &filter,
                     "--query",
-                    "length(Addresses)",
+                    "length(Addresses[?PublicIpv4Pool=='amazon'])",
                     "--output",
                     "text",
                 ],
@@ -3149,14 +3150,24 @@ if args[:2] == ['service-quotas', 'get-service-quota']:
     print(fixture['limit'] if region == 'eu-north-1' else 100)
 elif args[:2] == ['ec2', 'describe-addresses']:
     filters = args[args.index('--filters') + 1:args.index('--query')]
+    query = args[args.index('--query') + 1]
+    # Mirror the live EC2 API: no pool filter exists, so the request
+    # fails instead of silently narrowing (issue #636).
+    if any(f.startswith('Name=public-ipv4-pool') for f in filters):
+        print("aws: [ERROR]: An error occurred (InvalidParameterValue) when calling the DescribeAddresses operation: The filter 'public-ipv4-pool' is invalid", file=sys.stderr)
+        raise SystemExit(255)
     addresses = [a for a in fixture['addresses'] if a['region'] == region]
     for item in filters:
         name, value = item.removeprefix('Name=').split(',Values=')
         if name.startswith('tag:'):
             addresses = [a for a in addresses if a['owner'] == name.split('/cluster/')[1] and value == 'owned']
         else:
-            key = {'domain': 'domain', 'public-ipv4-pool': 'pool'}[name]
+            key = {'domain': 'domain'}[name]
             addresses = [a for a in addresses if a[key] == value]
+    # The preflight narrows client-side to the Amazon pool via the
+    # documented PublicIpv4Pool response field.
+    if "PublicIpv4Pool=='amazon'" in query:
+        addresses = [a for a in addresses if a['pool'] == 'amazon']
     print(len(addresses))
 else:
     raise SystemExit('unexpected AWS command')
@@ -3178,9 +3189,14 @@ else:
                 let args: Vec<String> = serde_json::from_str(line).unwrap();
                 if args[0] == "ec2" {
                     assert!(args.iter().any(|arg| arg == "Name=domain,Values=vpc"));
-                    assert!(args
+                    // The live API rejects the pool filter (issue #636); the
+                    // BYOIP exclusion must come from the PublicIpv4Pool field.
+                    assert!(!args
                         .iter()
                         .any(|arg| arg == "Name=public-ipv4-pool,Values=amazon"));
+                    assert!(args
+                        .iter()
+                        .any(|arg| arg == "length(Addresses[?PublicIpv4Pool=='amazon'])"));
                 }
             }
         }

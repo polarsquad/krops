@@ -114,10 +114,13 @@ preflight_aws_quotas() {
     limit=$(printf '%.0f' "${limit_raw:-0}" 2>/dev/null) || limit=0
 
     # BYOIP does not consume this quota; credit ownership from the same population.
+    # DescribeAddresses has no pool filter (the EC2 API rejects
+    # 'public-ipv4-pool', issue #636), so the count is narrowed client-side
+    # to the Amazon pool via the documented PublicIpv4Pool response field.
     if ! allocated=$(aws ec2 describe-addresses \
       --region "$region" \
-      --filters "Name=domain,Values=vpc" "Name=public-ipv4-pool,Values=amazon" \
-      --query 'length(Addresses)' \
+      --filters "Name=domain,Values=vpc" \
+      --query "length(Addresses[?PublicIpv4Pool=='amazon'])" \
       --output text); then
       echo "ERROR: Failed to list EC2 EIPs in ${region}" >&2
       echo "       Check AWS credentials and ec2:DescribeAddresses permission" >&2
@@ -136,9 +139,9 @@ preflight_aws_quotas() {
     for cluster in ${clusters//,/ }; do
       if ! count=$(aws ec2 describe-addresses \
         --region "$region" \
-        --filters "Name=domain,Values=vpc" "Name=public-ipv4-pool,Values=amazon" \
+        --filters "Name=domain,Values=vpc" \
           "Name=tag:sigs.k8s.io/cluster-api-provider-aws/cluster/${cluster},Values=owned" \
-        --query 'length(Addresses)' \
+        --query "length(Addresses[?PublicIpv4Pool=='amazon'])" \
         --output text); then
         echo "ERROR: Failed to list EC2 EIPs owned by ${cluster} in ${region}" >&2
         echo "       Check AWS credentials and ec2:DescribeAddresses permission" >&2

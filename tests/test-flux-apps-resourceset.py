@@ -16,12 +16,15 @@ import yaml
 
 REPO = Path(__file__).resolve().parents[1]
 
-# cloud -> {source kind, region -> (live cluster name, expected cluster-vars keys)}
-# local-host is OUT of this PR (airgap generator entanglement): it keeps its
-# CRS and must not gain a ResourceSet.
+# cloud -> {source kind, per-input template flags, region -> (live cluster
+# name, expected cluster-vars keys)}. local-host sources the mgmt
+# `flux-system` OCIRepository, and its bundle carries no SOPS decryption,
+# cluster-vars, or pull secret.
 CLOUDS = {
     "aws": {
         "source": "GitRepository",
+        "decryption": True,
+        "pull_secret": True,
         "regions": {
             "eu-north-1": ("eu-north-1-workload",
                            ["AWS_REGION", "CLUSTER_NAME", "AWS_ACCOUNT_ID"]),
@@ -31,6 +34,8 @@ CLOUDS = {
     },
     "azure": {
         "source": "GitRepository",
+        "decryption": True,
+        "pull_secret": True,
         "regions": {
             "swedencentral": ("swedencentral-workload",
                               ["AZURE_LOCATION", "CLUSTER_NAME", "AZURE_SUBSCRIPTION_ID",
@@ -39,15 +44,23 @@ CLOUDS = {
     },
     "gcp": {
         "source": "GitRepository",
+        "decryption": True,
+        "pull_secret": True,
         "regions": {
             "europe-north1": ("europe-north1-workload",
                               ["GCP_REGION", "CLUSTER_NAME", "GCP_PROJECT",
                                "GCP_PROJECT_NUMBER", "GCP_NETWORK"]),
         },
     },
+    "local-host": {
+        "source": "OCIRepository",
+        "decryption": False,
+        "pull_secret": False,
+        "regions": {
+            "docker": ("local-workload", []),
+        },
+    },
 }
-# local-host must stay byte-identical: CRS present, no ResourceSet.
-LOCAL_HOST = "mgmt/local-host/addons/flux-apps"
 
 
 def build(rel: str) -> str:
@@ -113,11 +126,12 @@ def main() -> None:
                 fails.append(f"{rel}: {region} path != {want_path}")
             if k["spec"].get("prune") is not True:
                 fails.append(f"{rel}: {region} Kustomization must set prune: true")
-            dec = k["spec"].get("decryption") or {}
-            if dec.get("provider") != "sops":
-                fails.append(f"{rel}: {region} decryption.provider != sops")
-            if dec.get("secretRef", {}).get("name") != "sops-age":
-                fails.append(f"{rel}: {region} decryption.secretRef.name != sops-age")
+            if spec["decryption"]:
+                dec = k["spec"].get("decryption") or {}
+                if dec.get("provider") != "sops":
+                    fails.append(f"{rel}: {region} decryption.provider != sops")
+                if dec.get("secretRef", {}).get("name") != "sops-age":
+                    fails.append(f"{rel}: {region} decryption.secretRef.name != sops-age")
 
             # The per-region bundle must build and carry the right objects.
             brel = f"mgmt/{cloud}/addons/flux-apps/regions/{region}"
@@ -134,26 +148,15 @@ def main() -> None:
             for var in want_vars:
                 if var not in bundle:
                     fails.append(f"{brel}: cluster-var {var} missing")
-            # Pull secret: SOPS-encrypted, so CI has no age key to decrypt it.
-            # Check file presence + kustomization membership instead.
-            secret_file = REPO / brel / "flux-github-pat.sops.yaml"
-            kustomization = (REPO / brel / "kustomization.yaml").read_text()
-            if not secret_file.exists():
-                fails.append(f"{brel}: flux-github-pat.sops.yaml missing")
-            elif "flux-github-pat.sops.yaml" not in kustomization:
-                fails.append(f"{brel}: flux-github-pat.sops.yaml not listed in kustomization.yaml")
-
-    # local-host is out of this PR: its flux-apps tree must be unchanged
-    # (CRS still present, no ResourceSet introduced).
-    try:
-        lh = build(LOCAL_HOST)
-    except subprocess.CalledProcessError as e:
-        fails.append(f"{LOCAL_HOST}: kustomize build failed: {e.stderr.strip()}")
-    else:
-        if "kind: ClusterResourceSet" not in lh:
-            fails.append(f"{LOCAL_HOST}: local-host is out of this PR; its CRS must stay")
-        if "kind: ResourceSet" in lh:
-            fails.append(f"{LOCAL_HOST}: local-host must not gain a ResourceSet in this PR")
+            if spec["pull_secret"]:
+                # Pull secret: SOPS-encrypted, so CI has no age key to decrypt it.
+                # Check file presence + kustomization membership instead.
+                secret_file = REPO / brel / "flux-github-pat.sops.yaml"
+                kustomization = (REPO / brel / "kustomization.yaml").read_text()
+                if not secret_file.exists():
+                    fails.append(f"{brel}: flux-github-pat.sops.yaml missing")
+                elif "flux-github-pat.sops.yaml" not in kustomization:
+                    fails.append(f"{brel}: flux-github-pat.sops.yaml not listed in kustomization.yaml")
 
     if fails:
         for f in fails:

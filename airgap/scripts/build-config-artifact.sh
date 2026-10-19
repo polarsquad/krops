@@ -36,6 +36,8 @@ cp mgmt/local-host/addons/cni/kindnet.yaml "$LH/addons/cni/kindnet.yaml"
 cp mgmt/local-host/addons/cni/kustomization.yaml "$LH/addons/cni/kustomization.yaml"
 cp mgmt/local-host/addons/cni/flux-ks.yaml "$LH/addons/cni/flux-ks.yaml"
 cp mgmt/local-host/addons/flux-apps/kustomization.yaml "$LH/addons/flux-apps/kustomization.yaml"
+cp mgmt/local-host/addons/flux-apps/flux-apps-rset.yaml "$LH/addons/flux-apps/flux-apps-rset.yaml"
+cp -R mgmt/local-host/addons/flux-apps/regions "$LH/addons/flux-apps/regions"
 
 # Airgap variant of the per-cluster flux-operator HelmChartProxy: fetch the
 # chart from krops-registry (seeded by stage-and-create-cluster.sh) instead of
@@ -66,106 +68,84 @@ spec:
       createNamespace: true
 EOF
 
-# Airgap variant of the workload-cluster FluxInstance: distribution.artifact
-# is omitted (embedded distribution manifests; the operator's artifact fetch
-# has no insecure-registry option) and the four controllers are pinned to
-# tags. The images come from docker-loaded preLoadImages in the CAPD node
-# stores (see the cluster-class patch below); a loaded image has no
-# RepoDigests, so a digest reference never resolves (docs/airgap.md finding
-# 9) and no workload pod ever needs the internet. sync.url keeps pointing at krops-registry, which
-# stage-and-create-cluster.sh recreates and seeds in the gap.
-cat > "$LH/addons/flux-apps/flux-instance.yaml" <<'EOF'
-apiVersion: v1
-kind: ConfigMap
+# Airgap variant of the per-region FluxInstance (regions/docker/):
+# distribution.artifact is omitted (embedded distribution manifests; the
+# operator's artifact fetch has no insecure-registry option) and the four
+# controllers are pinned to tags with digests. The images come from
+# docker-loaded preLoadImages in the CAPD node stores (see the cluster-class
+# patch below); a loaded image has no RepoDigests, so a digest reference
+# never resolves (docs/airgap.md finding 9) and the strip below rewrites the
+# pins to plain tags before the artifact is pushed. The digest-pinned form
+# in this heredoc is required by the Renovate digest-pinning test; no
+# workload pod ever needs the internet. namespace.yaml and the bundle
+# kustomization are copied verbatim from the repo. sync.url keeps pointing
+# at krops-registry, which stage-and-create-cluster.sh recreates and seeds
+# in the gap.
+cat > "$LH/addons/flux-apps/regions/docker/flux-instance.yaml" <<'EOF'
+apiVersion: fluxcd.controlplane.io/v1
+kind: FluxInstance
 metadata:
-  name: local-workload-flux-instance
-  namespace: default
-data:
-  flux-instance.yaml: |
-    apiVersion: v1
-    kind: Namespace
-    metadata:
-      name: flux-system
-    ---
-    apiVersion: fluxcd.controlplane.io/v1
-    kind: FluxInstance
-    metadata:
-      name: flux
-      namespace: flux-system
-      annotations:
-        fluxcd.controlplane.io/reconcileEvery: "1h"
-        fluxcd.controlplane.io/reconcileTimeout: "5m"
-    spec:
-      distribution:
-        version: "2.x"
-        registry: "ghcr.io/fluxcd"
-      components:
-        - source-controller
-        - kustomize-controller
-        - helm-controller
-        - notification-controller
-      cluster:
-        type: kubernetes
-        size: small
-        multitenant: false
-        networkPolicy: true
-        domain: cluster.local
-      sync:
-        kind: OCIRepository
-        url: oci://krops-registry:5000/krops
-        ref: latest
-        path: workload/local-host
-      kustomize:
-        patches:
-          - patch: |
-              - op: add
-                path: /spec/insecure
-                value: true
-            target:
-              kind: OCIRepository
-          - patch: |
-              - op: replace
-                path: /spec/template/spec/containers/0/image
-                value: ghcr.io/fluxcd/source-controller:v1.9.6@sha256:6a6693172589f8ff26123a231d5fa6ceb194a6efb4dc647cdf057c959f76a2e3
-            target:
-              kind: Deployment
-              name: source-controller
-          - patch: |
-              - op: replace
-                path: /spec/template/spec/containers/0/image
-                value: ghcr.io/fluxcd/kustomize-controller:v1.9.6@sha256:2ebeaa341da77d52b6abbbba5efcee0450d47f8b42f0e6f33b08f9020262d606
-            target:
-              kind: Deployment
-              name: kustomize-controller
-          - patch: |
-              - op: replace
-                path: /spec/template/spec/containers/0/image
-                value: ghcr.io/fluxcd/helm-controller:v1.6.5@sha256:0d52fff5c4d476277b8fcb6beb9041e269adb5db943fe69f5a806ea0c92b1511
-            target:
-              kind: Deployment
-              name: helm-controller
-          - patch: |
-              - op: replace
-                path: /spec/template/spec/containers/0/image
-                value: ghcr.io/fluxcd/notification-controller:v1.9.4@sha256:840f318265ee26f0d2c48a158bf7896b22aa4e998e320a18646309f0e40b15da
-            target:
-              kind: Deployment
-              name: notification-controller
----
-apiVersion: addons.cluster.x-k8s.io/v1beta1
-kind: ClusterResourceSet
-metadata:
-  name: local-workload-flux-instance
-  namespace: default
+  name: flux
+  namespace: flux-system
+  annotations:
+    fluxcd.controlplane.io/reconcileEvery: "1h"
+    fluxcd.controlplane.io/reconcileTimeout: "5m"
 spec:
-  clusterSelector:
-    matchLabels:
-      fluxcd: enabled
-      krops.polarsquad.com/environment: local-host
-  strategy: ApplyOnce
-  resources:
-    - kind: ConfigMap
-      name: local-workload-flux-instance
+  distribution:
+    version: "2.x"
+    registry: "ghcr.io/fluxcd"
+  components:
+    - source-controller
+    - kustomize-controller
+    - helm-controller
+    - notification-controller
+  cluster:
+    type: kubernetes
+    size: small
+    multitenant: false
+    networkPolicy: true
+    domain: cluster.local
+  sync:
+    kind: OCIRepository
+    url: oci://krops-registry:5000/krops
+    ref: latest
+    path: workload/local-host
+  kustomize:
+    patches:
+      - patch: |
+          - op: add
+            path: /spec/insecure
+            value: true
+        target:
+          kind: OCIRepository
+      - patch: |
+          - op: replace
+            path: /spec/template/spec/containers/0/image
+            value: ghcr.io/fluxcd/source-controller:v1.9.6@sha256:6a6693172589f8ff26123a231d5fa6ceb194a6efb4dc647cdf057c959f76a2e3
+        target:
+          kind: Deployment
+          name: source-controller
+      - patch: |
+          - op: replace
+            path: /spec/template/spec/containers/0/image
+            value: ghcr.io/fluxcd/kustomize-controller:v1.9.6@sha256:2ebeaa341da77d52b6abbbba5efcee0450d47f8b42f0e6f33b08f9020262d606
+        target:
+          kind: Deployment
+          name: kustomize-controller
+      - patch: |
+          - op: replace
+            path: /spec/template/spec/containers/0/image
+            value: ghcr.io/fluxcd/helm-controller:v1.6.5@sha256:0d52fff5c4d476277b8fcb6beb9041e269adb5db943fe69f5a806ea0c92b1511
+        target:
+          kind: Deployment
+          name: helm-controller
+      - patch: |
+          - op: replace
+            path: /spec/template/spec/containers/0/image
+            value: ghcr.io/fluxcd/notification-controller:v1.9.4@sha256:840f318265ee26f0d2c48a158bf7896b22aa4e998e320a18646309f0e40b15da
+        target:
+          kind: Deployment
+          name: notification-controller
 EOF
 
 # cluster-class.yaml: add preLoadImages to both DevMachineTemplates. One
@@ -204,14 +184,18 @@ PY
 # Digest-less references for host-daemon images: docs/airgap.md finding 9.
 sed -E -i.bak '/customImage:|^ +- [a-z0-9.\/-]+(:[^@ ]+)@sha256:/ s/@sha256:[a-f0-9]{64}//' "$LH/clusters/docker/cluster-class.yaml"
 rm -f "$LH/clusters/docker/cluster-class.yaml.bak"
-sed -E -i.bak 's#(value: ghcr\.io/fluxcd/[a-z-]+:[^@ ]+)@sha256:[a-f0-9]{64}#\1#' "$LH/addons/flux-apps/flux-instance.yaml"
-rm -f "$LH/addons/flux-apps/flux-instance.yaml.bak"
-! grep -q 'value: ghcr.io/fluxcd/.*@sha256:' "$LH/addons/flux-apps/flux-instance.yaml" || {
+sed -E -i.bak 's#(value: ghcr\.io/fluxcd/[a-z-]+:[^@ ]+)@sha256:[a-f0-9]{64}#\1#' "$LH/addons/flux-apps/regions/docker/flux-instance.yaml"
+rm -f "$LH/addons/flux-apps/regions/docker/flux-instance.yaml.bak"
+! grep -q 'value: ghcr.io/fluxcd/.*@sha256:' "$LH/addons/flux-apps/regions/docker/flux-instance.yaml" || {
   echo "ERROR: digest references left in the workload flux-instance.yaml" >&2
   exit 1
 }
 ! grep -E 'customImage:|^ +- ' "$LH/clusters/docker/cluster-class.yaml" | grep -q '@sha256:' || {
   echo "ERROR: digest references left in the artifact's cluster-class.yaml" >&2
+  exit 1
+}
+! grep -rq "kind: ClusterResourceSet" "$LH/addons/flux-apps" || {
+  echo "ERROR: ClusterResourceSet must not be in the artifact's flux-apps (ResourceSet is the only delivery path)" >&2
   exit 1
 }
 

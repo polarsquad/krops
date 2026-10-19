@@ -6,7 +6,10 @@ versions Flux reconciles from Git, or Flux cannot adopt the imperative
 installs without drift. Fails when they disagree, when a declared
 provider-manifest or sync path is missing, when an environment's kind
 does not match its section name (the section name is authoritative for
-profile resolution), or when the file does not parse.
+profile resolution), or when the file does not parse. Also requires the
+two airgap flux-operator chart pins (the airgap generator's regenerated
+HelmChartProxy and the Zarf component) to agree with each other; their
+alignment against [charts].flux-operator is tracked in issue #633.
 Requires Python 3.11+ (tomllib); mise and CI both provide it.
 """
 
@@ -54,6 +57,37 @@ def manifest_version(path: Path) -> str:
     return matches[0]
 
 
+BLOCK_VERSION_RE = re.compile(r'^\s*version:\s*"?([0-9][^"\s]*)"?\s*$', re.MULTILINE)
+
+
+def block_version(block: str, label: str) -> str:
+    matches = BLOCK_VERSION_RE.findall(block)
+    if len(matches) != 1:
+        raise SystemExit(f"FAILED: expected exactly one version: line in {label}, found {len(matches)}")
+    return matches[0]
+
+
+def airgap_flux_operator_pins() -> tuple[str, str]:
+    """The two airgap-side flux-operator chart pins: the regenerated
+    HelmChartProxy in build-config-artifact.sh and the Zarf component."""
+    script = (REPO_ROOT / "airgap/scripts/build-config-artifact.sh").read_text()
+    match = re.search(
+        r"^cat > \"\$LH/addons/flux-apps/flux-operator\.yaml\" <<'EOF'\n(.*?)^EOF$",
+        script, re.M | re.S,
+    )
+    if match is None:
+        raise SystemExit("FAILED: no flux-operator.yaml heredoc in build-config-artifact.sh")
+    generator_pin = block_version(match.group(1), "the generator's flux-operator.yaml heredoc")
+    zarf = (REPO_ROOT / "airgap/zarf.yaml").read_text()
+    component = re.search(
+        r"^  - name: flux-operator\n.*?(?=^  - name: |\Z)", zarf, re.M | re.S
+    )
+    if component is None:
+        raise SystemExit("FAILED: no flux-operator component in airgap/zarf.yaml")
+    zarf_pin = block_version(component.group(0), "the airgap/zarf.yaml flux-operator component")
+    return generator_pin, zarf_pin
+
+
 def main() -> int:
     failures = []
     config_path = REPO_ROOT / "bootstrap.toml"
@@ -78,6 +112,22 @@ def main() -> int:
                 failures.append(
                     f"charts.{chart} = {declared} but {relative} pins {actual}"
                 )
+
+    # The gap registry only ever carries the chart version
+    # stage-and-create-cluster.sh derives from bootstrap.toml, so the two
+    # airgap-side pins must agree with each other: a split between them can
+    # never resolve. Their alignment against [charts].flux-operator itself
+    # is tracked in issue #633 (both pins are currently stale at 0.58.0).
+    try:
+        generator_pin, zarf_pin = airgap_flux_operator_pins()
+    except SystemExit as error:
+        failures.append(str(error))
+    else:
+        if generator_pin != zarf_pin:
+            failures.append(
+                f"airgap flux-operator chart pins disagree: generator heredoc "
+                f"{generator_pin} vs airgap/zarf.yaml {zarf_pin}"
+            )
 
     for name, env in config.get("environments", {}).items():
         kind = env.get("kind")

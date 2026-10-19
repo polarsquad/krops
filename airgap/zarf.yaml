@@ -58,7 +58,8 @@ components:
         name: cert-manager-cainjector
         namespace: cert-manager
 
-  # flux-operator chart: installs the operator and the FluxInstance CRD.
+  # flux-operator chart: installs the operator and the FluxInstance and
+  # ResourceSet CRDs.
   - name: flux-operator
     required: true
     charts:

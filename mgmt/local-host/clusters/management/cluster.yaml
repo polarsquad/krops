@@ -5,9 +5,11 @@ metadata:
   namespace: default
   labels:
     # environment=local-host makes the kindnet ClusterResourceSet supply the
-    # CNI (CAPD clusters ship none). Deliberately NOT `fluxcd: enabled`: that
-    # label would make the local-workload-flux-instance ClusterResourceSet
-    # deploy a workload FluxInstance into the management cluster.
+    # CNI (CAPD clusters ship none). The management cluster is not listed in
+    # spec.inputs of the flux-apps ResourceSet
+    # (mgmt/local-host/addons/flux-apps/flux-apps-rset.yaml), and fluxcd:
+    # enabled is deliberately absent: the flux-operator HelmChartProxy would
+    # compete with the bootstrap-installed release.
     krops.polarsquad.com/environment: local-host
 spec:
   clusterNetwork:

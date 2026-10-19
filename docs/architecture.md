@@ -418,7 +418,11 @@ kcc-identity (networking first, then postgres after networking, iam last).
 The `local-host` environment replaces AWS with local Docker containers (CAPD)
 and GitHub with a local in-memory OCI registry (`krops-registry:5000`). It
 provisions a one-control-plane/one-worker workload cluster and reconciles the
-Podinfo demo application end to end on a single host.
+Podinfo demo application end to end on a single host. The per-workload Flux
+bag is delivered by a templated ResourceSet like the clouds, but the
+local-host bundle carries only the FluxInstance (no cluster-vars, no pull
+secret) and the per-cluster Kustomization sources from the mgmt
+`flux-system` OCIRepository.
 
 See the architecture diagram in [docs/local-host-infra.svg](local-host-infra.svg).
 
@@ -447,7 +451,7 @@ flowchart TD
         CAAPH[caaph-system]
         MGMT["management cluster def<br/>local-management (Docker)"]
         DOCKER["clusters/docker def<br/>local-workload"]
-        FA["flux-apps (HelmChartProxy + CRS)"]
+        FA["flux-apps (HelmChartProxy + ResourceSet)"]
 
         FS --> CM --> CO --> CAPIS --> CAPDS
         CAPIS --> CAAPH --> FA

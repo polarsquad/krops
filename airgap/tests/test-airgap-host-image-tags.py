@@ -77,9 +77,12 @@ def check_artifact_stripping() -> None:
     seds = re.findall(r"^sed -E -i\.bak (.+) \"\$LH/(.+)\"$", text, re.M)
     by_target = {target: expr for expr, target in seds if "@sha256" in expr}
     class_expr = by_target.get("clusters/docker/cluster-class.yaml")
-    flux_expr = by_target.get("addons/flux-apps/flux-instance.yaml")
+    flux_expr = by_target.get("addons/flux-apps/regions/docker/flux-instance.yaml")
     if not class_expr or not flux_expr:
-        sys.exit("build-config-artifact.sh no longer strips digests from cluster-class.yaml and flux-instance.yaml")
+        sys.exit(
+            "build-config-artifact.sh no longer strips digests from "
+            "cluster-class.yaml and the per-region flux-instance.yaml"
+        )
 
     def strip(expr: str, content: str) -> str:
         with tempfile.NamedTemporaryFile("w+", suffix=".yaml") as f:
@@ -97,13 +100,23 @@ def check_artifact_stripping() -> None:
         sys.exit(f"cluster-class digests were not stripped: {result!r}")
     if other not in result:
         sys.exit("cluster-class stripping touched an unrelated line")
-    flux = f"            value: ghcr.io/fluxcd/source-controller:v1.9.4@{DIGEST}\n"
-    if strip(flux_expr, flux) != "            value: ghcr.io/fluxcd/source-controller:v1.9.4\n":
+    flux = f"                value: ghcr.io/fluxcd/source-controller:v1.9.4@{DIGEST}\n"
+    if strip(flux_expr, flux) != "                value: ghcr.io/fluxcd/source-controller:v1.9.4\n":
         sys.exit("flux-instance digests were not stripped")
     for guard in ("digest references left in the workload flux-instance.yaml",
-                  "digest references left in the artifact's cluster-class.yaml"):
+                  "digest references left in the artifact's cluster-class.yaml",
+                  "ClusterResourceSet must not be in the artifact's flux-apps"):
         if guard not in text:
             sys.exit(f"missing post-strip guard: {guard}")
+    # The ConfigMap+CRS heredoc is gone: the only lines that may mention a
+    # ClusterResourceSet are the no-CRS guard itself (grep + error message).
+    crs_lines = [line for line in text.splitlines() if "ClusterResourceSet" in line]
+    guard_lines = [line for line in crs_lines if "grep -rq" in line or "ERROR: ClusterResourceSet" in line]
+    if len(crs_lines) != 2 or crs_lines != guard_lines:
+        sys.exit(
+            "build-config-artifact.sh must not define a ClusterResourceSet "
+            "manifest; only the no-CRS guard may mention it"
+        )
 
 
 def check_pause_image() -> None:

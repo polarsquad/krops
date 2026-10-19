@@ -48,9 +48,9 @@ spec:
   project: ${GCP_PROJECT}
   location: europe-north1-a
   clusterName: krops-europe-north1-workload
-  # Placeholder until `gcloud container get-server-config --location
-  # europe-north1-a` is run against the real project (acceptance run).
-  version: "1.33.4-gke.1234000"
+  # Newest REGULAR-channel validVersion from `gcloud container
+  # get-server-config --location europe-north1-a` (acceptance run).
+  version: "1.36.4-gke.1495002"
   releaseChannel: regular
   clusterSecurity:
     workloadIdentityConfig:
@@ -77,7 +77,7 @@ spec:
         apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
         kind: GCPManagedMachinePool
         name: workload-system
-      version: "1.33.4-gke.1234000"
+      version: "1.36.4-gke.1495002"
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: GCPManagedMachinePool
@@ -95,11 +95,42 @@ spec:
     autoUpgrade: false
 ---
 # ── ARM user pool (the aws/azure Arm pool's counterpart) ────────────────────
-# OMITTED pending spike S4 (arm machine-type availability in europe-north1-a),
-# which requires an authenticated gcloud and runs during the acceptance phase:
-#   gcloud compute machine-types list --zones europe-north1-a \
-#     --filter="name~'^(c4a|t2a)'"
-# If it returns a type, add a workload-arm MachinePool + GCPManagedMachinePool
-# here (machineType c4a-standard-2 or t2a-standard-2, replicas 2,
-# kubernetesLabels: {node.kubernetes.io/arch: arm64}), mirroring
+# Spike S4 (acceptance run): c4a-standard-2 is available in europe-north1-a
+# (the t2a family is not listed in that zone), so c4a-standard-2 is used per
+# the plan's decision rule. Mirrors
 # mgmt/azure/clusters/swedencentral/staging/cluster.yaml's workload-arm pool.
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachinePool
+metadata:
+  name: workload-arm
+  namespace: default
+spec:
+  clusterName: workload
+  replicas: 2
+  template:
+    spec:
+      clusterName: workload
+      bootstrap:
+        dataSecretName: ""
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        kind: GCPManagedMachinePool
+        name: workload-arm
+      version: "1.36.4-gke.1495002"
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: GCPManagedMachinePool
+metadata:
+  name: workload-arm
+  namespace: default
+spec:
+  machineType: c4a-standard-2
+  diskSizeGb: 50
+  diskType: pd-standard
+  nodeLocations:
+    - europe-north1-a
+  kubernetesLabels:
+    node.kubernetes.io/arch: arm64
+  management:
+    autoRepair: true
+    autoUpgrade: false

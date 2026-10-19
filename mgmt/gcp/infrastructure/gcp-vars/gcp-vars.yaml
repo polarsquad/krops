@@ -18,7 +18,7 @@ metadata:
   name: gcp-vars
   namespace: flux-system
 data:
-  GCP_PROJECT: "krops-placeholder"
-  GCP_PROJECT_NUMBER: "000000000000"
+  GCP_PROJECT: "josephs-sandbox-508907"
+  GCP_PROJECT_NUMBER: "96608837778"
   GCP_REGION: "europe-north1"
   GCP_ZONE: "europe-north1-a"

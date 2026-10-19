@@ -49,9 +49,9 @@ spec:
   # location and clusterName (infrastructure/kcc-identity/pool.yaml).
   location: europe-north1-a
   clusterName: krops-europe-north1-management
-  # Placeholder until `gcloud container get-server-config --location
-  # europe-north1-a` is run against the real project (acceptance run).
-  version: "1.33.4-gke.1234000"
+  # Newest REGULAR-channel validVersion from `gcloud container
+  # get-server-config --location europe-north1-a` (acceptance run).
+  version: "1.36.4-gke.1495002"
   releaseChannel: regular
   clusterSecurity:
     workloadIdentityConfig:
@@ -74,7 +74,7 @@ spec:
         apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
         kind: GCPManagedMachinePool
         name: management-pool
-      version: "1.33.4-gke.1234000"
+      version: "1.36.4-gke.1495002"
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: GCPManagedMachinePool

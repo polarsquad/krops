@@ -39,6 +39,20 @@ CAPI, the cloud operators) directly instead of wrapping it in generators,
 templating layers, or in-house CRDs, and adds a layer only when it removes
 more complexity than it introduces.
 
+### Cloud operators on the management cluster
+
+The cloud operators run on the management cluster: ACK for AWS, the ASO
+bundled with CAPZ for Azure, and Config Connector for GCP. They reconcile
+the per-workload-cluster cloud resources through
+mgmt/<cloud>/infrastructure/workload-resources/, so each workload's cloud
+resources are declared alongside the management cluster's other
+infrastructure.
+
+The workload clusters run no controllers and hold no credentials: no
+operator deployment, no workload identity, no secrets at rest. A workload
+that needs cloud access gets it the same way the management cluster does,
+not by installing its own operator.
+
 ## AWS environment (aws)
 
 The reference environment manages AWS infrastructure through the Kubernetes

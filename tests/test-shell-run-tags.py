@@ -35,10 +35,10 @@ elif 'create' in args: print('{}')
                 (path / cmd).chmod(0o755)
             (path / 'date').write_text("""#!/usr/bin/env python3
 from datetime import datetime, timezone
-import sys
+import os, sys
 args = sys.argv[1:]
 if args == ['-u', '+%s']:
-    print(1700000000)
+    print(os.environ.get('FAKE_NOW', '1700000000'))
 else:
     seconds = int(args[2].lstrip('@')) if args[1] in ('-d', '-r') else 1700000000
     print(datetime.fromtimestamp(seconds, timezone.utc).strftime(args[-1].lstrip('+')))
@@ -101,6 +101,21 @@ else:
                 result, events = self.run_shell(sequence, failure)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse(any(e[0] == 'helm' for e in events))
+
+    def test_ttl_clock_overflow(self):
+        result, _ = self.run_shell('resolve_run_tags', {'FAKE_NOW': '253402300800', 'KROPS_RUN_TTL': '0h'})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('clock overflow', result.stderr)
+
+    def test_activate_requires_prepare(self):
+        # SEED_REGISTRY_CONFIG not set at all
+        result, _ = self.run_shell('unset SEED_REGISTRY_CONFIG; activate_flux')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('activate_flux called before prepare_flux', result.stderr)
+        # SEED_REGISTRY_CONFIG set but empty
+        result, _ = self.run_shell('SEED_REGISTRY_CONFIG=""; activate_flux')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('activate_flux called before prepare_flux', result.stderr)
 
 
 if __name__ == '__main__':

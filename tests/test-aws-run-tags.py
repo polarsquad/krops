@@ -181,10 +181,12 @@ common_text = (REPO / "bootstrap-common.sh").read_text()
 for forbidden in ["_KROPS_RUN_ID", "date -u +%Y%m%dT", "KROPS_RUN_TTL"]:
     if forbidden in pivot_text:
         errors.append(f"pivot.sh: must not generate run tags (found {forbidden!r})")
-if "read_source_run_tags" not in pivot_text or "get configmap krops-run" not in common_text:
-    errors.append("pivot.sh: must read krops-run ConfigMap from kind (missing 'get configmap krops-run')")
+if "read_source_run_tags" not in pivot_text:
+    errors.append("pivot.sh: must call read_source_run_tags to copy krops-run from kind")
+if "get configmap krops-run" not in common_text:
+    errors.append("bootstrap-common.sh: read_source_run_tags must read the krops-run ConfigMap (missing 'get configmap krops-run')")
 if not re.search(r'--context\s+\S+\s+get configmap krops-run|get configmap krops-run.*--context', common_text):
-    errors.append("pivot.sh: must use explicit --context when reading from kind (missing '--context' in krops-run read)")
+    errors.append("bootstrap-common.sh: must use explicit --context when reading from kind (missing '--context' in krops-run read)")
 
 if errors:
     for e in errors:

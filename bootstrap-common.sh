@@ -322,6 +322,10 @@ prepare_flux() {
 
 # Activate reconciliation only after the run metadata has been applied.
 activate_flux() {
+  if [ -z "${SEED_REGISTRY_CONFIG:-}" ]; then
+    echo "ERROR: activate_flux called before prepare_flux (SEED_REGISTRY_CONFIG unset)" >&2
+    return 1
+  fi
   local registry_name="${REGISTRY_NAME:-krops-registry}"
   # ── Install the FluxInstance via Helm ───────────────────────────────────────
   echo ">>> Installing FluxInstance via Helm..."
@@ -406,6 +410,10 @@ resolve_run_tags() {
     seconds=$((seconds * 10 + digit))
   done
   now="$(date -u +%s)"
+  if [ "$now" -gt 253402300799 ]; then
+    echo "ERROR: clock overflow: now=$now exceeds max epoch 253402300799" >&2
+    return 1
+  fi
   if [ "$seconds" -gt $(((253402300799 - now) / unit)) ]; then
     echo 'ERROR: KROPS_RUN_TTL expiry overflows RFC3339' >&2; return 1
   fi

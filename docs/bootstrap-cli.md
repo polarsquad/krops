@@ -154,7 +154,7 @@ pins together with their declarative counterparts. See
 | `PIVOT_SKIP_DELETE` | `0` | Literal `1` keeps kind after a successful pivot |
 | `KROPS_RUN_ID` | `{profile}-{timestamp}` | Bootstrap/pivot run identifier for resource tagging; set to override auto-generation |
 | `KROPS_RUN_TTL` | `86400s` (24h) | Unsigned decimal seconds with optional `s`, `m`, or `h` (e.g. `3600`, `2h`); whitespace trimmed, empty defaults to 24h; `none` disables expiry |
-| `KROPS_REVISION` | Git branch HEAD SHA | Git revision tag for resource tagging; auto-extracted from GitHub during bootstrap |
+| `KROPS_REVISION` | Git branch HEAD SHA, else the forwarded `KROPS_OCI_GIT_SHA` checkout SHA, else `unknown` | Git revision tag for resource tagging; auto-extracted from GitHub during bootstrap, else the checkout SHA the toolbox wrapper forwards |
 | `KROPS_RUN_KIND` | `manual` | Bootstrap/pivot invocation kind for resource tagging (e.g. `manual`, `scheduled`, `emergency`) |
 
 The pivot's target node-readiness wait uses a fixed 15m budget (`MGMT_NODE_READY_TIMEOUT` in `pivot.sh` and `bootstrap-rs/src/main.rs`). It is not an environment knob and is separate from `MGMT_READY_TIMEOUT`.
@@ -343,6 +343,8 @@ recorded.
 Run metadata is validated before the FluxInstance activates reconciliation.
 Pivot copies all four nonempty data keys exactly; bootstrap regenerates metadata
 only when a rerun ConfigMap is absent, and propagates read or decoding failures.
-Rust discovers the branch SHA for the revision default; shell uses `unknown`.
+Rust discovers the branch SHA for the revision default, then falls back to
+the `KROPS_OCI_GIT_SHA` checkout SHA the toolbox wrapper forwards, then
+`unknown`; shell uses `unknown`.
 Both accept `KROPS_REVISION`. TTL arithmetic and RFC3339 expiry are checked
 for overflow (maximum year 9999).

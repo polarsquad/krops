@@ -17,6 +17,7 @@ const NS: &str = "flux-system";
 const KROPS_RUN_ID: &str = "KROPS_RUN_ID";
 const KROPS_RUN_TTL: &str = "KROPS_RUN_TTL";
 const KROPS_REVISION: &str = "KROPS_REVISION";
+const KROPS_OCI_GIT_SHA: &str = "KROPS_OCI_GIT_SHA";
 const KROPS_EXPIRES_AT: &str = "KROPS_EXPIRES_AT";
 const KROPS_RUN_KIND: &str = "KROPS_RUN_KIND";
 
@@ -49,7 +50,10 @@ pub struct RunTags {
 }
 
 impl RunTags {
-    /// Resolve run tags from environment, profile defaults, and branch SHA.
+    /// Resolve run tags from environment, profile defaults, branch SHA, and
+    /// the forwarded checkout SHA. The revision resolves as: KROPS_REVISION
+    /// env (nonempty), then the GitHub branch SHA, then KROPS_OCI_GIT_SHA
+    /// (the checkout SHA the toolbox wrapper forwards), then "unknown".
     /// If KROPS_RUN_ID env is already set, use the existing ConfigMap values
     /// (rerun-safe). Otherwise, generate new values and apply them.
     pub fn resolve(
@@ -64,7 +68,9 @@ impl RunTags {
 
         let revision = get_env(KROPS_REVISION)
             .filter(|v| !v.is_empty())
-            .unwrap_or_else(|| branch_sha.unwrap_or("unknown").to_string());
+            .or_else(|| branch_sha.map(str::to_owned))
+            .or_else(|| get_env(KROPS_OCI_GIT_SHA).filter(|v| !v.is_empty()))
+            .unwrap_or_else(|| "unknown".to_string());
 
         let ttl = get_env(KROPS_RUN_TTL).unwrap_or_default();
         let ttl = ttl.trim();
@@ -472,6 +478,74 @@ mod tests {
             "override"
         );
         assert!(checked_expiry(i64::MAX, 1).is_err());
+    }
+
+    #[test]
+    fn revision_precedence_env_branch_oci_unknown() {
+        // KROPS_REVISION wins over branch SHA and KROPS_OCI_GIT_SHA.
+        assert_eq!(
+            RunTags::resolve(
+                |key| match key {
+                    KROPS_REVISION => Some("explicit".to_string()),
+                    KROPS_OCI_GIT_SHA => Some("oci-sha".to_string()),
+                    _ => None,
+                },
+                "aws",
+                Some("branch-sha"),
+                0,
+            )
+            .unwrap()
+            .revision,
+            "explicit"
+        );
+        // Branch SHA (GitHub sync envs) beats KROPS_OCI_GIT_SHA.
+        assert_eq!(
+            RunTags::resolve(
+                |key| (key == KROPS_OCI_GIT_SHA).then(|| "oci-sha".to_string()),
+                "aws",
+                Some("branch-sha"),
+                0,
+            )
+            .unwrap()
+            .revision,
+            "branch-sha"
+        );
+        // KROPS_OCI_GIT_SHA is the fallback where branch SHA is absent.
+        assert_eq!(
+            RunTags::resolve(
+                |key| (key == KROPS_OCI_GIT_SHA).then(|| "oci-sha".to_string()),
+                "aws",
+                None,
+                0,
+            )
+            .unwrap()
+            .revision,
+            "oci-sha"
+        );
+        // Empty KROPS_REVISION falls through to the branch SHA.
+        assert_eq!(
+            RunTags::resolve(
+                |key| (key == KROPS_REVISION).then(String::new),
+                "aws",
+                Some("branch-sha"),
+                0,
+            )
+            .unwrap()
+            .revision,
+            "branch-sha"
+        );
+        // Empty KROPS_OCI_GIT_SHA falls through to unknown.
+        assert_eq!(
+            RunTags::resolve(
+                |key| (key == KROPS_OCI_GIT_SHA).then(String::new),
+                "aws",
+                None,
+                0,
+            )
+            .unwrap()
+            .revision,
+            "unknown"
+        );
     }
 
     #[tokio::test]

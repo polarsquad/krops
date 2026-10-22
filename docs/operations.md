@@ -393,7 +393,7 @@ for lifecycle tracking and cost attribution (#381):
 | Tag key | ConfigMap key | Default | Meaning |
 |---|---|---|---|
 | `krops.io/run-id` | `KROPS_RUN_ID` | `{profile}-{timestamp}` (auto-generated) | Bootstrap/pivot invocation identifier (e.g. `gha-123` for GitHub Actions run, or `{profile}-{timestamp}` auto-generated) |
-| `krops.io/revision` | `KROPS_REVISION` | `unknown` | Git branch HEAD SHA; extracted from GitHub API during bootstrap |
+| `krops.io/revision` | `KROPS_REVISION` | `unknown` | Git branch HEAD SHA; extracted from GitHub API during bootstrap, else the `KROPS_OCI_GIT_SHA` checkout SHA the toolbox wrapper forwards |
 | `krops.io/expires-at` | `KROPS_EXPIRES_AT`[^expires-at-derived] | `{now + 24h}` | Resource expiry target (RFC3339 timestamp or literal `never`) |
 | `krops.io/run-kind` | `KROPS_RUN_KIND` | `manual` | Lifecycle context (`manual`, `scheduled`, `emergency`, etc.) |
 
@@ -465,6 +465,7 @@ and before installing the FluxInstance. Failed reads or writes prevent activatio
 in both paths.
 
 Rust uses the discovered branch SHA as the default revision, falling back to
+the `KROPS_OCI_GIT_SHA` checkout SHA the toolbox wrapper forwards, then
 `unknown`; shell defaults to `unknown`. Both honor `KROPS_REVISION`.
 
 #### Lookup and cleanup

@@ -384,6 +384,17 @@
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker"
     },
+    {
+      "customType": "regex",
+      "description": "kindest/node bootstrap kind node image pin in bootstrap.toml (#647)",
+      "managerFilePatterns": ["/(^|/)bootstrap\\.toml$/"],
+      "matchStrings": [
+        "kind-node-image = \\\"kindest/node:v(?<currentValue>[0-9A-Za-z.\\-]+)(?:@(?<currentDigest>sha256:[a-f0-9]{64}))?\\\""
+      ],
+      "depNameTemplate": "kindest/node",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    },
     // ── virtualized-e2e harness images ───────────────────────────────────
     {
       "customType": "regex",

@@ -47,7 +47,8 @@ Renovate discovers and updates versions in:
 - `mgmt/**` and `workload/**` YAML: Flux, Helm, Kubernetes manifests, chart
   values, and clusterctl provider CRs under `capi-providers/`.
 - `kindest/node` image tags wherever they are referenced in management
-  manifests and air-gap scripts.
+  manifests and air-gap scripts, and the `kind-node-image` pin in
+  `bootstrap.toml` (the kind bootstrap node, #647).
 - `airgap/images.txt` and `airgap/zarf.yaml`: container image references,
   pinned by digest. `airgap/zarf.yaml` also embeds its own Helm chart-version
   pins (e.g. cert-manager's); the cert-manager one is annotation-driven like
@@ -84,7 +85,8 @@ keeps a freshly published, possibly compromised release from landing on
 `main` unreviewed.
 
 The `kubernetes-version` group (#142) covers `kindest/node` (docker datasource:
-the local-host node image and both Cluster `topology.version` pins),
+the local-host node image, the `kind-node-image` pin in `bootstrap.toml`, and
+both Cluster `topology.version` pins),
 `kubernetes/kubernetes` (github-releases datasource: the `kubectl` pin in
 `mise.toml` and the local-talos `TalosControlPlane.spec.version` annotation),
 and the `airgap/images.txt` images kubeadm itself deploys for that release
@@ -176,7 +178,11 @@ arguments. Renovate manages those base references and build arguments.
    pin from kubeadm and the registry so the fix can be committed by hand. The
    workload cluster, the
    CAPD management cluster, and the kind bootstrap mgmt node all run the
-   same `kindest/node` version. The check compares against `kubeadm config
+   same `kindest/node` version. The kind-bootstrap leg of that invariant is
+   enforced by `tests/test-kind-node-image-consistency.py`, which requires
+   the `kind-node-image` pin in `bootstrap.toml` to equal the ClusterClass
+   `customImage` pins, the Cluster `topology.version` pins, and the airgap
+   `kindest/node` refs (#647). The check compares against `kubeadm config
    images list` for that version, not a live `crictl` harvest against a
    running node -- worth re-confirming there once an operator has one.
    Also (#322) that cert-manager's chart

@@ -42,6 +42,9 @@ pub struct BootstrapSection {
     pub sops_age_secret: String,
     pub mgmt_namespace: String,
     pub mgmt_context: String,
+    /// kindest/node image (tag+digest) for the bootstrap kind node (#647);
+    /// must equal the CAPD ClusterClass customImage pins.
+    pub kind_node_image: String,
 }
 
 /// The Flux sync source for an environment
@@ -269,6 +272,7 @@ github-pat-secret = "flux-github-pat"
 sops-age-secret = "sops-age"
 mgmt-namespace = "default"
 mgmt-context = "krops-mgmt"
+kind-node-image = "kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed"
 
 [charts]
 flux-operator = "0.58.0"
@@ -310,6 +314,7 @@ manifest = "mgmt/aws/infrastructure/aws-identity/identity.yaml"
         let config = parse(MINIMAL).unwrap();
         assert_eq!(config.bootstrap.git_branch, "main");
         assert_eq!(config.bootstrap.default_environment, "aws");
+        assert_eq!(config.bootstrap.kind_node_image, "kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed");
         assert_eq!(config.charts["flux-operator"], "0.58.0");
 
         let aws = config.environment("aws").unwrap();

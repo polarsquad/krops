@@ -24,6 +24,11 @@ github-pat-secret = "flux-github-pat"
 sops-age-secret = "sops-age"
 mgmt-namespace = "default"
 mgmt-context = "krops-mgmt"
+# kindest/node image (tag+digest) for the bootstrap kind node. Must equal
+# the CAPD ClusterClass customImage pins and the airgap kindest/node refs;
+# tests/test-kind-node-image-consistency.py enforces it (#647). Renovate
+# bumps it in the kubernetes-version group via the dedicated manager.
+kind-node-image = "kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed"
 
 [charts]
 # Chart versions installed imperatively before Flux exists. Keep in sync

@@ -59,12 +59,18 @@ if [ "$PROFILE" = local-host ]; then
     [plugins.\"io.containerd.grpc.v1.cri\".registry.mirrors.\"localhost:${REGISTRY_PORT}\"]
       endpoint = [\"http://${REGISTRY_NAME}:5000\"]"
 fi
+# The bootstrap node's k8s version is repo-managed (#647): kind 0.33+
+# changed its baked-in default node image, so pin it explicitly from
+# bootstrap.toml instead of letting the kind binary decide.
+kind_node_image=$(sed -nE 's/^kind-node-image = "(.*)"/\1/p' bootstrap.toml | head -1)
+[ -n "$kind_node_image" ] || { echo "ERROR: no kind-node-image in bootstrap.toml [bootstrap]" >&2; exit 1; }
 kind create cluster --name mgmt --config - <<EOF
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 ${KIND_REGISTRY_PATCH}
 nodes:
   - role: control-plane
+    image: ${kind_node_image}
     extraMounts:
       - hostPath: ${ENGINE_SOCK}
         containerPath: /var/run/docker.sock

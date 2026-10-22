@@ -386,12 +386,15 @@ fn capd_recorded_endpoint(kubeconfig: &str) -> Option<String> {
 }
 
 /// Render the kind cluster config, mirroring the script's heredoc.
-/// `registry_name` comes from bootstrap.toml ([bootstrap] registry-name).
+/// `registry_name` comes from bootstrap.toml ([bootstrap] registry-name);
+/// `node_image` is the [bootstrap] kind-node-image pin (#647) that fixes
+/// the bootstrap node's k8s version instead of kind's baked-in default.
 fn render_kind_config(
     is_local: bool,
     registry_port: u16,
     engine_sock: &str,
     registry_name: &str,
+    node_image: &str,
 ) -> String {
     let registry_patch = if is_local {
         format!(
@@ -401,7 +404,7 @@ fn render_kind_config(
         String::new()
     };
     format!(
-        "kind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\n{registry_patch}nodes:\n  - role: control-plane\n    extraMounts:\n      - hostPath: {engine_sock}\n        containerPath: /var/run/docker.sock\n"
+        "kind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\n{registry_patch}nodes:\n  - role: control-plane\n    image: {node_image}\n    extraMounts:\n      - hostPath: {engine_sock}\n        containerPath: /var/run/docker.sock\n"
     )
 }
 
@@ -1133,6 +1136,7 @@ async fn ensure_kind_cluster(cfg: &Config, engine: &str, engine_sock: &str) -> R
         cfg.registry_port,
         engine_sock,
         &cfg.repo.bootstrap.registry_name,
+        &cfg.repo.bootstrap.kind_node_image,
     );
     run_with_stdin(
         "kind",
@@ -3882,16 +3886,21 @@ else:
 
     #[test]
     fn kind_config_includes_registry_patch_for_local_host_only() {
-        let local = render_kind_config(true, 5001, "/var/run/docker.sock", "krops-registry");
+        // The image line is environment-independent: the kind-node-image
+        // pin (#647) is rendered in every config.
+        let image = "kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed";
+        let local = render_kind_config(true, 5001, "/var/run/docker.sock", "krops-registry", image);
         assert!(local.contains("containerdConfigPatches"));
         assert!(local.contains("localhost:5001"));
         assert!(local.contains("http://krops-registry:5000"));
         assert!(local.contains("hostPath: /var/run/docker.sock"));
+        assert!(local.contains("image: kindest/node:"));
 
-        let aws = render_kind_config(false, 5001, "/var/run/docker.sock", "krops-registry");
+        let aws = render_kind_config(false, 5001, "/var/run/docker.sock", "krops-registry", image);
         assert!(!aws.contains("containerdConfigPatches"));
         assert!(aws.contains("kind: Cluster"));
         assert!(aws.contains("role: control-plane"));
+        assert!(aws.contains("image: kindest/node:"));
     }
 
     #[test]

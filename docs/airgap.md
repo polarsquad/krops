@@ -356,7 +356,7 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
      raises `fs.inotify.max_user_watches`/`max_user_instances` (kind's own
      documented values) before creating any node containers. The scheduled
      `air-gapped.yml` (`isolated-deploy` job) raises the same limits; its
-     missing step caused #322/#431/#488, and
+     missing step caused #322/#488, and
      `airgap/tests/test-airgap-workflow-config.py` now guards it.
 
 ## Known limitations / follow-ups

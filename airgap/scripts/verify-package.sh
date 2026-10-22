@@ -3,9 +3,9 @@
 
 airgap_verify_package() {
   local pkg=$1 sbom_dir=$2 doc sbom_found=0
-  local VERIFY_ARGS=() ZARF
+  local VERIFY_ARGS=()
+  local ZARF="${ZARF:-$(command -v zarf)}"
 
-  ZARF="${ZARF:-$(command -v zarf)}"
   if [ -n "${ZARF_VERIFY_KEY:-}" ]; then
     VERIFY_ARGS+=(--key "$ZARF_VERIFY_KEY")
   else

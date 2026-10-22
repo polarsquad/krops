@@ -402,7 +402,7 @@ its sha256, swap the staged archive in, then run the deploy command
 active archive untouched. A failed deploy restores the prior archive and exits
 3. A successful deploy leaves `phase=awaiting-confirm`: a second `apply` is
 refused until you run `confirm` (drops the `.bak`) or `rollback` (restores the
-`.bak`).
+`.bak`). An `.update-state` with any other content also refuses `apply` (exit 1); inspect it and run `rollback` or remove it manually.
 
 Files, all under `airgap/archives/` (gitignored):
 
@@ -413,7 +413,7 @@ Files, all under `airgap/archives/` (gitignored):
 | `<active>.bak.sha256` | Recorded digest of `.bak`, checked before any restore |
 | `.staging/` | Candidate package during verification; discarded by the next `apply` |
 | `.update-state` | `phase=cutover` or `phase=awaiting-confirm`, plus `first_install=1` for a first install |
-| `.update.lock` | Directory lock holding the owner pid; stale locks are reclaimed |
+| `.update.lock` | Directory lock holding the owner pid; stale locks are reclaimed, and reclaiming is not race-free, so run one update at a time |
 
 The `*.tar` glob in `stage-and-create-cluster.sh` does not match any of these
 names, so staging and backups never get loaded as images.

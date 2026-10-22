@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = REPO_ROOT / "airgap/scripts"
@@ -61,6 +62,8 @@ if argv[:1] == ["init"] or argv[:2] == ["package", "deploy"]:
     print("UNEXPECTED ZARF CALL: " + " ".join(argv), file=sys.stderr)
     sys.exit(99)
 if argv[:2] == ["package", "verify"]:
+    if os.environ.get("STUB_LITTER_STAGING"):
+        Path(argv[2]).parent.joinpath("litter").touch()
     sys.exit(0 if valid(argv[2]) else 1)
 if argv[:3] == ["package", "inspect", "sbom"]:
     if not valid(argv[3]):
@@ -132,21 +135,26 @@ class Harness:
         shutil.copy(VERIFY_SH, root / "airgap/scripts/verify-package.sh")
         return root
 
-    def env(self, tree, deploy_rc=0):
+    def env(self, tree, deploy_rc=0, extra_env=None):
         env = {k: v for k, v in os.environ.items() if k not in STRIPPED_ENV}
         if self.zarf is None:
             env["PATH"] = f"{self.bin_dir}{os.pathsep}{os.environ['PATH']}"
         else:
             env["ZARF"] = self.zarf
+            ref = os.environ.get("AIRGAP_VERIFY_WORKFLOW_REF")
+            if ref:
+                env["AIRGAP_VERIFY_WORKFLOW_REF"] = ref
         env["AIRGAP_DEPLOY_CMD"] = str(self.deploy_stub)
         env["STUB_DEPLOY_LOG"] = str(tree / "deploy.log")
         env["STUB_DEPLOY_RC"] = str(deploy_rc)
         env["STUB_LOG"] = str(tree / "zarf-calls.log")
+        if extra_env:
+            env.update(extra_env)
         return env
 
-    def update(self, tree, *args, deploy_rc=0):
+    def update(self, tree, *args, deploy_rc=0, extra_env=None):
         cmd = ["bash", str(tree / "airgap/scripts/update-package.sh"), *args]
-        return run(cmd, self.env(tree, deploy_rc))
+        return run(cmd, self.env(tree, deploy_rc, extra_env=extra_env))
 
     def write_package(self, tree, name, data):
         path = tree / name
@@ -365,6 +373,79 @@ def scenario_naming_invariants(h):
         )
 
 
+def scenario_explicit_zarf_honored(h):
+    """ZARF env var is used even when a decoy zarf is first on PATH."""
+    t = h.tree()
+    decoy_dir = h.base / "decoy-bin"
+    decoy_dir.mkdir()
+    decoy = decoy_dir / "zarf"
+    decoy.write_text("#!/bin/sh\necho DECOY >&2; exit 98\n")
+    decoy.chmod(0o755)
+    pkg = h.write_package(t, "v1.tar.zst", h.v1)
+    result = h.update(t, "apply", str(pkg), extra_env={
+        "PATH": f"{decoy_dir}{os.pathsep}{os.environ['PATH']}",
+        "ZARF": str(h.bin_dir / "zarf"),
+    })
+    check_rc(result, 0, "explicit zarf")
+    check(active(t).read_bytes() == h.v1, "explicit zarf: active must equal v1")
+    check("DECOY" not in result.stderr, f"explicit zarf: decoy zarf was used: {result.stderr}")
+
+
+def scenario_real_mode_forwards_workflow_ref(h):
+    """In real-zarf mode, AIRGAP_VERIFY_WORKFLOW_REF from the outer env is forwarded."""
+    t = h.tree()
+    fake_ref = "example/fork/.github/workflows/air-gapped.yml@refs/heads/feature"
+    # Build a real-mode harness (zarf= points at stub binary so it still runs offline)
+    real_dir = h.base / "real-mode"
+    real_dir.mkdir()
+    real = Harness(real_dir, str(h.bin_dir / "zarf"), (h.v1, h.v2, h.truncated, h.corrupted))
+    real_t = real.tree()
+    real_pkg = real.write_package(real_t, "v1.tar.zst", real.v1)
+    with mock.patch.dict(os.environ, {"AIRGAP_VERIFY_WORKFLOW_REF": fake_ref}):
+        # Real-mode harness forwards the ref via auto-injection (no extra_env)
+        check(real.env(real_t).get("AIRGAP_VERIFY_WORKFLOW_REF") == fake_ref, "real mode: ref must be forwarded")
+        # Stub-mode harness strips it
+        check("AIRGAP_VERIFY_WORKFLOW_REF" not in h.env(t), "stub mode: ref must be stripped")
+        # The ref reaches the zarf subprocess via auto-injection, not extra_env
+        check_rc(real.update(real_t, "apply", str(real_pkg)), 0, "forward ref apply")
+    calls_log = real_t / "zarf-calls.log"
+    check(calls_log.exists() and fake_ref in calls_log.read_text(), "real mode: ref must reach zarf verify")
+
+
+def scenario_unknown_phase_blocks_apply(h):
+    """apply() rejects any state file with an unknown or corrupted phase."""
+    t = h.tree()
+    install_v1(h, t)
+    clear_deploy_log(t)
+    # Write a corrupted phase
+    state(t).write_text("phase=bogus\n")
+    pkg = h.write_package(t, "v2.tar.zst", h.v2)
+    result = h.update(t, "apply", str(pkg))
+    check_rc(result, 1, "unknown phase apply")
+    check(active(t).read_bytes() == h.v1, "unknown phase: active must stay v1")
+    check(deploy_calls(t) == [], f"unknown phase: deploy must not run, got {deploy_calls(t)}")
+    check(state(t).read_text() == "phase=bogus\n", "unknown phase: state must be left alone")
+    check(not backup(t).exists(), "unknown phase: .bak must not exist")
+    check("unexpected state" in result.stderr, f"unknown phase: stderr {result.stderr}")
+    # Also test with empty state file
+    state(t).write_text("")
+    result2 = h.update(t, "apply", str(pkg))
+    check_rc(result2, 1, "empty state apply")
+    check("unexpected state" in result2.stderr, f"empty state: stderr {result2.stderr}")
+
+
+def scenario_littered_staging_still_deploys(h):
+    """apply() succeeds even when staging is non-empty after the swap (rm -rf, not rmdir)."""
+    t = h.tree()
+    install_v1(h, t)
+    pkg = h.write_package(t, "v2.tar.zst", h.v2)
+    result = h.update(t, "apply", str(pkg), extra_env={"STUB_LITTER_STAGING": "1"})
+    check_rc(result, 0, "littered staging apply")
+    check(active(t).read_bytes() == h.v2, "littered staging: active must equal v2")
+    check(not staging(t).exists(), "littered staging: .staging must be gone")
+    check(len(deploy_calls(t)) == 2, f"littered staging: expected 2 deploy calls, got {deploy_calls(t)}")
+
+
 def stub_scenarios():
     return [
         ("first install succeeds", scenario_first_install),
@@ -378,6 +459,10 @@ def stub_scenarios():
         ("cutover crash: confirm refused", scenario_cutover_blocks_confirm),
         ("tampered backup: rollback exits 4 and keeps active", scenario_tampered_backup_blocks_rollback),
         ("naming invariants", scenario_naming_invariants),
+        ("explicit ZARF honored over decoy on PATH", scenario_explicit_zarf_honored),
+        ("real-mode harness forwards AIRGAP_VERIFY_WORKFLOW_REF", scenario_real_mode_forwards_workflow_ref),
+        ("unknown or empty state phase blocks apply", scenario_unknown_phase_blocks_apply),
+        ("littered staging after swap still deploys", scenario_littered_staging_still_deploys),
     ]
 
 

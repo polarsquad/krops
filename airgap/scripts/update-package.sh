@@ -68,6 +68,7 @@ acquire_lock() {
       exit 1
     fi
     echo "update-package.sh: removing stale lock left by pid $holder" >&2
+    # Not race-free: two concurrent reclaims can both win; run one update at a time.
     rm -rf "$LOCK"
     mkdir "$LOCK"
   fi
@@ -131,13 +132,17 @@ apply() {
         echo "update-package.sh: prior update not finished; confirm or roll back first" >&2
         exit 1
         ;;
+      *)
+        echo "update-package.sh: unexpected state: $(tr '\n' ' ' < "$STATE"); inspect and roll back or remove $STATE manually" >&2
+        exit 1
+        ;;
     esac
   fi
 
   rm -rf "$STAGING"
   mkdir "$STAGING"
   cp "$package" "$STAGING/$ACTIVE_NAME"
-  sync
+  sync "$STAGING/$ACTIVE_NAME"
 
   sbom_dir=$(mktemp -d "${TMPDIR:-/tmp}/airgap-update-sbom.XXXXXX")
   if ! airgap_verify_package "$STAGING/$ACTIVE_NAME" "$sbom_dir"; then
@@ -158,7 +163,7 @@ apply() {
   fi
 
   mv -f "$STAGING/$ACTIVE_NAME" "$ACTIVE"
-  rmdir "$STAGING"
+  rm -rf "$STAGING"
 
   if ! "${AIRGAP_DEPLOY_CMD:-$SCRIPT_DIR/offline-run.sh}" "$ACTIVE"; then
     echo "update-package.sh: deploy failed; restoring prior archive" >&2

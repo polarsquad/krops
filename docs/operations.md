@@ -99,6 +99,13 @@ TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh bootstrap aws
 verb, which reaches `krops-bootstrap`) selects the environment. It loads
 `.env` before detecting the engine or resolving a socket for it, so a
 `.env`-selected `CONTAINER_ENGINE` takes effect from the start (issue #257).
+It also refreshes remote-registry `TOOLBOX_IMAGE` references before every
+run: it pulls the image so the mutable `:latest` tag is revalidated against
+the registry and a fresh release reaches hosts that already pulled it
+(issue #645). A failed pull never blocks a lifecycle operation; the wrapper
+warns and continues with the locally cached image, so offline runs and
+registry outages keep working. Local builds (any bare `name:tag` such as
+`krops-toolbox:dev`) have no registry source and are used as-is.
 For the supported single-line dotenv syntax, it follows mise's `env_file`, so
 `scripts/toolbox-run.sh` and `mise run bootstrap` hand the container the same
 values:

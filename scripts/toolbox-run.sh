@@ -15,6 +15,9 @@ Env:
   TOOLBOX_IMAGE   image reference (default: ghcr.io/polarsquad/krops-toolbox:latest;
                   build locally with: docker build -f bootstrap-rs/Dockerfile \\
                     -t krops-toolbox:dev . && TOOLBOX_IMAGE=krops-toolbox:dev)
+                  Remote-registry references are pulled (refreshed) before
+                  every run; a failed pull warns and falls back to the local
+                  cache. Local builds (bare name[:tag]) are used as-is.
   KROPS_PROFILE aws | azure | gcp | local-host | local-talos
                   (default: the mise environment in use)
 EOF
@@ -204,6 +207,27 @@ case "$CONTAINER_ENGINE" in
     exit 1
     ;;
 esac
+
+# ── Image refresh: revalidate remote-registry tags (#645) ────────────────────
+# docker/podman run treat a locally-present mutable tag (e.g. :latest) as
+# valid and never revalidate it against the registry, so a fresh release
+# never reaches a host that already pulled it. Pull remote-registry refs
+# explicitly, best-effort: a failed pull must not abort a lifecycle
+# operation that has a usable local cache (offline host, registry outage),
+# so it only warns. Local builds have no registry source and are used as-is.
+# Host rule: the first "/"-component of the ref is a registry host when it
+# contains "." or ":", or equals "localhost"; a bare name[:tag] is local.
+# Hostless docker.io-namespace refs (user/image) classify as local: worst
+# case is today's behavior (no auto-pull), and no repo doc uses that form.
+if [ "${TOOLBOX_IMAGE%%/*}" != "$TOOLBOX_IMAGE" ]; then
+  case "${TOOLBOX_IMAGE%%/*}" in
+    *[.:]*|localhost)
+      if ! "$CONTAINER_ENGINE" pull "$TOOLBOX_IMAGE"; then
+        printf 'WARNING: could not pull %s; continuing with the locally cached image (it may be stale)\n' "$TOOLBOX_IMAGE" >&2
+      fi
+      ;;
+  esac
+fi
 
 # Repo-local persistent kubeconfig state (gitignored): the toolbox's internal
 # kind kubeconfig and the exported management kubeconfig live here.

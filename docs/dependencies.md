@@ -231,7 +231,9 @@ verify the pairing during review.
   and remain untracked.
 - `scripts/toolbox-run.sh` defaults `TOOLBOX_IMAGE` to the mutable
   `ghcr.io/polarsquad/krops-toolbox:latest`; Renovate does not manage this
-  runtime default.
+  runtime default. The wrapper revalidates the mutable tag against the
+  registry on every run (best-effort pull with a local-cache fallback), so
+  a fresh release reaches hosts that already pulled `:latest` (issue #645).
 - The toolbox Dockerfile installs `docker-ce-cli` from Docker's apt repository
   without a package-version pin. Its client version intentionally follows that
   repository, while the base image, mise installer, and Podman client remain

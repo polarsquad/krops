@@ -169,7 +169,9 @@ The Config Connector operator is deployed via Flux HelmRelease, consuming
 the published Helm chart from `lioramilbaum/config-connector-helm`. The
 OCIRepository (`mgmt/gcp/infrastructure/kcc-operator/ocirepository.yaml`) pins
 both `ref.tag` and `ref.digest`; Renovate's native Flux manager bumps them
-together in one edit. The chart is fetched and installed automatically on the
+together in one edit, and `tests/test-gcp-kcc-operator-pin.py` (in
+`mise run validate` and CI) guards the digest and cosign pin against
+regression. The chart is fetched and installed automatically on the
 next Flux reconciliation.
 
 ## Known limitations

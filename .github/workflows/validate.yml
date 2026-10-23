@@ -213,6 +213,11 @@ jobs:
           uv sync --locked
           uv run python tests/test-gcp-identity-chain.py
 
+      - name: GCP KCC operator pin
+        run: |
+          uv sync --locked
+          uv run python tests/test-gcp-kcc-operator-pin.py
+
       - name: GCP postgres settings
         run: |
           uv sync --locked

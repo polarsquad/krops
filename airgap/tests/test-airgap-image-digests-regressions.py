@@ -181,6 +181,20 @@ class NewSourceDetectionTests(unittest.TestCase):
                 result, _, stderr = self.fixture.run(*args)
                 self.assertEqual(result, 0, stderr)
 
+    def test_generated_config_artifact_tree_is_not_flagged(self):
+        # build-config-artifact.sh leaves a gitignored generated copy of the
+        # manifests under airgap/config-artifact/ (e.g. the verbatim
+        # kindnet.yaml with a tagged, unpinned image); the working-tree walk
+        # must not flag it as an uncovered source (issue #170 review).
+        self.fixture.write(
+            "airgap/config-artifact/mgmt/local-host/addons/cni/kindnet.yaml",
+            "image: docker.io/kindest/kindnetd:v20260528-9350166c\n",
+        )
+        for args in ([], ["--all"]):
+            with self.subTest(args=args):
+                result, _, stderr = self.fixture.run(*args)
+                self.assertEqual(result, 0, stderr)
+
     def test_new_source_without_references_passes(self):
         self.fixture.write("airgap/notes.yaml", "count: 1\n")
         for args in ([], ["--all"]):

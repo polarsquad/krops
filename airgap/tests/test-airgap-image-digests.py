@@ -24,6 +24,9 @@ NON_IMAGE_REFERENCES = {"127.0.0.1:31999"}
 IGNORED_AIRGAP_PREFIXES = (
     # docker-save tarballs staged from already-pinned images; not a source.
     "airgap/archives/",
+    # Generated config artifact tree; gitignored and written by
+    # build-config-artifact.sh; not a committed source.
+    "airgap/config-artifact/",
     # Build-time output of render-and-inventory.sh; not a committed source.
     "airgap/rendered/",
     # Generated SBOM evidence, not an image source.

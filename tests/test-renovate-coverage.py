@@ -59,7 +59,7 @@ EXPECTED = {
         "kubernetes-sigs/cluster-api-provider-azure",
     },
     "mgmt/gcp/capi-providers/capg-system/providers.yaml": {
-        "kubernetes-sigs/cluster-api-provider-gcp",
+        "shrinedogg/cluster-api-provider-gcp",
     },
     "mise.gcp.toml": {
         "gcr.io/google.com/cloudsdktool/google-cloud-cli",

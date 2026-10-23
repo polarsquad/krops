@@ -249,8 +249,11 @@
     },
     {
       "customType": "regex",
-      "description": "Annotated version pins in local-talos manifests (#157)",
-      "managerFilePatterns": ["/(^|/)mgmt/local-talos/.+\\.ya?ml$/"],
+      "description": "Annotated version pins in provider manifests (local-talos #157, CAPG fork #641)",
+      "managerFilePatterns": [
+        "/(^|/)mgmt/local-talos/.+\\.ya?ml$/",
+        "/(^|/)mgmt/gcp/capi-providers/capg-system/.+\\.ya?ml$/"
+      ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z0-9-]+) depName=(?<depName>\\S+)\\n\\s{2,}version: \\\"v(?<currentValue>[^\\\"]+)\\\""
       ],
@@ -332,18 +335,6 @@
       ],
       "matchStrings": ["\\s{2}version: \"v(?<currentValue>[^\"]+)\""],
       "depNameTemplate": "kubernetes-sigs/cluster-api-provider-azure",
-      "datasourceTemplate": "github-releases",
-      "extractVersionTemplate": "^v(?<version>.+)",
-      "autoReplaceStringTemplate": "  version: \"v{{newValue}}\""
-    },
-    {
-      "customType": "regex",
-      "description": "CAPG (GCP infrastructure) provider version (issue #72)",
-      "managerFilePatterns": [
-        "/(^|/)mgmt/gcp/capi-providers/capg-system/.+\\.ya?ml$/"
-      ],
-      "matchStrings": ["\\s{2}version: \"v(?<currentValue>[^\"]+)\""],
-      "depNameTemplate": "kubernetes-sigs/cluster-api-provider-gcp",
       "datasourceTemplate": "github-releases",
       "extractVersionTemplate": "^v(?<version>.+)",
       "autoReplaceStringTemplate": "  version: \"v{{newValue}}\""
@@ -616,7 +607,7 @@
         "kubernetes-sigs/cluster-api-provider-aws",
         "kubernetes-sigs/cluster-api-addon-provider-helm",
         "kubernetes-sigs/cluster-api-provider-azure",
-        "kubernetes-sigs/cluster-api-provider-gcp",
+        "shrinedogg/cluster-api-provider-gcp",
         "/^registry\\.k8s\\.io/cluster-api//",
         "/^registry\\.k8s\\.io/cluster-api-helm//",
         "/^gcr\\.io/k8s-staging-cluster-api//"

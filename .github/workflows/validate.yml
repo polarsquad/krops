@@ -206,6 +206,9 @@ jobs:
       - name: Toolbox image runs mise with auto-install off (#601)
         run: python3 tests/test-toolbox-auto-install-off.py
 
+      - name: Toolbox image resolves bare aws and clusterawsadm shims (#635)
+        run: python3 tests/test-toolbox-bare-aws-shim.py
+
       - name: cert-manager version consistency (#322)
         run: python3 tests/test-cert-manager-version-consistency.py
 

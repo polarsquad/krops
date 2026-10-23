@@ -99,15 +99,28 @@ RUN chmod +x /usr/local/bin/toolbox-entrypoint.sh
 # Cloud SDK component before the shim is generated. `mise x` is avoided here:
 # it auto-installs every tool in the env (including the dev-only zarf) and a
 # zarf auto-install failure would abort the build. `mise which gcloud`
-# resolves the path without any install.
+# resolves the path without any install. After the aws tools install,
+# `mise use -g` bakes their exact pins into the image's global mise config
+# (the versionless form would write "latest", which could make a bare shim
+# fetch a newer release at run time). The pins stay single-sourced: they
+# are read back from the aws env layer's resolution, so the checkout
+# mounted at /workspace at run time needs no env layer for a bare `aws` or
+# `clusterawsadm` shim to resolve (issue #635). The smoke RUN below fails
+# the build if that resolution regresses.
 RUN cd /opt/krops \
     && mise install -y kind helm kubectl clusterctl flux2 sops age \
     && mise -E aws install -y aws-cli clusterawsadm \
+    && mise -E aws use -g "aws-cli@$(mise -E aws current aws-cli)" "clusterawsadm@$(mise -E aws current clusterawsadm)" \
     && mise install -y python uv \
     && mise -E azure install -y azure-cli \
     && mise -E gcp install -y gcloud \
     && "$(mise -E gcp which gcloud)" components install gke-gcloud-auth-plugin --quiet \
     && mise reshim
+
+# Build-time smoke check for the global aws bindings above (#635): a bare
+# shim invocation must resolve with no env layer active. If shim resolution
+# regresses, the build fails here instead of mid-bootstrap.
+RUN aws --version && clusterawsadm version
 
 # The container runs as root while the bind-mounted checkout is owned by the
 # host user, so git refuses to read it on native rootful Linux Docker

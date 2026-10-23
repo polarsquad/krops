@@ -78,6 +78,11 @@ if ! python3 tests/test-toolbox-auto-install-off.py; then
   echo "    FAILED: toolbox mise auto-install off" >&2
   fail=1
 fi
+echo "==> toolbox image resolves bare aws and clusterawsadm shims (#635)"
+if ! python3 tests/test-toolbox-bare-aws-shim.py; then
+  echo "    FAILED: toolbox bare aws shims" >&2
+  fail=1
+fi
 echo "==> toolbox-run.sh .env precedence"
 if ! python3 tests/test-toolbox-run-env-precedence.py; then
   echo "    FAILED: toolbox-run.sh .env precedence" >&2

@@ -161,7 +161,7 @@ The pivot's target node-readiness wait uses a fixed 15m budget (`MGMT_NODE_READY
 
 ### Toolbox runtime contracts
 
-The toolbox runtime adds six contracts:
+The toolbox runtime adds seven contracts:
 
 - `KROPS_TOOLBOX=1` enables internal kind networking and disables host-only CAPD
   endpoint rewrites.
@@ -186,6 +186,14 @@ The toolbox runtime adds six contracts:
   plain aws binary. The preflight and the sweep probe `aws --version` before
   the first AWS call and fail with a message that names the shim, so a
   broken shim is never read as a credentials error or an empty listing.
+- Bare `aws` and `clusterawsadm` resolve image-wide through global mise
+  bindings baked in at build time (`mise -E aws use -g`, with each pin read
+  back from the `aws` env layer so it stays single-sourced in
+  `mise.aws.toml`), because the checkout mounted at /workspace carries no
+  `aws` env layer for a bare shim to resolve against (issue #635). A
+  build-time smoke check runs both tools bare and fails the build if shim
+  resolution regresses; lifecycle invocations still scope `MISE_ENV=aws`
+  explicitly as above (issue #504).
 
 The container reaches the local registry at `krops-registry:5000`. Its
 `/root/.kube` mount makes the management kubeconfig persist on the host as

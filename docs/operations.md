@@ -8,12 +8,12 @@ The toolbox image (`ghcr.io/polarsquad/krops-toolbox`) carries
 `krops-bootstrap` plus every tool used by bootstrap, pivot, and teardown. It
 intentionally omits the development-only Go toolchain and the Zarf CLI; a
 pinned Python and uv are present only as a runtime backend for azure-cli and
-gcloud.
+gcloud. The image runs mise with auto-install disabled (#601), so a
+lifecycle run never downloads tools at runtime: the pinned tool layer is
+preinstalled, and a task that touches a dev-only pin fails loudly on the
+missing tool instead of fetching it.
 The host needs the repository checkout and a running Docker engine or Podman
-5.5+. Lifecycle runs also download the pinned `go` and `zarf` tools through mise
-at runtime (the toolbox container is ephemeral, so this repeats on every
-run); outbound access to their release hosts is needed. This is unintended
-and tracked in #601.
+5.5+.
 
 The toolbox image is published to `ghcr.io/polarsquad/krops-toolbox` for
 Linux amd64 and arm64 as `X.Y.Z`, `X.Y`, and stable `latest`, signed with
@@ -229,10 +229,12 @@ Rules that apply to every helper run:
   address is not routable from the host (use the macOS section below for the
   port-mapped form). On Linux with a rootful engine, it works from the host
   after fixing file ownership (see the Linux section).
-- `MISE_AUTO_INSTALL=0` is required. The mounted `mise.toml` pins dev-only
-  tools (`zarf`, `go`) that the image does not carry; without the flag mise
-  tries to install them, and as a non-root user that fails with `Permission
-  denied` under `/usr/local/share/mise`.
+- `MISE_AUTO_INSTALL=0` is the image default since #601; the flag stays in
+  the examples because it is harmless and keeps older images behaving the
+  same. The mounted `mise.toml` pins dev-only tools (`zarf`, `go`) that the
+  image does not carry; with auto-install on, mise would try to install
+  them, and as a non-root user that fails with `Permission denied` under
+  `/usr/local/share/mise`.
 - mise loads `/workspace/.env` (`env_file` in `mise.toml`) and its values
   override the process environment. Cloud credentials for `aws-bootstrap`,
   `aws-credentials`, `azure-bootstrap`, and `gcp-bootstrap` come from `.env`

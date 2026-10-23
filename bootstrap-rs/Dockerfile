@@ -68,9 +68,14 @@ RUN apt-get update \
 
 # The repository is mounted at /workspace at run time; mise runs from the
 # working directory with both env layers available (aws tools per the #104
-# decision: one image, credentials arrive at runtime).
+# decision: one image, credentials arrive at runtime). Auto-install is off
+# (#601): the image carries the full pinned tool layer, so a lifecycle task
+# that touches a dev-only pin (go, zarf) must fail loudly on the missing
+# tool instead of downloading it mid-run. An operator can opt back in per
+# run with -e MISE_AUTO_INSTALL=1.
 ENV MISE_DATA_DIR=/usr/local/share/mise \
     MISE_YES=1 \
+    MISE_AUTO_INSTALL=0 \
     AWS_PAGER="" \
     PATH=/usr/local/share/mise/shims:/usr/local/bin:/usr/bin:/sbin:/bin
 

@@ -68,6 +68,11 @@ if ! python3 tests/test-toolbox-git-safe-directory.py; then
   echo "    FAILED: toolbox git safe.directory" >&2
   fail=1
 fi
+echo "==> toolbox image runs mise with auto-install off (#601)"
+if ! python3 tests/test-toolbox-auto-install-off.py; then
+  echo "    FAILED: toolbox mise auto-install off" >&2
+  fail=1
+fi
 echo "==> toolbox-run.sh .env precedence"
 if ! python3 tests/test-toolbox-run-env-precedence.py; then
   echo "    FAILED: toolbox-run.sh .env precedence" >&2

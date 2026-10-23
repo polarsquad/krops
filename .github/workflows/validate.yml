@@ -201,6 +201,9 @@ jobs:
       - name: shell lifecycle scopes MISE_ENV=aws to the aws child (#504)
         run: python3 tests/test-shell-aws-mise-env.py
 
+      - name: Toolbox image runs mise with auto-install off (#601)
+        run: python3 tests/test-toolbox-auto-install-off.py
+
       - name: cert-manager version consistency (#322)
         run: python3 tests/test-cert-manager-version-consistency.py
 

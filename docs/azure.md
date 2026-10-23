@@ -122,9 +122,9 @@ Management cluster: cert-manager, capi-operator, capi-system, capz-system
 (health check waits for the CAPZ and the additional ASO CRDs),
 azure-identity, aso-workload-identity, workload-resources, swedencentral
 (clusters), flux-apps.
-`azure-identity` substitutes from the `azure-vars` ConfigMap it creates
-itself, so its first reconcile fails once and succeeds on the 2-minute
-retry.
+`azure-vars` is applied by the root `mgmt/azure` sync, which does no
+substitution, so the ConfigMap exists before `azure-identity`,
+`aso-workload-identity`, and `workload-resources` build (issue #507).
 
 Workload cluster: cert-manager only (the Azure resources moved to the
 management cluster in issue #559).

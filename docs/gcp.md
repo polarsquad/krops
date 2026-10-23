@@ -87,6 +87,15 @@ restricted by `attributeCondition` to exactly those two service accounts.
   issuer, `allowedAudiences` equal to the issuer). The pivot pins
   `GCP_WIF_PROVIDER=mgmt` through `pivot-manifest-vars` in `bootstrap.toml`
   because the source-side ConfigMap merge order cannot guarantee it.
+- The CAPG credential additionally carries a `client_email` naming the
+  impersonated `krops-capg` GSA. CAPG v1.13.1's kubeconfig-token path reads
+  it to call iamcredentials GenerateAccessToken (self-impersonation,
+  authorized by the existing project-level
+  `roles/iam.serviceAccountTokenCreator` grant on `krops-capg`, issue #642).
+  The token exchange itself ignores the field, so the design stays keyless.
+  It becomes redundant once CAPG ships the upstream fix
+  (kubernetes-sigs/cluster-api-provider-gcp@ef84466ae182, expected v1.14.0)
+  and can be dropped then.
 
 ## Bootstrap, pivot, teardown
 

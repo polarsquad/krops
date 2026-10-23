@@ -1,6 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
+  # Applied here, by the root sync (no substitution), not by azure-identity:
+  # every Kustomization that substitutes from azure-vars needs the ConfigMap
+  # to exist before Flux can build it, including azure-identity itself.
+  - infrastructure/azure-identity/azure-vars.yaml
   - infrastructure/flux-ks.yaml
   - capi-providers/flux-ks.yaml
   - addons/flux-ks.yaml

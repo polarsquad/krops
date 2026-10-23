@@ -12,26 +12,28 @@
 # cannot log in; see docs/gcp.md (Known limitations).
 #
 # settings.diskType PD_HDD + db-f1-micro keep the default bill small; the
-# tier is a documented knob, not a pin. deletionProtectionEnabled stays
-# false so teardown can delete the instance (the manual teardown procedure
-# in bootstrap.toml lists it).
+# tier is a documented knob, not a pin. settings.deletionProtectionEnabled
+# stays false so teardown can delete the instance (the manual teardown
+# procedure in bootstrap.toml lists it).
 # ══════════════════════════════════════════════════════════════════════════════
 apiVersion: sql.cnrm.cloud.google.com/v1beta1
 kind: SQLInstance
 metadata:
   name: app-db
   namespace: default
+  annotations:
+    cnrm.cloud.google.com/project-id: ${GCP_PROJECT}
 spec:
   resourceID: "krops-europe-north1-workload-db"
   region: "${GCP_REGION}"
   databaseVersion: POSTGRES_17
-  deletionProtectionEnabled: false
   settings:
     edition: ENTERPRISE
     tier: "db-f1-micro"
     availabilityType: ZONAL
     diskSize: 10
     diskType: PD_HDD
+    deletionProtectionEnabled: false
     ipConfiguration:
       ipv4Enabled: false
       sslMode: ENCRYPTED_ONLY
@@ -48,6 +50,8 @@ kind: SQLDatabase
 metadata:
   name: app
   namespace: default
+  annotations:
+    cnrm.cloud.google.com/project-id: ${GCP_PROJECT}
 spec:
   charset: "UTF8"
   collation: ""
@@ -69,6 +73,8 @@ kind: SQLUser
 metadata:
   name: app-db-reader
   namespace: default
+  annotations:
+    cnrm.cloud.google.com/project-id: ${GCP_PROJECT}
 spec:
   instanceRef:
     name: app-db

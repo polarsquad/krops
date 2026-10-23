@@ -11,6 +11,10 @@
 #                mgmt/gcp/infrastructure/workload-resources/.
 #   krops-reader the human read-only identity; humans impersonate it.
 #
+# The pinned KCC 1.159.0 IAMServiceAccount CRD declares no spec.projectRef;
+# the GCP project scope comes from the per-resource
+# cnrm.cloud.google.com/project-id annotation (upstream docs).
+#
 # Project-level role grants mirror the gcp-bootstrap grant() loop, so KCC
 # adopts the imperatively created bindings.
 # ══════════════════════════════════════════════════════════════════════════════
@@ -19,20 +23,20 @@ kind: IAMServiceAccount
 metadata:
   name: krops-capg
   namespace: default
+  annotations:
+    cnrm.cloud.google.com/project-id: ${GCP_PROJECT}
 spec:
   displayName: krops CAPG + management-side Config Connector
-  projectRef:
-    external: projects/${GCP_PROJECT}
 ---
 apiVersion: iam.cnrm.cloud.google.com/v1beta1
 kind: IAMServiceAccount
 metadata:
   name: krops-reader
   namespace: default
+  annotations:
+    cnrm.cloud.google.com/project-id: ${GCP_PROJECT}
 spec:
   displayName: krops human read-only identity
-  projectRef:
-    external: projects/${GCP_PROJECT}
 ---
 # ── krops-capg project-level grants ──────────────────────────────────────────
 apiVersion: iam.cnrm.cloud.google.com/v1beta1

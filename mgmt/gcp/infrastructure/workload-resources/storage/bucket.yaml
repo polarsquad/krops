@@ -19,6 +19,7 @@ metadata:
   namespace: default
   annotations:
     cnrm.cloud.google.com/force-destroy: "false"
+    cnrm.cloud.google.com/project-id: ${GCP_PROJECT}
 spec:
   resourceID: "krops-${GCP_PROJECT_NUMBER}-europe-north1-workload-data"
   location: "${GCP_REGION}"

@@ -27,6 +27,7 @@ WORKLOAD_RESOURCES = REPO_ROOT / "mgmt/gcp/infrastructure/workload-resources"
 MGMT_FLUX_KS = REPO_ROOT / "mgmt/gcp/infrastructure/flux-ks.yaml"
 READER = WORKLOAD_RESOURCES / "iam/reader.yaml"
 SQL = WORKLOAD_RESOURCES / "postgres/postgres.yaml"
+MGMT_GCP = REPO_ROOT / "mgmt/gcp"
 # The one live workload cluster: its name is a literal in the moved CRs
 # (the management-side gcp-vars ConfigMap carries no per-cluster keys).
 CLUSTER_NAME = "europe-north1-workload"
@@ -53,6 +54,52 @@ EXPECTED_KROPS_CAPG_GRANTS = {
     "krops-capg-cloudsql-admin": "roles/cloudsql.admin",
     "krops-capg-storage-admin": "roles/storage.admin",
     "krops-capg-servicenetworking-admin": "roles/servicenetworking.networksAdmin",
+}
+
+# ── KCC 1.159.0 CRD-shape snapshot (issue #643) ──────────────────────────────
+# Fetched from the upstream k8s-config-connector v1.159.0 tag, the tag the
+# kcc-operator OCIRepository pins (mgmt/gcp/infrastructure/kcc-operator/
+# ocirepository.yaml). Per kind: (apiVersion group, {served version:
+# top-level spec fields}, the CRD declares spec.projectRef). A manifest
+# outside this shape fails Flux's client-side dry-run before it reaches the
+# API server; a project-scoped resource with neither spec.projectRef nor the
+# cnrm.cloud.google.com/project-id annotation silently targets the namespace
+# name as the GCP project at reconcile time. Refresh this snapshot when the
+# OCIRepository tag moves.
+KCC_CRD_SHAPE = {
+    "IAMServiceAccount": ("iam.cnrm.cloud.google.com",
+                          {"v1beta1": frozenset({"description", "disabled", "displayName", "resourceID"})},
+                          False),
+    "IAMPolicyMember": ("iam.cnrm.cloud.google.com",
+                        {"v1beta1": frozenset({"condition", "member", "memberFrom", "resourceRef", "role"})},
+                        False),
+    "IAMWorkloadIdentityPool": ("iam.cnrm.cloud.google.com",
+                                {"v1beta1": frozenset({"description", "disabled", "displayName", "location", "projectRef", "resourceID"})},
+                                True),
+    "IAMWorkloadIdentityPoolProvider": ("iam.cnrm.cloud.google.com",
+                                        {"v1beta1": frozenset({"attributeCondition", "attributeMapping", "aws", "description", "disabled", "displayName", "location", "oidc", "projectRef", "resourceID", "workloadIdentityPoolRef"})},
+                                        True),
+    "Service": ("serviceusage.cnrm.cloud.google.com",
+                {"v1beta1": frozenset({"projectRef", "resourceID"})},
+                True),
+    "StorageBucket": ("storage.cnrm.cloud.google.com",
+                      {"v1beta1": frozenset({"autoclass", "bucketPolicyOnly", "cors", "customPlacementConfig", "defaultEventBasedHold", "encryption", "ipFilter", "lifecycleRule", "location", "logging", "publicAccessPrevention", "requesterPays", "resourceID", "retentionPolicy", "softDeletePolicy", "storageClass", "uniformBucketLevelAccess", "versioning", "website"})},
+                      False),
+    "SQLInstance": ("sql.cnrm.cloud.google.com",
+                    {"v1beta1": frozenset({"cloneSource", "databaseVersion", "encryptionKMSCryptoKeyRef", "instanceType", "maintenanceVersion", "masterInstanceRef", "region", "replicaConfiguration", "replicationCluster", "resourceID", "rootPassword", "settings"})},
+                    False),
+    "SQLDatabase": ("sql.cnrm.cloud.google.com",
+                    {"v1beta1": frozenset({"charset", "collation", "deletionPolicy", "instanceRef", "resourceID"})},
+                    False),
+    "SQLUser": ("sql.cnrm.cloud.google.com",
+                {"v1beta1": frozenset({"host", "instanceRef", "password", "passwordPolicy", "resourceID", "type"})},
+                False),
+    "ComputeAddress": ("compute.cnrm.cloud.google.com",
+                       {"v1beta1": frozenset({"address", "addressType", "description", "ipCollectionRef", "ipVersion", "ipv6EndpointType", "location", "networkRef", "networkTier", "prefixLength", "purpose", "resourceID", "subnetworkRef"})},
+                       False),
+    "ServiceNetworkingConnection": ("servicenetworking.cnrm.cloud.google.com",
+                                    {"v1beta1": frozenset({"networkRef", "reservedPeeringRanges", "service"})},
+                                    False),
 }
 
 # secret path -> (expected name, expected namespace, expected JSON key)
@@ -304,6 +351,40 @@ def main() -> int:
         name = buckets[0]["spec"]["resourceID"].replace("${GCP_PROJECT_NUMBER}", "9" * BUCKET_PROJECT_NUMBER_DIGITS)
         if len(name) > 63:
             failures.append(f"(j) bucket name `{name}` is {len(name)} chars; GCS bucket names are capped at 63")
+
+    # ── (k) KCC 1.159.0 CRD-shape gate (issue #643): every cnrm document
+    # under mgmt/gcp must use a served apiVersion and only top-level spec
+    # fields the pinned CRDs declare, and every project-scoped resource
+    # whose CRD lacks spec.projectRef must carry the project-id annotation
+    # (without it KCC targets the namespace name as the GCP project). This
+    # gate runs offline against the KCC_CRD_SHAPE snapshot; the Oct 19 run
+    # would have caught defects A-D in #643 by it. ─────────────────────────
+    for path, doc in all_docs(MGMT_GCP):
+        kind = doc.get("kind")
+        if kind not in KCC_CRD_SHAPE:
+            continue
+        want_group, served, has_project_ref = KCC_CRD_SHAPE[kind]
+        name = doc["metadata"]["name"]
+        group, sep, version = str(doc.get("apiVersion", "")).partition("/")
+        if group != want_group:
+            failures.append(f"(k) {path}: {kind}/{name} apiVersion group {group} != {want_group}")
+            continue
+        if version not in served:
+            failures.append(f"(k) {path}: {kind}/{name} apiVersion {group}/{version} not served (served: {sorted(served)})")
+            continue
+        spec = doc.get("spec", {}) or {}
+        unknown = set(spec) - served[version]
+        if unknown:
+            failures.append(f"(k) {path}: {kind}/{name} spec fields not in the KCC 1.159.0 CRD schema: {sorted(unknown)}")
+        annotations = doc.get("metadata", {}).get("annotations") or {}
+        if "projectRef" not in spec and "cnrm.cloud.google.com/project-id" not in annotations:
+            # IAMPolicyMember takes its scope from resourceRef, not project
+            # fields; all other kinds in the snapshot are project-scoped.
+            if kind != "IAMPolicyMember":
+                if has_project_ref:
+                    failures.append(f"(k) {path}: {kind}/{name} needs spec.projectRef or the cnrm.cloud.google.com/project-id annotation")
+                else:
+                    failures.append(f"(k) {path}: {kind}/{name} needs the cnrm.cloud.google.com/project-id annotation (the KCC 1.159.0 CRD declares no spec.projectRef)")
 
     if failures:
         print("gcp identity chain FAILED:")

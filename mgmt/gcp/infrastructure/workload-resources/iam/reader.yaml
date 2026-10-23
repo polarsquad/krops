@@ -7,15 +7,17 @@
 # management-side gcp-vars ConfigMap carries no per-cluster keys). The grants
 # are unchanged from the workload-cluster copy: the human krops-reader flow
 # is byte-equivalent in behavior.
-apiVersion: iam.cnrm.cloud.google.com/v1
+apiVersion: iam.cnrm.cloud.google.com/v1beta1
 kind: IAMServiceAccount
 metadata:
   name: krops-europe-north1-workload-r
   namespace: default
+  annotations:
+    cnrm.cloud.google.com/project-id: ${GCP_PROJECT}
 spec:
   displayName: "krops reader (europe-north1-workload)"
 ---
-apiVersion: iam.cnrm.cloud.google.com/v1
+apiVersion: iam.cnrm.cloud.google.com/v1beta1
 kind: IAMPolicyMember
 metadata:
   name: krops-reader-bucket-viewer
@@ -27,7 +29,7 @@ spec:
     kind: StorageBucket
     name: data
 ---
-apiVersion: iam.cnrm.cloud.google.com/v1
+apiVersion: iam.cnrm.cloud.google.com/v1beta1
 kind: IAMPolicyMember
 metadata:
   name: krops-reader-sql-viewer
@@ -38,7 +40,7 @@ spec:
   resourceRef:
     external: "projects/${GCP_PROJECT}"
 ---
-apiVersion: iam.cnrm.cloud.google.com/v1
+apiVersion: iam.cnrm.cloud.google.com/v1beta1
 kind: IAMPolicyMember
 metadata:
   name: krops-reader-sql-instance-user
@@ -49,7 +51,7 @@ spec:
   resourceRef:
     external: "projects/${GCP_PROJECT}"
 ---
-apiVersion: iam.cnrm.cloud.google.com/v1
+apiVersion: iam.cnrm.cloud.google.com/v1beta1
 kind: IAMPolicyMember
 metadata:
   name: krops-reader-token-creator

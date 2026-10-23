@@ -27,6 +27,8 @@ kind: ComputeAddress
 metadata:
   name: psa
   namespace: default
+  annotations:
+    cnrm.cloud.google.com/project-id: ${GCP_PROJECT}
 spec:
   resourceID: krops-europe-north1-workload-psa
   location: global
@@ -41,6 +43,8 @@ kind: ServiceNetworkingConnection
 metadata:
   name: psa
   namespace: default
+  annotations:
+    cnrm.cloud.google.com/project-id: ${GCP_PROJECT}
 spec:
   networkRef:
     external: "projects/${GCP_PROJECT}/global/networks/krops-europe-north1-workload"

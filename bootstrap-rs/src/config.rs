@@ -16,6 +16,14 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BootstrapConfig {
+    /// The repository root this config's relative paths resolve against
+    /// (issue #260): the canonicalized parent directory of the loaded
+    /// config file, set by `load_from`. Repository-owned relative paths
+    /// (provider/pivot/move-fallback manifests) join it, and repository
+    /// mise tasks run with it as their working directory. Skipped by
+    /// serde: it is derived from the file's location, not its content.
+    #[serde(skip, default)]
+    pub root: PathBuf,
     pub bootstrap: BootstrapSection,
     pub charts: IndexMap<String, String>,
     /// Teardown constants (issue #100): AWS orphan-sweep names and the
@@ -206,13 +214,24 @@ impl BootstrapConfig {
             .unwrap_or_else(|| PathBuf::from("bootstrap.toml"))
     }
 
-    /// Parse a config file from disk, with validation beyond deserialization.
+    /// Parse a config file from disk, with validation beyond
+    /// deserialization. The config's directory (canonicalized) becomes
+    /// `root`, the repository root its relative paths resolve against
+    /// (issue #260); a config stored outside a repository therefore
+    /// resolves them against its own directory.
     pub fn load_from(path: &Path) -> Result<Self> {
         let raw = std::fs::read_to_string(path)
             .with_context(|| format!("failed to read bootstrap config '{path:?}'"))?;
-        let config: BootstrapConfig = toml::from_str(&raw)
+        let mut config: BootstrapConfig = toml::from_str(&raw)
             .with_context(|| format!("failed to parse bootstrap config '{path:?}'"))?;
         config.validate()?;
+        // `parent()` of a bare filename is `Some("")`, which canonicalizes
+        // to the caller's working directory: the pre-#260 behavior for
+        // `BOOTSTRAP_CONFIG=./bootstrap.toml`-style relative locations.
+        let dir = path.parent().unwrap_or_else(|| Path::new("."));
+        let root = std::fs::canonicalize(dir)
+            .with_context(|| format!("failed to resolve bootstrap config directory '{dir:?}'"))?;
+        config.root = root;
         Ok(config)
     }
 
@@ -465,6 +484,37 @@ manifest = "mgmt/aws/infrastructure/aws-identity/identity.yaml"
         let aws = config.environment("aws").unwrap();
         assert_eq!(aws.provider_manifests.len(), 6);
         assert_eq!(aws.move_fallbacks.len(), 1);
+        // The root is the canonicalized parent of the loaded file (issue
+        // #260): the checkout directory, not the test process' CWD.
+        let file = root.join("../bootstrap.toml");
+        assert_eq!(
+            config.root,
+            std::fs::canonicalize(file.parent().unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn load_from_derives_root_from_the_config_parent() {
+        // A config loaded from a nested directory resolves repository
+        // relative paths against that directory's canonical form, no
+        // matter where the caller stands (issue #260).
+        let dir = tempfile::tempdir().unwrap();
+        let nested = dir.path().join("repo/nested");
+        std::fs::create_dir_all(&nested).unwrap();
+        let config_path = nested.join("bootstrap.toml");
+        std::fs::write(&config_path, MINIMAL).unwrap();
+        let config = BootstrapConfig::load_from(&config_path).unwrap();
+        let expected = std::fs::canonicalize(&nested).unwrap();
+        assert_eq!(config.root, expected);
+        // A sibling config in a different directory has a different root:
+        // the directory is a property of the loaded file, not the content.
+        let other = dir.path().join("elsewhere");
+        std::fs::create_dir_all(&other).unwrap();
+        let other_path = other.join("bootstrap.toml");
+        std::fs::write(&other_path, MINIMAL).unwrap();
+        let other_config = BootstrapConfig::load_from(&other_path).unwrap();
+        assert_eq!(other_config.root, std::fs::canonicalize(&other).unwrap());
+        assert_ne!(config.root, other_config.root);
     }
 
     #[test]

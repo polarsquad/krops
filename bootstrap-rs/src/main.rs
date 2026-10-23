@@ -189,6 +189,17 @@ impl Config {
         self.is_local() && !self.toolbox
     }
 
+    /// The repository root this run resolves against (issue #260): the
+    /// canonicalized parent of the loaded config file. Repository-owned
+    /// manifest paths join it and repository mise tasks run with it as
+    /// their working directory. Caller-supplied paths (`AGE_KEY_FILE`, a
+    /// relative `MGMT_KUBECONFIG`, `KUBECONFIG`) deliberately do NOT: they
+    /// keep caller-working-directory semantics, and the run never changes
+    /// the process CWD to re-root them.
+    pub(crate) fn root(&self) -> &Path {
+        &self.repo.root
+    }
+
     /// Resolve the run configuration from the process environment.
     fn load(cli: &Cli, repo: BootstrapConfig) -> Result<Self> {
         Self::from_env(cli, repo, |name| std::env::var(name).ok())
@@ -740,6 +751,38 @@ pub(crate) async fn run_with_stdin(cmd: &str, args: &[&str], input: &str) -> Res
         bail!("'{cmd} {}' failed with {status}", args.join(" "));
     }
     Ok(())
+}
+
+/// `run` with the child's working directory set explicitly (issue #260):
+/// repository mise tasks must resolve their own relative paths against the
+/// repository root, not the caller's working directory.
+pub(crate) async fn run_in(cmd: &str, args: &[&str], dir: &Path) -> Result<()> {
+    let status = Command::new(cmd)
+        .args(args)
+        .current_dir(dir)
+        .status()
+        .await
+        .with_context(|| format!("failed to spawn '{cmd}'"))?;
+    if !status.success() {
+        bail!("'{cmd} {}' failed with {status}", args.join(" "));
+    }
+    Ok(())
+}
+
+/// `capture` with the child's working directory set explicitly (issue
+/// #260); stderr inherited, error on nonzero exit.
+pub(crate) async fn capture_in(cmd: &str, args: &[&str], dir: &Path) -> Result<String> {
+    let out = Command::new(cmd)
+        .args(args)
+        .current_dir(dir)
+        .stderr(Stdio::inherit())
+        .output()
+        .await
+        .with_context(|| format!("failed to spawn '{cmd}'"))?;
+    if !out.status.success() {
+        bail!("'{cmd} {}' failed with {}", args.join(" "), out.status);
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
 /// The aws-spawning variants of the helpers above, with `MISE_ENV=aws`
@@ -1404,6 +1447,9 @@ async fn bootstrap_local_registry(
     let (registry_host, oci_port) = cfg.registry_endpoint();
     let status = Command::new("mise")
         .args(["-E", &cfg.profile, "run", "oci-push"])
+        // Repository mise task: run against the config's repository root,
+        // not the caller's working directory (issue #260).
+        .current_dir(cfg.root())
         .env("REGISTRY_PORT", oci_port.to_string())
         .env("REGISTRY_HOST", &registry_host)
         .env("OCI_REPOSITORY", &cfg.oci_repository)
@@ -2441,11 +2487,11 @@ async fn pivot_install_capi_in_target(
 
     println!(">>> Applying provider CRs in the target...");
     for manifest in &cfg.environment.provider_manifests {
-        run(
-            "kubectl",
-            &kubectl_cmd(Some(kc), &["apply", "-f", manifest]),
-        )
-        .await?;
+        // Repository-owned path: resolve against the config's repository
+        // root, not the caller's working directory (issue #260).
+        let path = cfg.root().join(manifest);
+        let path = path.to_string_lossy().into_owned();
+        run("kubectl", &kubectl_cmd(Some(kc), &["apply", "-f", &path])).await?;
     }
 
     // Plain pivot manifests (issue #236): non-secret objects the moved
@@ -2469,8 +2515,13 @@ async fn pivot_install_capi_in_target(
             vars.insert(key.clone(), value.clone());
         }
         for manifest in &cfg.environment.pivot_manifests {
-            let raw = std::fs::read_to_string(manifest)
-                .with_context(|| format!("failed to read pivot manifest '{manifest}'"))?;
+            // Repository-owned path: resolve against the config's
+            // repository root (issue #260); failures name the absolute
+            // path so a config stored outside a repository fails
+            // readably instead of against the caller's working directory.
+            let path = cfg.root().join(manifest);
+            let raw = std::fs::read_to_string(&path)
+                .with_context(|| format!("failed to read pivot manifest '{}'", path.display()))?;
             let substituted = substitute_manifest_vars(&raw, &vars);
             let missing = remaining_manifest_vars(&substituted);
             ensure!(
@@ -2495,7 +2546,14 @@ async fn pivot_install_capi_in_target(
         // from ambient credentials. Do NOT pre-apply mgmt/aws/infrastructure/aws-identity/:
         // the AWSClusterControllerIdentity carries a move hook and comes over
         // with the Phase 4 move. Credentials travel in a stdin manifest, never on argv.
-        let credentials = capture("mise", &["-E", &cfg.profile, "run", "aws-credentials"]).await?;
+        let credentials = capture_in(
+            "mise",
+            &["-E", &cfg.profile, "run", "aws-credentials"],
+            // Repository mise task: run against the config's repository
+            // root, not the caller's working directory (issue #260).
+            cfg.root(),
+        )
+        .await?;
         create_aws_credential_secrets(Some(kc), &credentials).await?;
     }
 
@@ -2509,6 +2567,10 @@ async fn pivot_install_capi_in_target(
             std::env::set_var("SOPS_AGE_KEY_FILE", cfg.age_key_file.as_os_str());
         }
         for manifest in &cfg.environment.pivot_sops_secrets {
+            // Repository-owned path: resolve against the config's
+            // repository root (issue #260).
+            let path = cfg.root().join(manifest);
+            let path = path.to_string_lossy();
             let plaintext = capture(
                 "sops",
                 &[
@@ -2517,7 +2579,7 @@ async fn pivot_install_capi_in_target(
                     "yaml",
                     "--output-type",
                     "yaml",
-                    manifest,
+                    &path,
                 ],
             )
             .await?;
@@ -2733,11 +2795,11 @@ async fn pivot_suspend_and_move(cfg: &Config, kc: &str) -> Result<()> {
                 ">>> {} '{}' missing after the move; applying from Git...",
                 fallback.resource, fallback.name
             );
-            run(
-                "kubectl",
-                &kubectl_cmd(Some(kc), &["apply", "-f", &fallback.manifest]),
-            )
-            .await?;
+            // Repository-owned path: resolve against the config's
+            // repository root (issue #260).
+            let path = cfg.root().join(&fallback.manifest);
+            let path = path.to_string_lossy().into_owned();
+            run("kubectl", &kubectl_cmd(Some(kc), &["apply", "-f", &path])).await?;
         }
     }
     Ok(())
@@ -2762,6 +2824,9 @@ async fn pivot_seed_target(
         let (registry_host, oci_port) = cfg.registry_endpoint();
         let status = Command::new("mise")
             .args(["-E", &cfg.profile, "run", "oci-push"])
+            // Repository mise task: run against the config's repository
+            // root, not the caller's working directory (issue #260).
+            .current_dir(cfg.root())
             .env("REGISTRY_PORT", oci_port.to_string())
             .env("REGISTRY_HOST", &registry_host)
             .env("OCI_REPOSITORY", &cfg.oci_repository)
@@ -3082,7 +3147,14 @@ async fn run_bootstrap(cfg: &Config, http: &reqwest::Client) -> Result<()> {
             ">>> Running post-kind-create task '{task}' (mise -E {} run {task})...",
             cfg.profile
         );
-        run("mise", &post_kind_create_hook_args(&cfg.profile, task)).await?;
+        run_in(
+            "mise",
+            &post_kind_create_hook_args(&cfg.profile, task),
+            // Repository mise task: run against the config's repository
+            // root, not the caller's working directory (issue #260).
+            cfg.root(),
+        )
+        .await?;
     }
 
     // Step 1.5: bootstrap the local container registry (local-host only).
@@ -3117,7 +3189,14 @@ async fn run_bootstrap(cfg: &Config, http: &reqwest::Client) -> Result<()> {
 
     // Step 3.5: AWS credentials (AWS profile only).
     if cfg.profile == "aws" {
-        let credentials = capture("mise", &["-E", &cfg.profile, "run", "aws-credentials"]).await?;
+        let credentials = capture_in(
+            "mise",
+            &["-E", &cfg.profile, "run", "aws-credentials"],
+            // Repository mise task: run against the config's repository
+            // root, not the caller's working directory (issue #260).
+            cfg.root(),
+        )
+        .await?;
         create_aws_credential_secrets(None, &credentials).await?;
     }
 
@@ -3343,6 +3422,203 @@ else:
         let envs = std::fs::read_to_string(&log).unwrap();
         assert_eq!(envs.lines().filter(|l| *l == "aws").count(), 4);
         assert_eq!(envs.lines().filter(|l| *l == "<unset>").count(), 1);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn in_dir_helpers_run_in_the_given_working_directory() {
+        // Issue #260: the cwd-scoped helpers must run the child in the
+        // directory they are given, not the process' working directory.
+        // The stub prints the CWD it actually saw.
+        use std::os::unix::fs::PermissionsExt;
+        let repo = tempfile::tempdir().unwrap();
+        let stub = repo.path().join("cwd-stub");
+        std::fs::write(
+            &stub,
+            "#!/usr/bin/env python3\nimport sys\nfrom pathlib import Path\nassert sys.argv[1:] == ['marker'], sys.argv\nprint(Path.cwd())\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let bin = stub.to_str().unwrap();
+
+        let expected = std::fs::canonicalize(repo.path()).unwrap();
+        let here = std::fs::canonicalize(std::env::current_dir().unwrap()).unwrap();
+        let cwd = capture_in(bin, &["marker"], repo.path()).await.unwrap();
+        assert_eq!(
+            cwd.trim(),
+            expected.to_string_lossy(),
+            "capture_in must run in the given directory"
+        );
+        assert_ne!(
+            cwd.trim(),
+            here.to_string_lossy(),
+            "capture_in must not fall back to the process' working directory"
+        );
+        run_in(bin, &["marker"], repo.path()).await.unwrap();
+    }
+
+    #[test]
+    fn repo_paths_and_mise_tasks_resolve_against_the_config_root() {
+        // Pin the issue #260 wiring in the source: every repository mise
+        // spawn runs with the config's repository root as its working
+        // directory, and every repository-owned manifest path joins it.
+        // The fixture tests prove the mechanism; this keeps the call
+        // sites on it, so a refactor back to caller-relative paths
+        // breaks the build.
+        let src = include_str!("main.rs");
+
+        let direct_mise: Vec<usize> = src
+            .match_indices("Command::new(\"mise\")")
+            .map(|(i, _)| i)
+            .collect();
+        assert_eq!(direct_mise.len(), 2, "expected the two direct mise spawns");
+        for start in direct_mise {
+            let window = &src[start..start + 600];
+            assert!(
+                window.contains(".current_dir(cfg.root())"),
+                "a direct mise spawn must run against the config's repository root"
+            );
+        }
+
+        let capture_sites: Vec<usize> = src
+            .match_indices("run\", \"aws-credentials\"")
+            .map(|(i, _)| i)
+            .collect();
+        assert_eq!(
+            capture_sites.len(),
+            2,
+            "expected the two aws-credentials captures"
+        );
+        for start in capture_sites {
+            let window = &src[start.saturating_sub(120)..start + 260];
+            assert!(
+                window.contains("capture_in("),
+                "aws-credentials must run through the cwd-scoped capture"
+            );
+            assert!(
+                window.contains("cfg.root()"),
+                "aws-credentials must run against the config's repository root"
+            );
+        }
+
+        let hook = src
+            .find("run_in(\n            \"mise\",\n            &post_kind_create_hook_args(&cfg.profile, task),")
+            .expect("the post-kind-create hook must run through the cwd-scoped run");
+        assert!(
+            src[hook..hook + 300].contains("cfg.root()"),
+            "the post-kind-create hook must run against the config's repository root"
+        );
+
+        for loop_head in [
+            "for manifest in &cfg.environment.provider_manifests",
+            "for manifest in &cfg.environment.pivot_manifests",
+            "for manifest in &cfg.environment.pivot_sops_secrets",
+        ] {
+            let start = src.find(loop_head).expect(loop_head);
+            assert!(
+                src[start..start + 400].contains("cfg.root().join(manifest)"),
+                "{loop_head} must resolve against the config's repository root"
+            );
+        }
+        let start = src
+            .find("for fallback in &cfg.environment.move_fallbacks")
+            .expect("move-fallbacks loop");
+        assert!(
+            src[start..start + 900].contains("cfg.root().join(&fallback.manifest)"),
+            "move-fallbacks must resolve against the config's repository root"
+        );
+    }
+
+    #[test]
+    fn caller_supplied_paths_stay_caller_relative() {
+        // Issue #260: the repository root re-roots only repository-owned
+        // paths. Caller-supplied paths keep caller-working-directory
+        // semantics (no global chdir, no joining against the root).
+        let cli = Cli::try_parse_from(["krops-bootstrap", "aws"]).unwrap();
+        let cfg = Config::from_env(&cli, repo_config(), |name| match name {
+            "AGE_KEY_FILE" => Some("secrets/age.agekey".into()),
+            "MGMT_KUBECONFIG" => Some("./mgmt-kubeconfig.yaml".into()),
+            _ => None,
+        })
+        .unwrap();
+        assert_eq!(cfg.age_key_file, PathBuf::from("secrets/age.agekey"));
+        assert_eq!(cfg.mgmt_kubeconfig, PathBuf::from("./mgmt-kubeconfig.yaml"));
+        // The root is the loaded config's directory; the values above
+        // must not have been silently joined against it.
+        assert!(!cfg.root().as_os_str().is_empty());
+        assert!(!cfg.age_key_file.starts_with(cfg.root()));
+        assert!(!cfg.mgmt_kubeconfig.starts_with(cfg.root()));
+    }
+
+    #[test]
+    fn provider_manifest_resolves_against_config_dir_not_caller_dir() {
+        // Issue #260 scenario, end to end at the Config level: the config
+        // lives in one directory, the binary is invoked from another. The
+        // provider manifest (a repository-relative path) must resolve
+        // against the config's directory, where the file exists, not the
+        // caller's directory, where it does not. No cluster, no chdir:
+        // root is fixed at load time, so the process CWD is irrelevant.
+        let caller = tempfile::tempdir().unwrap();
+        let repo = tempfile::tempdir().unwrap();
+        let manifest_rel = "mgmt/aws/capi-providers/capi-system/providers.yaml";
+        let manifest_raw = repo.path().join(manifest_rel);
+        std::fs::create_dir_all(manifest_raw.parent().unwrap()).unwrap();
+        std::fs::write(&manifest_raw, "apiVersion: v1\n").unwrap();
+        // Canonicalize: the config's root is canonicalized too, and temp
+        // dirs may sit behind a symlink (/var -> /private/var on macOS).
+        let manifest_abs = std::fs::canonicalize(manifest_raw).unwrap();
+
+        let config_path = repo.path().join("bootstrap.toml");
+        let config_text = format!(
+            "[bootstrap]\n\
+             default-environment = \"aws\"\n\
+             git-branch = \"main\"\n\
+             kind-cluster = \"mgmt\"\n\
+             kind-context = \"kind-mgmt\"\n\
+             registry-name = \"krops-registry\"\n\
+             flux-namespace = \"flux-system\"\n\
+             github-pat-secret = \"flux-github-pat\"\n\
+             sops-age-secret = \"sops-age\"\n\
+             mgmt-namespace = \"default\"\n\
+             mgmt-context = \"krops-mgmt\"\n\
+             kind-node-image = \"kindest/node:v1.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000\"\n\
+             \n\
+             [charts]\n\
+             flux-operator = \"0.58.0\"\n\
+             \n\
+             [environments.aws]\n\
+             kind = \"aws\"\n\
+             sync = \"github\"\n\
+             sync-path = \"mgmt/aws\"\n\
+             mgmt-cluster = \"mgmt\"\n\
+             mgmt-ready-timeout = \"40m\"\n\
+             infra-provider-namespace = \"capa-system\"\n\
+             infra-provider-name = \"aws\"\n\
+             provider-manifests = [\"{manifest_rel}\"]\n"
+        );
+        std::fs::write(&config_path, config_text).unwrap();
+
+        let repo_config = BootstrapConfig::load_from(&config_path).unwrap();
+        let cli = Cli::try_parse_from(["krops-bootstrap", "aws"]).unwrap();
+        let cfg = Config::from_env(&cli, repo_config, |_| None).unwrap();
+
+        // The fix: the manifest resolves against the config's directory,
+        // and the file is actually there.
+        let resolved = cfg.root().join(manifest_rel);
+        assert_eq!(resolved, manifest_abs);
+        assert!(
+            resolved.is_file(),
+            "must resolve against the config directory, where the manifest lives"
+        );
+        // The pre-fix behavior resolved against the caller's CWD, where the
+        // manifest does not exist. The two must differ and only the
+        // config-dir one must hit the file.
+        let caller_resolved = caller.path().join(manifest_rel);
+        assert_ne!(resolved, caller_resolved);
+        assert!(
+            !caller_resolved.is_file(),
+            "the caller directory must not contain the manifest"
+        );
     }
 
     #[cfg(unix)]

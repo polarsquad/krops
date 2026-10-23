@@ -4,7 +4,9 @@
 # itself is a generic bootstrap engine. Environment variables (REGISTRY_PORT,
 # GIT_REPO_URL, BOOTSTRAP_KUBECONTEXT, ...) keep their precedence over these
 # values at runtime. Locate this file with BOOTSTRAP_CONFIG when not running
-# from the repository root.
+# from the repository root; the file's directory becomes the repository
+# root that relative manifests and repository mise tasks resolve against
+# (issue #260).
 #
 # Environment order matters: error messages list environments in file order
 # to preserve bootstrap.sh's exact wording ('local-host' before 'aws').

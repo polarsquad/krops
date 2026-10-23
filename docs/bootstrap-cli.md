@@ -61,8 +61,11 @@ cd ..
 ./bootstrap-rs/target/debug/krops-bootstrap teardown --help
 ```
 
-Run the binary from the repository root so its default `./bootstrap.toml` path
-resolves. Set `BOOTSTRAP_CONFIG` when running from another directory.
+Run the binary from the repository root so its default `./bootstrap.toml`
+path resolves. `BOOTSTRAP_CONFIG` selects another config path and works
+from any directory: the config's directory becomes the run's repository
+root for repository-owned files and mise tasks (see
+[Repository configuration](#repository-configuration)).
 
 CI runs `cargo fmt --check`, clippy with warnings denied, a locked build, and
 the test suite. The toolchain is pinned in `bootstrap-rs/rust-toolchain.toml`;
@@ -104,6 +107,20 @@ teardown targets live in [`bootstrap.toml`](../bootstrap.toml). The binary
 retains generic fallback defaults and sequence-level contracts. It reads
 `./bootstrap.toml` by default; `BOOTSTRAP_CONFIG` selects another path.
 
+The loaded config's directory is the run's **repository root** (the
+file's parent directory, canonicalized). Repository-owned relative paths
+(`provider-manifests`, `pivot-manifests`, `pivot-sops-secrets`, and the
+`move-fallbacks` manifests) resolve against that root, and repository
+mise tasks (`oci-push`, `aws-credentials`, `post-kind-create-task`) run
+with it as their working directory; the binary never changes the process
+working directory, so selecting a checkout's config from another
+directory runs against that checkout (issue #260). A config stored
+outside a repository resolves those paths against its own directory, and
+the first use of a missing manifest fails naming the absolute resolved
+path. Caller-supplied paths keep their own semantics and are not
+re-rooted: `AGE_KEY_FILE`, a relative `MGMT_KUBECONFIG`, and `KUBECONFIG`
+resolve against the caller's working directory.
+
 Runtime environment variables take precedence where an override exists.
 `mise run validate` parses the file and cross-checks its chart pins and
 teardown names against the Git manifests. Renovate updates the annotated chart
@@ -134,7 +151,7 @@ pins together with their declarative counterparts. See
 
 | Variable | Default | Used by |
 |---|---|---|
-| `BOOTSTRAP_CONFIG` | `./bootstrap.toml` | Repository configuration path |
+| `BOOTSTRAP_CONFIG` | `./bootstrap.toml` | Repository configuration path; its directory is the repository root that repository-owned paths and mise tasks resolve against |
 | `KROPS_PROFILE` | positional profile, then `bootstrap.default-environment` (`aws` checked in) | Environment selection |
 | `REGISTRY_PORT` | `5001` | Local-host registry host port |
 | `REGISTRY_READY_RETRIES` | `120` | Local-host registry readiness attempts |
@@ -143,11 +160,11 @@ pins together with their declarative counterparts. See
 | `GIT_REPO_URL` | required for GitHub-synced environments (`aws`, `local-talos`, `azure`, `gcp`) | Management Flux Git source |
 | `GITHUB_TOKEN` | required for GitHub-synced environments (`aws`, `local-talos`, `azure`, `gcp`) | PAT with read access to the repository |
 | `GITHUB_USER` | `git` | Basic-auth username paired with the PAT |
-| `AGE_KEY_FILE` | `age.agekey` | SOPS age private key loaded into `sops-age` |
+| `AGE_KEY_FILE` | `age.agekey` | SOPS age private key loaded into `sops-age`; relative to the caller's working directory |
 | `AGE_PUBLIC_KEY` | derived from `AGE_KEY_FILE` | Public key override during secret creation; must match the key file's public key when both are known (preflight fails fast on a mismatch) |
 | `OCI_REPOSITORY` / `OCI_TAG` | `krops` / `latest` | Local-host OCI artifact name |
 | `BOOTSTRAP_PIVOT` | `1` | Any value other than literal `1` skips pivot |
-| `MGMT_KUBECONFIG` | `~/.kube/krops-mgmt.yaml` | Exported management kubeconfig for native fallback runs |
+| `MGMT_KUBECONFIG` | `~/.kube/krops-mgmt.yaml` | Exported management kubeconfig for native fallback runs; a relative value stays relative to the caller's working directory |
 | `MGMT_READY_TIMEOUT` | `40m` for aws, `15m` for local-host, `30m` for local-talos (PXE install + first Talos boot) | Management cluster definition and provisioning waits |
 | `MGMT_POLL_INTERVAL` | `10` seconds | Management cluster definition, provisioning, and node-readiness polls |
 | `BOOTSTRAP_KUBECONTEXT` | config value `kind-mgmt` | Source context required by pivot |

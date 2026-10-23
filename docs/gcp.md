@@ -10,7 +10,7 @@ clusters no longer run their own Config Connector).
 
 | AWS (`aws`) | Azure (`azure`) | GCP (`gcp`) |
 |---|---|---|
-| CAPA, `AWSManagedControlPlane` | CAPZ, `AzureASOManagedControlPlane` | CAPG v1.13.1, `GCPManagedControlPlane` (GKE) |
+| CAPA, `AWSManagedControlPlane` | CAPZ, `AzureASOManagedControlPlane` | CAPG v1.13.1-zonal.1 (fork, #641), `GCPManagedControlPlane` (GKE) |
 | ACK controllers on the management cluster only (issue #346) | ASO bundled by CAPZ on the management cluster only (workload release removed, issue #559) | Config Connector (KCC 1.158.0) on the management cluster only (issue #560) |
 | Static SOPS credentials on the management cluster (no EKS Pod Identity since issue #346) | Entra Workload Identity | Workload Identity Federation (WIF pool `krops`) |
 | S3 bucket | Storage account + blob container | Storage bucket (versioning, uniform access, PAP) |
@@ -145,6 +145,13 @@ Workload cluster: Flux only, ready for a future application workload
 
 ## Upgrading CAPG and the Config Connector operator
 
+CAPG is pinned to the fork release `shrinedogg/cluster-api-provider-gcp`
+v1.13.1-zonal.1 (fetched via `fetchConfig`), not upstream: upstream
+resolves node pools against the zone-stripped regional path, so node pools
+of the zonal clusters never converge (#641). Re-point at upstream once a
+release there includes the zonal node-pool fix (retirement tracked in
+issue #656).
+
 CAPG minors: merge one at a time and let the management cluster settle
 before the next (GKE and MachinePool are feature-gated, see
 `capi-providers/capg-system/capg-variables.yaml`).
@@ -168,9 +175,10 @@ next Flux reconciliation.
   -- never put it in Git or a cluster Secret. Limit who holds
   `cloudsql.users.update` (roles/cloudsql.admin, roles/editor) as that
   permission can enable the user.
-- No live acceptance run has been performed yet (no project at
-  implementation time); the project number is a placeholder until
-  `gcp-bootstrap` runs.
+- The first live acceptance run (#319 stage B, 2026-10-19) has been
+  performed; it surfaced the zonal node-pool convergence bug (#641, fixed
+  by the CAPG fork pin above) and the WIF `generateToken` failure (#642).
+  Acceptance is pending the re-run after both are fixed.
 - Zonal clusters (`europe-north1-a`) until multi-zone availability in the
   project is confirmed (spike S4 of the implementation plan).
 - Cloud SQL instance names have a reuse cooldown after deletion; a

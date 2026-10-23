@@ -161,6 +161,11 @@ def main() -> int:
             failures.append(f"(c) {rel}: audience must reference pool krops / provider ${{GCP_WIF_PROVIDER:=mgmt}}")
         if "krops-capg@${GCP_PROJECT}.iam.gserviceaccount.com" not in raw:
             failures.append(f"(c) {rel}: must impersonate krops-capg@${{GCP_PROJECT}}")
+        if secret_name == "capg-wif-credentials" and \
+                '"client_email": "krops-capg@${GCP_PROJECT}.iam.gserviceaccount.com"' not in raw:
+            failures.append(
+                f"(c) {rel}: CAPG credential must carry client_email "
+                f"krops-capg@${{GCP_PROJECT}} (CAPG v1.13.1's generateToken, issue #642)")
         if cfg.get("credential_source", {}).get("file") != "/var/run/secrets/kubernetes.io/serviceaccount/token":
             failures.append(f"(c) {rel}: credential_source.file must be the projected serviceaccount token")
 

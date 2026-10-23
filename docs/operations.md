@@ -150,7 +150,8 @@ happen for `CLOUDSDK_CONFIG`).
 
 It does not pass `BOOTSTRAP_CONFIG`, `REGISTRY_READY_RETRIES`,
 `LOCAL_RECONCILE_TIMEOUT`, `MGMT_KUBECONFIG`, `MGMT_READY_TIMEOUT`,
-`MGMT_POLL_INTERVAL`, `BOOTSTRAP_KUBECONTEXT`, or the teardown controls
+`MGMT_POLL_INTERVAL`, `BOOTSTRAP_KUBECONTEXT`, `KROPS_KIND_CLUSTER`,
+`KROPS_REGISTRY_NAME`, or the teardown controls
 `AWS_ONLY`, `FORCE_KIND_DELETE`, `CLUSTER_DELETE_TIMEOUT`, and
 `PROVIDER_DELETE_TIMEOUT`. Use a raw container run with explicit `-e` entries
 when overriding those values.
@@ -183,6 +184,16 @@ Inside the toolbox:
   `KROPS_OCI_GIT_*` forwarding remains the primary metadata path for
   `oci-push`; without it the task's git fallback now prints git's own error
   instead of hiding it.
+- Concurrent lifecycle runs on one host collide on the bootstrap.toml
+  host-local names (kind cluster `mgmt`, context `kind-mgmt`, local-host
+  registry `krops-registry`): the later run's idempotent
+  delete-before-create step deletes the earlier run's in-flight management
+  cluster (issue #640). Run them with distinct host-local names
+  (`KROPS_KIND_CLUSTER`, plus `KROPS_REGISTRY_NAME` and `REGISTRY_PORT`
+  for local-host) via a raw container run with explicit `-e` entries; the
+  knob semantics, precedence, and the native-script limitation are
+  documented in
+  [bootstrap-cli.md](./bootstrap-cli.md) ("Concurrent runs on one host").
 
 ### Helper tasks in the toolbox
 

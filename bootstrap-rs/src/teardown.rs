@@ -84,7 +84,8 @@ impl TeardownConfig {
 /// bootstrap cluster; post-pivot in the self-managed management cluster.
 #[derive(Debug, PartialEq)]
 pub enum ControllerHost {
-    /// The kind bootstrap cluster (`kind-mgmt` context).
+    /// The kind bootstrap cluster (its resolved kubeconfig context,
+    /// `kind-mgmt` by default; #640).
     Kind,
     /// The self-managed management cluster, via its exported kubeconfig.
     SelfManaged,
@@ -267,7 +268,7 @@ fn parse_workloads(listing: &str, mgmt_cluster: &str) -> Vec<String> {
 /// kind cluster present (and reachable) wins (pre-pivot world); then the
 /// mgmt kubeconfig (post-pivot); then unreachable.
 pub async fn discover_controller_host(cfg: &Config) -> ControllerHost {
-    let kind_ctx = &cfg.repo.bootstrap.kind_context;
+    let kind_ctx = &cfg.bootstrap_kubecontext;
     // `kubectl config get-contexts` lists contexts without touching a
     // cluster; kind's context existing is the pre-pivot signal.
     let contexts = capture_lossy("kubectl", &["config", "get-contexts", "-o", "name"]).await;
@@ -305,7 +306,7 @@ pub async fn discover_controller_host(cfg: &Config) -> ControllerHost {
 fn resolve_target(host: &ControllerHost, cfg: &Config, tcfg: &TeardownConfig) -> Option<K8sTarget> {
     match host {
         ControllerHost::Kind => Some(K8sTarget::Kind {
-            context: cfg.repo.bootstrap.kind_context.clone(),
+            context: cfg.bootstrap_kubecontext.clone(),
         }),
         ControllerHost::SelfManaged => Some(K8sTarget::SelfManaged {
             kubeconfig: tcfg.mgmt_kubeconfig.to_string_lossy().into_owned(),
@@ -1919,7 +1920,7 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
             && capture_lossy("kind", &["get", "clusters"])
                 .await
                 .lines()
-                .any(|l| l.trim() == cfg.repo.bootstrap.kind_cluster);
+                .any(|l| l.trim() == cfg.kind_cluster);
 
         let kc: Option<String> = if kind_present {
             // Toolbox runs: join the kind network so the internal API
@@ -1934,7 +1935,7 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
             }
             let _ = run(
                 "kubectl",
-                &["config", "use-context", &cfg.repo.bootstrap.kind_context],
+                &["config", "use-context", &cfg.bootstrap_kubecontext],
             )
             .await;
             None
@@ -1953,7 +1954,7 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
         // post-pivot - never the caller's current context.
         let target: Option<K8sTarget> = if kind_present {
             Some(K8sTarget::Kind {
-                context: cfg.repo.bootstrap.kind_context.clone(),
+                context: cfg.bootstrap_kubecontext.clone(),
             })
         } else {
             kc.as_ref().map(|k| K8sTarget::SelfManaged {
@@ -2013,7 +2014,7 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
             // would have refused); delete kind.
             println!(
                 ">>> Deleting kind management cluster '{}'...",
-                cfg.repo.bootstrap.kind_cluster
+                cfg.kind_cluster
             );
             // Toolbox runs must leave the kind network first: kind 0.33.0's
             // delete removes the node containers but not the Docker network,
@@ -2024,7 +2025,7 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
                     toolbox_leave_kind_network(cfg, engine).await;
                 }
             }
-            let kind_name = cfg.repo.bootstrap.kind_cluster.clone();
+            let kind_name = cfg.kind_cluster.clone();
             if run("kind", &["delete", "cluster", "--name", &kind_name])
                 .await
                 .is_ok()
@@ -2042,9 +2043,9 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
         }
 
         if let Some(engine) = engine.as_deref() {
-            remove_registry_container(Some(engine), &cfg.repo.bootstrap.registry_name).await;
+            remove_registry_container(Some(engine), &cfg.registry_name).await;
         } else {
-            remove_registry_container(None, &cfg.repo.bootstrap.registry_name).await;
+            remove_registry_container(None, &cfg.registry_name).await;
         }
         println!();
         println!("✓ Teardown complete.");
@@ -2162,7 +2163,7 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
 
         if clusters_gone && host == ControllerHost::Kind {
             // Pre-pivot: the bootstrap kind cluster owns nothing else.
-            let name = cfg.repo.bootstrap.kind_cluster.clone();
+            let name = cfg.kind_cluster.clone();
             println!(">>> Deleting kind bootstrap cluster '{name}'...");
             if run("kind", &["delete", "cluster", "--name", &name])
                 .await
@@ -2342,7 +2343,7 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
             }
             HostGuard::ConfirmedGone | HostGuard::Forced => match host {
                 ControllerHost::Kind => {
-                    let name = cfg.repo.bootstrap.kind_cluster.clone();
+                    let name = cfg.kind_cluster.clone();
                     println!(">>> Deleting kind management cluster '{name}'...");
                     // Mirror the sibling delete sites (local-host teardown,
                     // pivot, bootstrap --recreate): a toolbox run leaves the
@@ -3034,6 +3035,11 @@ mod tests {
         .unwrap();
         let name = "aws".to_string();
         let environment = repo.environment(&name).unwrap().clone();
+        // The bootstrap.toml defaults: the tests set no host-name env
+        // overrides (#640).
+        let kind_cluster = repo.bootstrap.kind_cluster.clone();
+        let bootstrap_kubecontext = repo.bootstrap.kind_context.clone();
+        let registry_name = repo.bootstrap.registry_name.clone();
         Config {
             repo,
             profile: name,
@@ -3057,7 +3063,9 @@ mod tests {
             mgmt_kubeconfig: std::path::PathBuf::from("/nonexistent/krops-mgmt.yaml"),
             mgmt_ready_timeout: String::new(),
             mgmt_poll_interval: 30,
-            bootstrap_kubecontext: String::new(),
+            bootstrap_kubecontext,
+            kind_cluster,
+            registry_name,
         }
     }
 

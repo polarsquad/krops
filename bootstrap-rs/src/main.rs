@@ -85,6 +85,56 @@ fn resolve_environment(
     config.environment(name).map(|_| name.to_string())
 }
 
+/// Validate a host-local resource name (kind cluster, registry container)
+/// the way kind validates cluster names: lowercase alphanumerics with
+/// interior dots and hyphens, starting and ending alphanumeric
+/// (`[a-z0-9]([a-z0-9.-]*[a-z0-9])?`).
+fn is_valid_host_name(name: &str) -> bool {
+    let bytes = name.as_bytes();
+    let edge = |c: u8| c.is_ascii_lowercase() || c.is_ascii_digit();
+    !bytes.is_empty()
+        && edge(*bytes.first().unwrap())
+        && edge(*bytes.last().unwrap())
+        && bytes.iter().all(|c| edge(*c) || *c == b'.' || *c == b'-')
+}
+
+/// The host-local names a bootstrap run owns on this machine: the kind
+/// cluster, its kubeconfig context, and the local-host registry container
+/// (#640). `KROPS_KIND_CLUSTER` and `KROPS_REGISTRY_NAME` override the
+/// bootstrap.toml values so concurrent runs on one host can use distinct
+/// names instead of colliding on the shared cluster; an empty value
+/// behaves like unset, matching the `${VAR:-default}` semantics of the
+/// other knobs. The context is `BOOTSTRAP_KUBECONTEXT` when set, else
+/// derived as `kind-<cluster>` when the cluster name was overridden
+/// (kind's own `kind export kubeconfig` convention), else bootstrap.toml's
+/// `kind-context`.
+fn resolve_host_names(
+    repo: &BootstrapConfig,
+    get: &impl Fn(&str) -> Option<String>,
+) -> Result<(String, String, String)> {
+    let value = |name: &str| get(name).filter(|v| !v.is_empty());
+    let kind_cluster =
+        value("KROPS_KIND_CLUSTER").unwrap_or_else(|| repo.bootstrap.kind_cluster.clone());
+    let bootstrap_kubecontext = if let Some(ctx) = value("BOOTSTRAP_KUBECONTEXT") {
+        ctx
+    } else if value("KROPS_KIND_CLUSTER").is_some() {
+        format!("kind-{kind_cluster}")
+    } else {
+        repo.bootstrap.kind_context.clone()
+    };
+    let registry_name =
+        value("KROPS_REGISTRY_NAME").unwrap_or_else(|| repo.bootstrap.registry_name.clone());
+    for (name, what) in [
+        (kind_cluster.as_str(), "kind cluster name"),
+        (registry_name.as_str(), "registry name"),
+    ] {
+        if !is_valid_host_name(name) {
+            bail!("invalid {what} '{name}': must match [a-z0-9]([a-z0-9.-]*[a-z0-9])?");
+        }
+    }
+    Ok((kind_cluster, bootstrap_kubecontext, registry_name))
+}
+
 /// One-time imperative bootstrap for the krops management cluster.
 ///
 /// Behavioral port of bootstrap.sh: the CLI surface is the script's
@@ -101,9 +151,10 @@ struct Cli {
     /// [environments.*] sections of bootstrap.toml.
     profile: Option<String>,
 
-    /// Delete and recreate an existing 'mgmt' cluster instead of reusing it.
-    /// Required when the profile or the kind/registry configuration changed
-    /// since the cluster was created (the reuse path does not detect drift).
+    /// Delete and recreate an existing kind bootstrap cluster instead of
+    /// reusing it. Required when the profile or the kind/registry
+    /// configuration changed since the cluster was created (the reuse path
+    /// does not detect drift).
     #[arg(long)]
     recreate: bool,
 
@@ -163,7 +214,18 @@ struct Config {
     mgmt_kubeconfig: PathBuf,
     mgmt_ready_timeout: String,
     mgmt_poll_interval: u64,
+    /// The effective kind bootstrap context: `BOOTSTRAP_KUBECONTEXT` when
+    /// set, else `kind-<kind_cluster>` when the cluster name is overridden
+    /// via `KROPS_KIND_CLUSTER`, else bootstrap.toml's [bootstrap]
+    /// kind-context (#640).
     bootstrap_kubecontext: String,
+    /// The effective kind cluster name: `KROPS_KIND_CLUSTER` when set,
+    /// else bootstrap.toml's [bootstrap] kind-cluster (#640).
+    kind_cluster: String,
+    /// The effective local-host registry container name:
+    /// `KROPS_REGISTRY_NAME` when set, else bootstrap.toml's [bootstrap]
+    /// registry-name (#640).
+    registry_name: String,
 }
 
 impl Config {
@@ -177,7 +239,7 @@ impl Config {
     /// Host runs use the published port; toolbox runs share the kind network.
     fn registry_endpoint(&self) -> (String, u16) {
         if self.toolbox {
-            (self.repo.bootstrap.registry_name.clone(), 5000)
+            (self.registry_name.clone(), 5000)
         } else {
             ("localhost".to_string(), self.registry_port)
         }
@@ -240,6 +302,10 @@ impl Config {
             mgmt_poll_interval > 0,
             "MGMT_POLL_INTERVAL must be a positive integer, got 0"
         );
+        // Host-local names (kind cluster, its context, local-host registry)
+        // resolve with env precedence so concurrent runs on one host can
+        // use distinct names (#640).
+        let (kind_cluster, bootstrap_kubecontext, registry_name) = resolve_host_names(&repo, &get)?;
         Ok(Config {
             recreate: cli.recreate,
             registry_port,
@@ -268,10 +334,9 @@ impl Config {
                 .unwrap_or_else(default_mgmt_kubeconfig),
             mgmt_ready_timeout,
             mgmt_poll_interval,
-            bootstrap_kubecontext: with_default(
-                "BOOTSTRAP_KUBECONTEXT",
-                &repo.bootstrap.kind_context,
-            ),
+            bootstrap_kubecontext,
+            kind_cluster,
+            registry_name,
             repo,
             profile,
             environment: environment.clone(),
@@ -386,9 +451,11 @@ fn capd_recorded_endpoint(kubeconfig: &str) -> Option<String> {
 }
 
 /// Render the kind cluster config, mirroring the script's heredoc.
-/// `registry_name` comes from bootstrap.toml ([bootstrap] registry-name);
-/// `node_image` is the [bootstrap] kind-node-image pin (#647) that fixes
-/// the bootstrap node's k8s version instead of kind's baked-in default.
+/// `registry_name` is the resolved local-host registry name
+/// (`KROPS_REGISTRY_NAME` override, else bootstrap.toml's [bootstrap]
+/// registry-name, #640); `node_image` is the [bootstrap] kind-node-image
+/// pin (#647) that fixes the bootstrap node's k8s version instead of
+/// kind's baked-in default.
 fn render_kind_config(
     is_local: bool,
     registry_port: u16,
@@ -1131,7 +1198,7 @@ pub(crate) async fn select_toolbox_kind_kubeconfig(cfg: &Config) -> Result<()> {
     let Some(path) = toolbox_kubeconfig_path(cfg.toolbox, kubeconfig.as_deref())? else {
         return Ok(());
     };
-    let args = internal_kind_kubeconfig_args(&cfg.repo.bootstrap.kind_cluster);
+    let args = internal_kind_kubeconfig_args(&cfg.kind_cluster);
     let contents = capture("kind", &args).await?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
@@ -1148,15 +1215,15 @@ pub(crate) async fn select_toolbox_kind_kubeconfig(cfg: &Config) -> Result<()> {
     Ok(())
 }
 
-/// Ensure the kind 'mgmt' cluster exists and is healthy.
+/// Ensure the kind bootstrap cluster exists and is healthy.
 ///
 /// Default: reuse an existing cluster after validating that its context is
 /// reachable and all nodes go Ready; this makes reruns non-destructive and
 /// lets a partially failed bootstrap resume. With --recreate (or when no
 /// cluster exists) the cluster is (re)built from the rendered config.
 async fn ensure_kind_cluster(cfg: &Config, engine: &str, engine_sock: &str) -> Result<()> {
-    let kind_cluster = &cfg.repo.bootstrap.kind_cluster;
-    let kind_context = &cfg.repo.bootstrap.kind_context;
+    let kind_cluster = &cfg.kind_cluster;
+    let kind_context = &cfg.bootstrap_kubecontext;
     let clusters = capture_lossy("kind", &["get", "clusters"]).await;
     let exists = clusters.lines().any(|l| l.trim() == kind_cluster);
     let node_ready_timeout = format!("--timeout={NODE_READY_TIMEOUT}");
@@ -1218,7 +1285,7 @@ async fn ensure_kind_cluster(cfg: &Config, engine: &str, engine_sock: &str) -> R
         cfg.is_local(),
         cfg.registry_port,
         engine_sock,
-        &cfg.repo.bootstrap.registry_name,
+        &cfg.registry_name,
         &cfg.repo.bootstrap.kind_node_image,
     );
     run_with_stdin(
@@ -1254,7 +1321,7 @@ async fn bootstrap_local_registry(
 ) -> Result<()> {
     println!(">>> Bootstrapping local container registry...");
     let port = cfg.registry_port;
-    let registry_name = &cfg.repo.bootstrap.registry_name;
+    let registry_name = &cfg.registry_name;
     let name_filter = format!("name=^{registry_name}$");
 
     let exists = capture_lossy(
@@ -1733,7 +1800,7 @@ async fn install_flux_instance(
                 "--set".into(),
                 format!(
                     "instance.sync.url=oci://{}:5000/{}",
-                    cfg.repo.bootstrap.registry_name,
+                    cfg.registry_name,
                     cfg.oci_repository
                 ),
                 "--set".into(),
@@ -2852,16 +2919,7 @@ async fn pivot_delete_bootstrap_cluster(
     // removes the node containers but not the Docker network, so the leave
     // is detach hygiene so the toolbox is not attached when the nodes go away.
     engine::toolbox_leave_kind_network(cfg, engine).await;
-    run(
-        "kind",
-        &[
-            "delete",
-            "cluster",
-            "--name",
-            &cfg.repo.bootstrap.kind_cluster,
-        ],
-    )
-    .await?;
+    run("kind", &["delete", "cluster", "--name", &cfg.kind_cluster]).await?;
 
     println!();
     println!(">>> Pivot complete: the management cluster is self-managed.");
@@ -2973,7 +3031,11 @@ async fn main() -> Result<()> {
                 .with_context(|| "internal: environment vanished between resolution and lookup")?
                 .clone();
             // A minimal Config carrying what teardown needs (profile,
-            // environment section, repository config).
+            // environment section, repository config). The host-local names
+            // resolve from the environment too: a multiplexed run tears down
+            // the cluster it created, not the bootstrap.toml default (#640).
+            let (kind_cluster, bootstrap_kubecontext, registry_name) =
+                resolve_host_names(&repo, &|n| std::env::var(n).ok())?;
             let cfg = Config {
                 repo,
                 profile: name,
@@ -2998,7 +3060,9 @@ async fn main() -> Result<()> {
                     .mgmt_kubeconfig,
                 mgmt_ready_timeout: String::new(),
                 mgmt_poll_interval: DEFAULT_MGMT_POLL_INTERVAL,
-                bootstrap_kubecontext: String::new(),
+                bootstrap_kubecontext,
+                kind_cluster,
+                registry_name,
             };
             let tcfg = teardown::TeardownConfig::from_env(|n| std::env::var(n).ok())?;
             return teardown::run_teardown(&cfg, &tcfg).await;
@@ -3017,7 +3081,11 @@ async fn main() -> Result<()> {
                 .with_context(|| "internal: environment vanished between resolution and lookup")?
                 .clone();
             // A minimal Config carrying what orphans needs (profile,
-            // environment section, repository config).
+            // environment section, repository config). The host-local names
+            // resolve from the environment too: discovery must name the
+            // run's own cluster, not the bootstrap.toml default (#640).
+            let (kind_cluster, bootstrap_kubecontext, registry_name) =
+                resolve_host_names(&repo, &|n| std::env::var(n).ok())?;
             let cfg = Config {
                 repo,
                 profile: name,
@@ -3041,7 +3109,9 @@ async fn main() -> Result<()> {
                 mgmt_kubeconfig: PathBuf::new(),
                 mgmt_ready_timeout: String::new(),
                 mgmt_poll_interval: DEFAULT_MGMT_POLL_INTERVAL,
-                bootstrap_kubecontext: String::new(),
+                bootstrap_kubecontext,
+                kind_cluster,
+                registry_name,
             };
             let ocfg = orphans::OrphansConfig::from_env();
             return orphans::run_orphans(&cfg, ocfg).await;
@@ -3147,7 +3217,7 @@ async fn run_bootstrap(cfg: &Config, http: &reqwest::Client) -> Result<()> {
         println!(">>> Bootstrap complete! Flux is now reconciling from {url}");
         println!(">>> Watch progress with: flux get kustomizations --watch");
     } else {
-        let registry_name = &cfg.repo.bootstrap.registry_name;
+        let registry_name = &cfg.registry_name;
         println!(">>> Bootstrap complete: Flux is reconciling from the local OCI artifact");
         println!(
             ">>> Local registry: localhost:{port} (cluster endpoint: {registry_name}:5000)",
@@ -3441,6 +3511,9 @@ else:
         assert_eq!(cfg.mgmt_ready_timeout, "15m"); // local-host default
         assert_eq!(cfg.mgmt_poll_interval, 10);
         assert_eq!(cfg.bootstrap_kubecontext, "kind-mgmt");
+        // Host-local names default to the repository config values (#640).
+        assert_eq!(cfg.kind_cluster, "mgmt");
+        assert_eq!(cfg.registry_name, "krops-registry");
         assert_eq!(cfg.mgmt_kubeconfig, default_mgmt_kubeconfig());
         // Values now sourced from the repository config.
         assert_eq!(cfg.environment.mgmt_cluster, "local-management");
@@ -3500,6 +3573,104 @@ else:
         assert_eq!(cfg.mgmt_poll_interval, 5);
         assert_eq!(cfg.mgmt_kubeconfig, PathBuf::from("/tmp/mgmt.yaml"));
         assert_eq!(cfg.bootstrap_kubecontext, "other-ctx");
+        // No KROPS_KIND_CLUSTER: the cluster name stays the config value.
+        assert_eq!(cfg.kind_cluster, "mgmt");
+    }
+
+    #[test]
+    fn config_kind_cluster_override_derives_the_context() {
+        // #640: a multiplexed run names its own kind cluster; the context
+        // follows kind's own convention (kind-<name>) instead of the
+        // bootstrap.toml context, which would belong to the default run.
+        let cli = Cli::try_parse_from(["krops-bootstrap"]).unwrap();
+        let get = |name: &str| -> Option<String> {
+            match name {
+                "KROPS_KIND_CLUSTER" => Some("krops-a".into()),
+                "KROPS_REGISTRY_NAME" => Some("krops-registry-a".into()),
+                _ => None,
+            }
+        };
+        let cfg = Config::from_env(&cli, repo_config(), get).unwrap();
+        assert_eq!(cfg.kind_cluster, "krops-a");
+        assert_eq!(cfg.bootstrap_kubecontext, "kind-krops-a");
+        assert_eq!(cfg.registry_name, "krops-registry-a");
+    }
+
+    #[test]
+    fn config_explicit_kubecontext_wins_over_the_derived_one() {
+        // #640 precedence: BOOTSTRAP_KUBECONTEXT beats the kind-<name>
+        // derivation even when KROPS_KIND_CLUSTER is set.
+        let cli = Cli::try_parse_from(["krops-bootstrap"]).unwrap();
+        let get = |name: &str| -> Option<String> {
+            match name {
+                "KROPS_KIND_CLUSTER" => Some("krops-a".into()),
+                "BOOTSTRAP_KUBECONTEXT" => Some("custom-ctx".into()),
+                _ => None,
+            }
+        };
+        let cfg = Config::from_env(&cli, repo_config(), get).unwrap();
+        assert_eq!(cfg.kind_cluster, "krops-a");
+        assert_eq!(cfg.bootstrap_kubecontext, "custom-ctx");
+    }
+
+    #[test]
+    fn config_empty_host_name_env_behaves_like_unset() {
+        // `${VAR:-default}` semantics: empty values fall back to the
+        // bootstrap.toml names instead of being validated as overrides.
+        let cli = Cli::try_parse_from(["krops-bootstrap"]).unwrap();
+        let get = |name: &str| -> Option<String> {
+            match name {
+                "KROPS_KIND_CLUSTER" | "KROPS_REGISTRY_NAME" => Some(String::new()),
+                _ => None,
+            }
+        };
+        let cfg = Config::from_env(&cli, repo_config(), get).unwrap();
+        assert_eq!(cfg.kind_cluster, "mgmt");
+        assert_eq!(cfg.bootstrap_kubecontext, "kind-mgmt");
+        assert_eq!(cfg.registry_name, "krops-registry");
+    }
+
+    #[test]
+    fn config_rejects_invalid_kind_cluster_names() {
+        for bad in ["Mgmt", "mgmt-", "-mgmt", ".mgmt", "mgmt.", "mg mt"] {
+            let cli = Cli::try_parse_from(["krops-bootstrap"]).unwrap();
+            let get = |name: &str| -> Option<String> {
+                (name == "KROPS_KIND_CLUSTER").then(|| bad.to_string())
+            };
+            let err = Config::from_env(&cli, repo_config(), get).unwrap_err();
+            assert!(
+                err.to_string().contains("kind cluster name"),
+                "expected a kind cluster name error for '{bad}', got: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn config_rejects_invalid_registry_names() {
+        for bad in ["Registry-A", "registry-a!", "a b"] {
+            let cli = Cli::try_parse_from(["krops-bootstrap"]).unwrap();
+            let get = |name: &str| -> Option<String> {
+                (name == "KROPS_REGISTRY_NAME").then(|| bad.to_string())
+            };
+            let err = Config::from_env(&cli, repo_config(), get).unwrap_err();
+            assert!(
+                err.to_string().contains("registry name"),
+                "expected a registry name error for '{bad}', got: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn is_valid_host_name_accepts_kind_style_names() {
+        assert!(is_valid_host_name("mgmt"));
+        assert!(is_valid_host_name("krops-registry"));
+        assert!(is_valid_host_name("a"));
+        assert!(is_valid_host_name("krops-a-1"));
+        assert!(is_valid_host_name("krops.a.b"));
+        assert!(!is_valid_host_name(""));
+        assert!(!is_valid_host_name("Mgmt"));
+        assert!(!is_valid_host_name("mg mt"));
+        assert!(!is_valid_host_name("mgmt_"));
     }
 
     #[test]

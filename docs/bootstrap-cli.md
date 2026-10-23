@@ -136,7 +136,9 @@ pins together with their declarative counterparts. See
 |---|---|---|
 | `BOOTSTRAP_CONFIG` | `./bootstrap.toml` | Repository configuration path |
 | `KROPS_PROFILE` | positional profile, then `bootstrap.default-environment` (`aws` checked in) | Environment selection |
+| `KROPS_KIND_CLUSTER` | config value `mgmt` | Kind cluster name for the run; its kubeconfig context derives as `kind-<name>` unless `BOOTSTRAP_KUBECONTEXT` is set (concurrent runs on one host, #640) |
 | `REGISTRY_PORT` | `5001` | Local-host registry host port |
+| `KROPS_REGISTRY_NAME` | config value `krops-registry` | Local-host registry container name for the run (concurrent runs on one host, #640) |
 | `REGISTRY_READY_RETRIES` | `120` | Local-host registry readiness attempts |
 | `LOCAL_RECONCILE_TIMEOUT` | `15m` | Local-host management and workload reconciliation waits |
 | `CONTAINER_ENGINE` | auto-detect Docker, then Podman | kind and registry engine |
@@ -150,7 +152,7 @@ pins together with their declarative counterparts. See
 | `MGMT_KUBECONFIG` | `~/.kube/krops-mgmt.yaml` | Exported management kubeconfig for native fallback runs |
 | `MGMT_READY_TIMEOUT` | `40m` for aws, `15m` for local-host, `30m` for local-talos (PXE install + first Talos boot) | Management cluster definition and provisioning waits |
 | `MGMT_POLL_INTERVAL` | `10` seconds | Management cluster definition, provisioning, and node-readiness polls |
-| `BOOTSTRAP_KUBECONTEXT` | config value `kind-mgmt` | Source context required by pivot |
+| `BOOTSTRAP_KUBECONTEXT` | `kind-<KROPS_KIND_CLUSTER>` when the cluster name is overridden, else the config value `kind-mgmt` | Source context required by pivot; wins over the derived context |
 | `PIVOT_SKIP_DELETE` | `0` | Literal `1` keeps kind after a successful pivot |
 | `KROPS_RUN_ID` | `{profile}-{timestamp}` | Bootstrap/pivot run identifier for resource tagging; set to override auto-generation |
 | `KROPS_RUN_TTL` | `86400s` (24h) | Unsigned decimal seconds with optional `s`, `m`, or `h` (e.g. `3600`, `2h`); whitespace trimmed, empty defaults to 24h; `none` disables expiry |
@@ -158,6 +160,40 @@ pins together with their declarative counterparts. See
 | `KROPS_RUN_KIND` | `manual` | Bootstrap/pivot invocation kind for resource tagging (e.g. `manual`, `scheduled`, `emergency`) |
 
 The pivot's target node-readiness wait uses a fixed 15m budget (`MGMT_NODE_READY_TIMEOUT` in `pivot.sh` and `bootstrap-rs/src/main.rs`). It is not an environment knob and is separate from `MGMT_READY_TIMEOUT`.
+
+### Concurrent runs on one host
+
+Bootstrap runs on one host collide on the host-local names by default:
+the kind cluster (`mgmt`), its kubeconfig context (`kind-mgmt`), and the
+local-host registry container (`krops-registry`) all come from
+bootstrap.toml for every run. Two concurrent runs therefore target the
+same cluster and the same context, and the idempotent
+delete-before-create step makes them mutually destructive: whichever
+starts later deletes the other's in-flight management cluster mid-flight,
+orphaning whatever cloud resources the destroyed run's controllers had
+already reconciled (issue #640).
+
+The CLI is multiplex-safe when each run uses distinct host-local names:
+
+```sh
+KROPS_KIND_CLUSTER=krops-a krops-bootstrap aws
+KROPS_KIND_CLUSTER=krops-b krops-bootstrap gcp
+```
+
+`KROPS_KIND_CLUSTER` names the kind cluster for the run; its kubeconfig
+context follows kind's convention as `kind-<name>` (an explicit
+`BOOTSTRAP_KUBECONTEXT` still wins). A local-host run also separates the
+registry: `KROPS_REGISTRY_NAME` for the container and `REGISTRY_PORT`
+for the published host port. Pass the same values to the run's `teardown`
+and `orphans` invocations so they target the run's own cluster. A
+toolbox run receives the knobs through the container environment (raw
+`docker run` with explicit `-e` entries; the wrapper's allowlist does not
+forward them, see [Operations](./operations.md#toolbox-container-primary-interface)).
+
+The legacy shell scripts (`bootstrap.sh`, `teardown.sh`, `pivot.sh`) keep
+the fixed `mgmt` name and are not multiplex-safe: on a host that runs
+them, only one native bootstrap may be in flight at a time (the scripts
+are being retired in favor of the CLI, issues #92/#95/#100).
 
 ### Toolbox runtime contracts
 

@@ -48,6 +48,11 @@ if ! python3 airgap/tests/test-airgap-kubeadm-images-regressions.py; then
   echo "    FAILED: air-gap kubeadm inventory regressions" >&2
   fail=1
 fi
+echo "==> air-gap image source coverage regressions (offline)"
+if ! python3 airgap/tests/test-airgap-image-digests-regressions.py; then
+  echo "    FAILED: air-gap image source coverage regressions" >&2
+  fail=1
+fi
 echo "==> toolbox-run.sh exec (image and CLI args reach the container engine)"
 if ! python3 tests/test-toolbox-run-exec.py; then
   echo "    FAILED: toolbox-run.sh exec" >&2

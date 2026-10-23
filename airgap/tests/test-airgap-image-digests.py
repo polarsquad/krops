@@ -28,11 +28,13 @@ IGNORED_AIRGAP_PREFIXES = (
     "airgap/rendered/",
     # Generated SBOM evidence, not an image source.
     "airgap/sbom/",
-    # The test suite itself.
+    # The test suite itself; its fixtures may carry image references
+    # (for example this gate's own LOCAL_EXCEPTIONS) and must never
+    # trigger the uncovered-source check.
     "airgap/tests/",
     "airgap/values/",
 )
-POTENTIAL_SOURCE_SUFFIXES = {".json", ".sh", ".toml", ".txt", ".yaml", ".yml"}
+POTENTIAL_SOURCE_SUFFIXES = {".json", ".py", ".sh", ".toml", ".txt", ".yaml", ".yml"}
 IMAGE_REF = re.compile(
     # A shell parameter default commonly places the reference after `:-`.
     r"(?:(?<![\w./-])|(?<=:-))"
@@ -93,21 +95,34 @@ def is_potential_image_source(relative: str) -> bool:
     )
 
 
-def contains_image_reference(relative: str) -> bool:
-    for line in (REPO_ROOT / relative).read_text().splitlines():
+def first_image_reference(relative: str):
+    """Return (line number, reference) of the first image reference in a file."""
+    for number, line in enumerate((REPO_ROOT / relative).read_text().splitlines(), 1):
         code = line.split("#", 1)[0]
         for match in IMAGE_REF.finditer(code):
             if match.group(0) not in NON_IMAGE_REFERENCES:
-                return True
-    return False
+                return number, match.group(0)
+    return None
 
 
 def all_image_sources():
     scripts = {
         path.relative_to(REPO_ROOT).as_posix()
-        for path in (REPO_ROOT / "airgap/scripts").glob("*.sh")
+        for path in (REPO_ROOT / "airgap/scripts").rglob("*.sh")
     }
     return sorted(INVENTORY_FILES | scripts)
+
+
+def unregistered_image_candidates():
+    """Working-tree airgap/ files with a potential-source suffix outside the registered set."""
+    candidates = []
+    for path in (REPO_ROOT / "airgap").rglob("*"):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        if is_potential_image_source(relative) and not is_image_source(relative):
+            candidates.append(relative)
+    return sorted(candidates)
 
 
 def changed_paths(base):
@@ -180,7 +195,7 @@ def main() -> int:
     args = parser.parse_args()
     if args.all:
         sources = all_image_sources()
-        changed = []
+        unregistered = unregistered_image_candidates()
     else:
         changed = changed_paths(args.changed_from)
         sources = sorted(
@@ -190,19 +205,22 @@ def main() -> int:
                 if is_image_source(path) and (REPO_ROOT / path).is_file()
             }
         )
+        unregistered = sorted(set(changed) - set(sources))
 
     failures = []
     seen = defaultdict(list)
 
-    for relative in sorted(set(changed) - set(sources)):
-        if (
-            (REPO_ROOT / relative).is_file()
-            and is_potential_image_source(relative)
-            and contains_image_reference(relative)
-        ):
-            failures.append(
-                f"{relative}: uncovered image-bearing source; register it in the gate"
-            )
+    for relative in unregistered:
+        if (REPO_ROOT / relative).is_file() and is_potential_image_source(relative):
+            first = first_image_reference(relative)
+            if first is not None:
+                number, reference = first
+                failures.append(
+                    f"{relative}:{number}: uncovered image-bearing source "
+                    f"(first reference: {reference}); register it in the gate "
+                    f"(INVENTORY_FILES or is_image_source) or add a documented "
+                    f"exclusion to IGNORED_AIRGAP_PREFIXES"
+                )
 
     for relative in sources:
         matches = 0

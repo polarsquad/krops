@@ -91,6 +91,9 @@ args = sys.argv[1:]
 root = Path(__file__).parent
 with (root / 'calls.jsonl').open('a') as log:
     log.write(json.dumps(args) + '\n')
+if args == ['--version']:
+    print('aws-cli/2.36.32 (stub)')
+    raise SystemExit(0)
 region = args[args.index('--region') + 1]
 fixture = json.loads((root / 'fixture.json').read_text())
 if args[:2] == ['service-quotas', 'get-service-quota']:

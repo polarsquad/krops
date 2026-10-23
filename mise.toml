@@ -78,6 +78,11 @@ if ! python3 tests/test-toolbox-run-azure-session.py; then
   echo "    FAILED: Azure toolbox session" >&2
   fail=1
 fi
+echo "==> shell lifecycle scopes MISE_ENV=aws to the aws child (#504)"
+if ! python3 tests/test-shell-aws-mise-env.py; then
+  echo "    FAILED: shell aws MISE_ENV wrapper" >&2
+  fail=1
+fi
 echo "==> sops-keygen prints the public key"
 if ! python3 tests/test-sops-keygen-prints-public-key.py; then
   echo "    FAILED: sops-keygen public key" >&2

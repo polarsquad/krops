@@ -14,11 +14,13 @@
 
 use anyhow::{bail, Context, Result};
 use std::path::PathBuf;
-use std::process::Stdio;
 use tokio::process::Command;
 
 use crate::engine::{self, toolbox_join_kind_network, toolbox_leave_kind_network};
-use crate::{capture_lossy, kubectl_cmd, run, run_quiet, select_toolbox_kind_kubeconfig, Config};
+use crate::{
+    capture_lossy, capture_lossy_aws, kubectl_cmd, run, run_quiet, run_quiet_aws,
+    run_with_stdin_aws, select_toolbox_kind_kubeconfig, Config,
+};
 
 // ── Configuration knobs (teardown.sh `${VAR:-default}` equivalents) ───────────
 
@@ -713,7 +715,7 @@ fn aws_base(region: &str) -> Vec<String> {
 
 /// True when the EKS cluster exists (used by every EKS-gated unit).
 async fn eks_exists(cluster: &str, region: &str) -> bool {
-    run_quiet(
+    run_quiet_aws(
         "aws",
         &[
             "eks",
@@ -747,7 +749,7 @@ pub async fn cleanup_nodegroups(target: &AwsSweepTarget) {
         "text".into(),
     ]);
     let argrefs: Vec<&str> = args.iter().map(String::as_str).collect();
-    let ngs = capture_lossy("aws", &argrefs).await;
+    let ngs = capture_lossy_aws("aws", &argrefs).await;
     for ng in ngs.split_whitespace() {
         println!(">>>   Deleting nodegroup: {ng}");
         let mut args = aws_base(&target.region);
@@ -760,7 +762,7 @@ pub async fn cleanup_nodegroups(target: &AwsSweepTarget) {
             ng.into(),
         ]);
         let argrefs: Vec<&str> = args.iter().map(String::as_str).collect();
-        if !run_quiet("aws", &argrefs).await {
+        if !run_quiet_aws("aws", &argrefs).await {
             warn(&format!("Failed to delete nodegroup {ng}"));
         }
     }
@@ -782,7 +784,7 @@ pub async fn wait_nodegroups_deleted(target: &AwsSweepTarget) {
         "text".into(),
     ]);
     let argrefs: Vec<&str> = args.iter().map(String::as_str).collect();
-    let ngs = capture_lossy("aws", &argrefs).await;
+    let ngs = capture_lossy_aws("aws", &argrefs).await;
     for ng in ngs.split_whitespace() {
         println!(">>>   Waiting for nodegroup {ng} to finish deleting...");
         let mut args = aws_base(&target.region);
@@ -796,7 +798,7 @@ pub async fn wait_nodegroups_deleted(target: &AwsSweepTarget) {
             ng.into(),
         ]);
         let argrefs: Vec<&str> = args.iter().map(String::as_str).collect();
-        if !run_quiet("aws", &argrefs).await {
+        if !run_quiet_aws("aws", &argrefs).await {
             warn(&format!("Timed out waiting for nodegroup {ng}"));
         }
     }
@@ -823,7 +825,7 @@ pub async fn cleanup_eks_cluster(target: &AwsSweepTarget) {
         target.eks_cluster_name.clone(),
     ]);
     let argrefs: Vec<&str> = args.iter().map(String::as_str).collect();
-    if !run_quiet("aws", &argrefs).await {
+    if !run_quiet_aws("aws", &argrefs).await {
         warn(&format!(
             "Failed to delete EKS cluster {}",
             target.eks_cluster_name
@@ -848,7 +850,7 @@ pub async fn wait_eks_cluster_deleted(target: &AwsSweepTarget) {
         target.eks_cluster_name.clone(),
     ]);
     let argrefs: Vec<&str> = args.iter().map(String::as_str).collect();
-    if !run_quiet("aws", &argrefs).await {
+    if !run_quiet_aws("aws", &argrefs).await {
         warn(&format!(
             "Timed out waiting for EKS cluster {}",
             target.eks_cluster_name
@@ -866,7 +868,7 @@ pub async fn cleanup_rds_instance(target: &AwsSweepTarget) {
         target.rds_instance.clone(),
     ]);
     let argrefs: Vec<&str> = args.iter().map(String::as_str).collect();
-    if !run_quiet("aws", &argrefs).await {
+    if !run_quiet_aws("aws", &argrefs).await {
         println!(
             "✓   RDS instance {} not found in {}",
             target.rds_instance, target.region
@@ -885,7 +887,7 @@ pub async fn cleanup_rds_instance(target: &AwsSweepTarget) {
         "text".into(),
     ]);
     let argrefs: Vec<&str> = args.iter().map(String::as_str).collect();
-    let status = capture_lossy("aws", &argrefs).await.trim().to_string();
+    let status = capture_lossy_aws("aws", &argrefs).await.trim().to_string();
     if status == "deleting" {
         println!(
             ">>>   RDS instance {} already deleting in {}",
@@ -907,7 +909,7 @@ pub async fn cleanup_rds_instance(target: &AwsSweepTarget) {
         "--delete-automated-backups".into(),
     ]);
     let argrefs: Vec<&str> = args.iter().map(String::as_str).collect();
-    if !run_quiet("aws", &argrefs).await {
+    if !run_quiet_aws("aws", &argrefs).await {
         warn(&format!(
             "Failed to delete RDS instance {}",
             target.rds_instance
@@ -922,7 +924,7 @@ pub async fn cleanup_rds_instance(target: &AwsSweepTarget) {
 /// VPCs (#493).
 pub async fn cleanup_vpc_resources(target: &AwsSweepTarget) {
     let tag = target.capa_tag_key();
-    let vpcs = capture_lossy(
+    let vpcs = capture_lossy_aws(
         "aws",
         &[
             "ec2",
@@ -949,7 +951,7 @@ pub async fn cleanup_vpc_resources(target: &AwsSweepTarget) {
 
 async fn cleanup_vpc(vpc: &str, region: &str) {
     // NAT gateways (before subnets), including the deleting state.
-    let nats = capture_lossy(
+    let nats = capture_lossy_aws(
         "aws",
         &[
             "ec2",
@@ -968,7 +970,7 @@ async fn cleanup_vpc(vpc: &str, region: &str) {
     .await;
     for nat in nats.split_whitespace() {
         println!(">>>     Deleting NAT gateway: {nat}");
-        let _ = run_quiet(
+        let _ = run_quiet_aws(
             "aws",
             &[
                 "ec2",
@@ -983,7 +985,7 @@ async fn cleanup_vpc(vpc: &str, region: &str) {
     }
     for nat in nats.split_whitespace() {
         println!(">>>     Waiting for NAT gateway {nat} to finish deleting...");
-        let _ = run_quiet(
+        let _ = run_quiet_aws(
             "aws",
             &[
                 "ec2",
@@ -998,7 +1000,7 @@ async fn cleanup_vpc(vpc: &str, region: &str) {
         .await;
     }
     // Subnets (the VPC is CAPA-tagged, never the default VPC).
-    let subnets = capture_lossy(
+    let subnets = capture_lossy_aws(
         "aws",
         &[
             "ec2",
@@ -1016,7 +1018,7 @@ async fn cleanup_vpc(vpc: &str, region: &str) {
     .await;
     for subnet in subnets.split_whitespace() {
         println!(">>>     Deleting subnet: {subnet}");
-        let _ = run_quiet(
+        let _ = run_quiet_aws(
             "aws",
             &[
                 "ec2",
@@ -1030,7 +1032,7 @@ async fn cleanup_vpc(vpc: &str, region: &str) {
         .await;
     }
     // Internet gateways: detach, then delete.
-    let igws = capture_lossy(
+    let igws = capture_lossy_aws(
         "aws",
         &[
             "ec2",
@@ -1048,7 +1050,7 @@ async fn cleanup_vpc(vpc: &str, region: &str) {
     .await;
     for igw in igws.split_whitespace() {
         println!(">>>     Detaching internet gateway: {igw}");
-        let _ = run_quiet(
+        let _ = run_quiet_aws(
             "aws",
             &[
                 "ec2",
@@ -1063,7 +1065,7 @@ async fn cleanup_vpc(vpc: &str, region: &str) {
         )
         .await;
         println!(">>>     Deleting internet gateway: {igw}");
-        let _ = run_quiet(
+        let _ = run_quiet_aws(
             "aws",
             &[
                 "ec2",
@@ -1077,7 +1079,7 @@ async fn cleanup_vpc(vpc: &str, region: &str) {
         .await;
     }
     // Route tables (skip the main).
-    let main_rt = capture_lossy(
+    let main_rt = capture_lossy_aws(
         "aws",
         &[
             "ec2",
@@ -1096,7 +1098,7 @@ async fn cleanup_vpc(vpc: &str, region: &str) {
     .await
     .trim()
     .to_string();
-    let rts = capture_lossy(
+    let rts = capture_lossy_aws(
         "aws",
         &[
             "ec2",
@@ -1117,7 +1119,7 @@ async fn cleanup_vpc(vpc: &str, region: &str) {
             continue;
         }
         println!(">>>     Deleting route table: {rt}");
-        let _ = run_quiet(
+        let _ = run_quiet_aws(
             "aws",
             &[
                 "ec2",
@@ -1131,7 +1133,7 @@ async fn cleanup_vpc(vpc: &str, region: &str) {
         .await;
     }
     // Security groups reference each other: strip all rules, then delete.
-    let sgs = capture_lossy(
+    let sgs = capture_lossy_aws(
         "aws",
         &[
             "ec2",
@@ -1149,7 +1151,7 @@ async fn cleanup_vpc(vpc: &str, region: &str) {
     .await;
     let sg_list: Vec<String> = sgs.split_whitespace().map(String::from).collect();
     for sg in &sg_list {
-        let ingress = capture_lossy(
+        let ingress = capture_lossy_aws(
             "aws",
             &[
                 "ec2",
@@ -1166,7 +1168,7 @@ async fn cleanup_vpc(vpc: &str, region: &str) {
         )
         .await;
         if ingress.trim() != "[]" && !ingress.trim().is_empty() {
-            let _ = run_quiet(
+            let _ = run_quiet_aws(
                 "aws",
                 &[
                     "ec2",
@@ -1181,7 +1183,7 @@ async fn cleanup_vpc(vpc: &str, region: &str) {
             )
             .await;
         }
-        let egress = capture_lossy(
+        let egress = capture_lossy_aws(
             "aws",
             &[
                 "ec2",
@@ -1198,7 +1200,7 @@ async fn cleanup_vpc(vpc: &str, region: &str) {
         )
         .await;
         if egress.trim() != "[]" && !egress.trim().is_empty() {
-            let _ = run_quiet(
+            let _ = run_quiet_aws(
                 "aws",
                 &[
                     "ec2",
@@ -1216,7 +1218,7 @@ async fn cleanup_vpc(vpc: &str, region: &str) {
     }
     for sg in &sg_list {
         println!(">>>     Deleting security group: {sg}");
-        let _ = run_quiet(
+        let _ = run_quiet_aws(
             "aws",
             &[
                 "ec2",
@@ -1230,7 +1232,7 @@ async fn cleanup_vpc(vpc: &str, region: &str) {
         .await;
     }
     println!(">>>     Deleting VPC: {vpc}");
-    if !run_quiet(
+    if !run_quiet_aws(
         "aws",
         &["ec2", "delete-vpc", "--region", region, "--vpc-id", vpc],
     )
@@ -1256,7 +1258,7 @@ pub async fn release_cluster_eips(target: &AwsSweepTarget) {
 /// a stub without touching the process environment.
 async fn release_cluster_eips_with(aws: &str, target: &AwsSweepTarget) {
     let tag = target.capa_tag_key();
-    let eips = capture_lossy(
+    let eips = capture_lossy_aws(
         aws,
         &[
             "ec2",
@@ -1278,7 +1280,7 @@ async fn release_cluster_eips_with(aws: &str, target: &AwsSweepTarget) {
     }
     for eip in eips.split_whitespace() {
         println!(">>>     Releasing Elastic IP: {eip}");
-        if !run_quiet(
+        if !run_quiet_aws(
             aws,
             &[
                 "ec2",
@@ -1299,7 +1301,7 @@ async fn release_cluster_eips_with(aws: &str, target: &AwsSweepTarget) {
 /// 4e. S3 buckets: versioned, so every object version AND delete marker
 /// must be purged before the bucket itself can be deleted.
 pub async fn cleanup_s3_bucket(bucket: &str, region: &str) {
-    let head = run_quiet(
+    let head = run_quiet_aws(
         "aws",
         &[
             "s3api",
@@ -1317,7 +1319,7 @@ pub async fn cleanup_s3_bucket(bucket: &str, region: &str) {
     }
     println!(">>>   Emptying S3 bucket: {bucket} (all versions and delete markers)");
     loop {
-        let batch = capture_lossy(
+        let batch = capture_lossy_aws(
             "aws",
             &[
                 "s3api",
@@ -1337,7 +1339,7 @@ pub async fn cleanup_s3_bucket(bucket: &str, region: &str) {
         if !batch.contains("\"Key\"") {
             break;
         }
-        let ok = run_with_stdin_str(
+        let ok = run_with_stdin_aws(
             "aws",
             &[
                 "s3api",
@@ -1352,13 +1354,13 @@ pub async fn cleanup_s3_bucket(bucket: &str, region: &str) {
             &batch,
         )
         .await;
-        if !ok {
+        if ok.is_err() {
             warn(&format!("Failed to purge objects from {bucket}"));
             break;
         }
     }
     println!(">>>   Deleting S3 bucket: {bucket}");
-    if !run_quiet(
+    if !run_quiet_aws(
         "aws",
         &[
             "s3api",
@@ -1378,11 +1380,11 @@ pub async fn cleanup_s3_bucket(bucket: &str, region: &str) {
 /// 4f (roles). IAM role (detach policies, instance profiles, inline policies,
 /// then the role). Skips silently when the role is absent.
 pub async fn cleanup_iam_role(role: &str) {
-    if !run_quiet("aws", &["iam", "get-role", "--role-name", role]).await {
+    if !run_quiet_aws("aws", &["iam", "get-role", "--role-name", role]).await {
         return;
     }
     println!(">>>   Deleting IAM role: {role}");
-    let policies = capture_lossy(
+    let policies = capture_lossy_aws(
         "aws",
         &[
             "iam",
@@ -1398,7 +1400,7 @@ pub async fn cleanup_iam_role(role: &str) {
     .await;
     for arn in policies.split_whitespace() {
         println!(">>>     Detaching policy: {arn}");
-        let _ = run_quiet(
+        let _ = run_quiet_aws(
             "aws",
             &[
                 "iam",
@@ -1411,7 +1413,7 @@ pub async fn cleanup_iam_role(role: &str) {
         )
         .await;
     }
-    let profiles = capture_lossy(
+    let profiles = capture_lossy_aws(
         "aws",
         &[
             "iam",
@@ -1427,7 +1429,7 @@ pub async fn cleanup_iam_role(role: &str) {
     .await;
     for profile in profiles.split_whitespace() {
         println!(">>>     Deleting instance profile: {profile}");
-        let _ = run_quiet(
+        let _ = run_quiet_aws(
             "aws",
             &[
                 "iam",
@@ -1439,7 +1441,7 @@ pub async fn cleanup_iam_role(role: &str) {
             ],
         )
         .await;
-        let _ = run_quiet(
+        let _ = run_quiet_aws(
             "aws",
             &[
                 "iam",
@@ -1450,7 +1452,7 @@ pub async fn cleanup_iam_role(role: &str) {
         )
         .await;
     }
-    let inline = capture_lossy(
+    let inline = capture_lossy_aws(
         "aws",
         &[
             "iam",
@@ -1466,7 +1468,7 @@ pub async fn cleanup_iam_role(role: &str) {
     .await;
     for policy in inline.split_whitespace() {
         println!(">>>     Deleting inline policy: {policy}");
-        let _ = run_quiet(
+        let _ = run_quiet_aws(
             "aws",
             &[
                 "iam",
@@ -1479,7 +1481,7 @@ pub async fn cleanup_iam_role(role: &str) {
         )
         .await;
     }
-    if !run_quiet("aws", &["iam", "delete-role", "--role-name", role]).await {
+    if !run_quiet_aws("aws", &["iam", "delete-role", "--role-name", role]).await {
         warn(&format!("Failed to delete IAM role {role}"));
     }
 }
@@ -1489,7 +1491,7 @@ pub async fn cleanup_iam_role(role: &str) {
 pub async fn cleanup_capa_iam_roles(prefix: &str) {
     // list-roles is paginated at 100 by the CLI without a paginator on
     // server-side filters; use the query prefix sweep like the script.
-    let roles = capture_lossy(
+    let roles = capture_lossy_aws(
         "aws",
         &[
             "iam",
@@ -1513,12 +1515,12 @@ pub async fn cleanup_capa_iam_roles(prefix: &str) {
 
 /// 4f (users). IAM user (login profile, access keys, inline policies, user).
 pub async fn cleanup_iam_user(user: &str) {
-    if !run_quiet("aws", &["iam", "get-user", "--user-name", user]).await {
+    if !run_quiet_aws("aws", &["iam", "get-user", "--user-name", user]).await {
         return;
     }
     println!(">>>   Deleting IAM user: {user}");
-    let _ = run_quiet("aws", &["iam", "delete-login-profile", "--user-name", user]).await;
-    let keys = capture_lossy(
+    let _ = run_quiet_aws("aws", &["iam", "delete-login-profile", "--user-name", user]).await;
+    let keys = capture_lossy_aws(
         "aws",
         &[
             "iam",
@@ -1534,7 +1536,7 @@ pub async fn cleanup_iam_user(user: &str) {
     .await;
     for key in keys.split_whitespace() {
         println!(">>>     Deleting access key: {key}");
-        let _ = run_quiet(
+        let _ = run_quiet_aws(
             "aws",
             &[
                 "iam",
@@ -1547,7 +1549,7 @@ pub async fn cleanup_iam_user(user: &str) {
         )
         .await;
     }
-    let inline = capture_lossy(
+    let inline = capture_lossy_aws(
         "aws",
         &[
             "iam",
@@ -1562,7 +1564,7 @@ pub async fn cleanup_iam_user(user: &str) {
     )
     .await;
     for policy in inline.split_whitespace() {
-        let _ = run_quiet(
+        let _ = run_quiet_aws(
             "aws",
             &[
                 "iam",
@@ -1575,14 +1577,14 @@ pub async fn cleanup_iam_user(user: &str) {
         )
         .await;
     }
-    if !run_quiet("aws", &["iam", "delete-user", "--user-name", user]).await {
+    if !run_quiet_aws("aws", &["iam", "delete-user", "--user-name", user]).await {
         warn(&format!("Failed to delete IAM user {user}"));
     }
 }
 
 /// 4g. CloudFormation bootstrap stack.
 pub async fn cleanup_cfn_stack(stack: &str, region: &str) {
-    if !run_quiet(
+    if !run_quiet_aws(
         "aws",
         &[
             "cloudformation",
@@ -1598,7 +1600,7 @@ pub async fn cleanup_cfn_stack(stack: &str, region: &str) {
         return;
     }
     println!(">>>   Deleting CFN stack: {stack} in {region}");
-    if !run_quiet(
+    if !run_quiet_aws(
         "aws",
         &[
             "cloudformation",
@@ -1613,21 +1615,6 @@ pub async fn cleanup_cfn_stack(stack: &str, region: &str) {
     {
         warn(&format!("Failed to delete CFN stack {stack} in {region}"));
     }
-}
-
-/// run_with_stdin, but best-effort (returns success instead of raising).
-async fn run_with_stdin_str(cmd: &str, args: &[&str], input: &str) -> bool {
-    use tokio::io::AsyncWriteExt;
-    let mut child = match Command::new(cmd).args(args).stdin(Stdio::piped()).spawn() {
-        Ok(c) => c,
-        Err(_) => return false,
-    };
-    if let Some(mut stdin) = child.stdin.take() {
-        if stdin.write_all(input.as_bytes()).await.is_err() {
-            return false;
-        }
-    }
-    matches!(child.wait().await, Ok(s) if s.success())
 }
 
 // ── Orchestrator: the nine steps in the script's order ───────────────────────
@@ -1885,7 +1872,13 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
     // The script's tool preflight, restored: hard-fail on a missing tool
     // BEFORE any mutation. A PATH problem must never downgrade the aws
     // path into a blind AWS-only sweep against a live world.
-    let aws_available = !which_failure("aws").await;
+    // The aws check is an EXECUTION probe, not a PATH stat (issue #504):
+    // a broken mise shim exists on PATH but fails on every call, and a
+    // stat-only check would read it as available and let every sweep
+    // listing degrade to a silent "nothing to delete". The wrapper
+    // carries MISE_ENV=aws, which resolves the toolbox shim; on native
+    // hosts the variable is inert for a plain aws binary.
+    let aws_available = run_quiet_aws("aws", &["--version"]).await;
     if tcfg.aws_only {
         if !aws_available {
             bail!("aws CLI not found in PATH (required for AWS_ONLY mode)");
@@ -2259,7 +2252,7 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
             release_cluster_eips(target).await;
         }
         // 4e: S3 buckets.
-        let account = capture_lossy(
+        let account = capture_lossy_aws(
             "aws",
             &[
                 "sts",
@@ -3182,6 +3175,42 @@ mod tests {
         assert!(
             !releases.exists(),
             "an absent allocation must be a silent skip, never a release call"
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn availability_probe_reads_a_broken_shim_as_unavailable() {
+        // Pre-fix availability was a PATH stat (issue #504): a broken
+        // mise shim exists on PATH, so the sweep ran every call and each
+        // failed silently, reading as "nothing to delete". The execution
+        // probe behind `aws_available` must report a failing binary as
+        // unavailable, and a shim-shaped binary (which only runs with
+        // MISE_ENV=aws, exactly like the toolbox's) as available through
+        // the wrapper that carries the variable.
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let broken = tmp.path().join("aws-broken");
+        std::fs::write(&broken, "#!/bin/sh\nexit 1\n").unwrap();
+        std::fs::set_permissions(&broken, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let shim = tmp.path().join("aws-shim");
+        std::fs::write(
+            &shim,
+            "#!/bin/sh\n[ \"$MISE_ENV\" = aws ] || exit 1\necho 'aws-cli/2.36.32 (stub)'\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&shim, std::fs::Permissions::from_mode(0o755)).unwrap();
+        wait_until_executable(&broken);
+        wait_until_executable(&shim);
+
+        assert!(
+            !run_quiet_aws(broken.to_str().unwrap(), &["--version"]).await,
+            "a failing binary (broken shim) must read as unavailable"
+        );
+        assert!(
+            run_quiet_aws(shim.to_str().unwrap(), &["--version"]).await,
+            "a shim-shaped binary must read as available through the \
+             MISE_ENV=aws wrapper"
         );
     }
 }

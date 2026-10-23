@@ -5,6 +5,19 @@
 # Environment variables set by these helpers are plain globals in the
 # sourcing shell (bash 3.2 compatible: no namerefs, no associative arrays).
 
+# ── aws CLI wrapper (issue #504) ─────────────────────────────────────────────
+# In the toolbox image `aws` resolves through a mise shim, and the aws-cli
+# pin lives in mise.aws.toml, which mise loads only when the `aws`
+# environment is active (MISE_ENV=aws). Nothing on the lifecycle path set
+# it, so a bare `aws` failed with "No version is set for shim: aws". The
+# wrapper scopes the variable to each aws child process: the shim resolves
+# offline, and the parent process and other tools are left alone. On hosts
+# where `aws` is a plain binary rather than a shim, the variable is inert,
+# so native runs are unchanged.
+aws() {
+  MISE_ENV=aws command aws "$@"
+}
+
 # ── Preflight: environment (aws) ──────────────────────────────────────────────
 # Validates the GitHub + age inputs the Flux seed needs on the aws environment.
 # Sets: GITHUB_USER, GITHUB_REPO, AGE_KEY_FILE, AGE_PUBKEY.
@@ -68,8 +81,15 @@ require_flux_env() {
 # Checks that the EC2-VPC Elastic IP quota is sufficient in every region the
 # default AWS run touches before provisioning begins. Requires aws CLI in PATH.
 preflight_aws_quotas() {
-  command -v aws >/dev/null 2>&1 \
-    || { echo "ERROR: aws CLI not found in PATH (required for EIP quota preflight)" >&2; exit 1; }
+  # Execution probe (issue #504): `aws --version` through the wrapper must
+  # succeed before any quota call. A failing probe means the aws CLI cannot
+  # run at all (missing, or a toolbox mise shim that cannot resolve the
+  # aws-cli pin) and must be named as such, not read as a credentials
+  # error on the first quota query.
+  if ! aws --version >/dev/null 2>&1; then
+    echo "ERROR: aws CLI unusable (required for EIP quota preflight): 'aws --version' failed. Check that the aws CLI is installed and on PATH; in the toolbox a bare 'aws' fails when the mise shim cannot resolve the aws-cli pin (mise.aws.toml, the 'aws' mise environment) with 'No version is set for shim: aws'. This is a toolchain problem, not an AWS credentials problem." >&2
+    exit 1
+  fi
 
   # KEEP IN SYNC with bootstrap.toml [environments.aws]:
   #   - mgmt-cluster = "eu-north-1-management"  (region = name minus "-management")

@@ -161,7 +161,7 @@ The pivot's target node-readiness wait uses a fixed 15m budget (`MGMT_NODE_READY
 
 ### Toolbox runtime contracts
 
-The toolbox runtime adds five contracts:
+The toolbox runtime adds six contracts:
 
 - `KROPS_TOOLBOX=1` enables internal kind networking and disables host-only CAPD
   endpoint rewrites.
@@ -178,6 +178,14 @@ The toolbox runtime adds five contracts:
   pages its output through `less` (the toolbox is non-interactive and ships no
   pager). An operator-supplied value via `-e AWS_PAGER=...` overrides the
   default at runtime.
+- Every lifecycle `aws` invocation (the EIP quota preflight, the AWS orphan
+  sweep, and the legacy shell scripts) carries `MISE_ENV=aws` scoped to the
+  child process, so the in-image mise shim resolves the aws-cli pin from
+  `mise.aws.toml` even though the parent process is not in the `aws` mise
+  environment (issue #504); on native hosts the variable is inert for a
+  plain aws binary. The preflight and the sweep probe `aws --version` before
+  the first AWS call and fail with a message that names the shim, so a
+  broken shim is never read as a credentials error or an empty listing.
 
 The container reaches the local registry at `krops-registry:5000`. Its
 `/root/.kube` mount makes the management kubeconfig persist on the host as

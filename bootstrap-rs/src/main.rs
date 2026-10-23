@@ -742,6 +742,74 @@ pub(crate) async fn run_with_stdin(cmd: &str, args: &[&str], input: &str) -> Res
     Ok(())
 }
 
+/// The aws-spawning variants of the helpers above, with `MISE_ENV=aws`
+/// scoped to the child process. In the toolbox image `aws` resolves
+/// through a mise shim and the aws-cli pin lives in `mise.aws.toml`, which
+/// mise only loads when the `aws` environment is active; nothing on the
+/// lifecycle path set it, so a bare `aws` failed with "No version is set
+/// for shim: aws" and callers read the failure as missing credentials or
+/// an empty listing (issue #504). Scoping the variable to the child lets
+/// the shim resolve the pin offline and leaves the parent process and
+/// every other tool alone. On hosts where `aws` is a plain binary rather
+/// than a shim the variable is inert, so native runs are unchanged.
+pub(crate) async fn run_quiet_aws(cmd: &str, args: &[&str]) -> bool {
+    Command::new(cmd)
+        .env("MISE_ENV", "aws")
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+pub(crate) async fn capture_aws(cmd: &str, args: &[&str]) -> Result<String> {
+    let out = Command::new(cmd)
+        .env("MISE_ENV", "aws")
+        .args(args)
+        .stderr(Stdio::inherit())
+        .output()
+        .await
+        .with_context(|| format!("failed to spawn '{cmd}'"))?;
+    if !out.status.success() {
+        bail!("'{cmd} {}' failed with {}", args.join(" "), out.status);
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+pub(crate) async fn capture_lossy_aws(cmd: &str, args: &[&str]) -> String {
+    Command::new(cmd)
+        .env("MISE_ENV", "aws")
+        .args(args)
+        .stderr(Stdio::null())
+        .output()
+        .await
+        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+        .unwrap_or_default()
+}
+
+pub(crate) async fn run_with_stdin_aws(cmd: &str, args: &[&str], input: &str) -> Result<()> {
+    let mut child = Command::new(cmd)
+        .env("MISE_ENV", "aws")
+        .args(args)
+        .stdin(Stdio::piped())
+        .spawn()
+        .with_context(|| format!("failed to spawn '{cmd}'"))?;
+    child
+        .stdin
+        .take()
+        .context("child stdin unavailable")?
+        .write_all(input.as_bytes())
+        .await?;
+    let status = child.wait().await?;
+    if !status.success() {
+        bail!("'{cmd} {}' failed with {status}", args.join(" "));
+    }
+    Ok(())
+}
+
 /// kubectl args with an optional target kubeconfig (None = the current
 /// context, i.e. the kind cluster; Some = the pivot target).
 pub(crate) fn kubectl_cmd<'a>(kubeconfig: Option<&'a str>, args: &[&'a str]) -> Vec<&'a str> {
@@ -933,9 +1001,24 @@ async fn preflight_aws_quotas_with(cfg: &Config, aws: &str) -> Result<()> {
     }
     let mut errors: Vec<String> = Vec::new();
 
+    // Probe the CLI once before the first real call (issue #504): a
+    // broken aws must fail loudly and name the shim, not masquerade as a
+    // credentials error on the first quota query. The shim's own error
+    // (stderr) stays visible above this message.
+    capture_aws(aws, &["--version"]).await.with_context(|| {
+        format!(
+            "aws CLI unusable before the first AWS call ('{aws} --version' \
+                 failed). Check that the aws CLI is installed and on PATH; \
+                 in the toolbox a bare `aws` fails when the mise shim cannot \
+                 resolve the aws-cli pin (mise.aws.toml, active only with \
+                 MISE_ENV=aws) with 'No version is set for shim: aws'. \
+                 This is a toolchain problem, not an AWS credentials problem"
+        )
+    })?;
+
     for (region, plan) in &requirements {
         let required = plan.required;
-        let limit_raw = capture(
+        let limit_raw = capture_aws(
             aws,
             &[
                 "service-quotas",
@@ -968,7 +1051,7 @@ async fn preflight_aws_quotas_with(cfg: &Config, aws: &str) -> Result<()> {
         // DescribeAddresses has no pool filter (the EC2 API rejects
         // 'public-ipv4-pool', issue #636), so the Amazon-pool count comes
         // from the documented PublicIpv4Pool response field instead.
-        let allocated_raw = capture(
+        let allocated_raw = capture_aws(
             aws,
             &[
                 "ec2",
@@ -992,7 +1075,7 @@ async fn preflight_aws_quotas_with(cfg: &Config, aws: &str) -> Result<()> {
         let mut owned: u32 = 0;
         for cluster in &plan.clusters {
             let filter = format!("Name=tag:{},Values=owned", teardown::capa_tag_key(cluster));
-            let owned_raw = capture(
+            let owned_raw = capture_aws(
                 aws,
                 &[
                     "ec2",
@@ -3148,6 +3231,9 @@ args = sys.argv[1:]
 root = Path(__file__).parent
 with (root / 'calls.jsonl').open('a') as log:
     log.write(json.dumps(args) + '\n')
+if args == ['--version']:
+    print('aws-cli/2.36.32 (stub)')
+    raise SystemExit(0)
 region = args[args.index('--region') + 1]
 fixture = json.loads((root / 'fixture.json').read_text())
 if args[:2] == ['service-quotas', 'get-service-quota']:
@@ -3204,6 +3290,87 @@ else:
                 }
             }
         }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn aws_helpers_scope_mise_env_to_the_child() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("env.log");
+        let aws = dir.path().join("aws");
+        // The stub records the MISE_ENV it sees, succeeds only for
+        // `--version` and `s3api`, and refuses to run unless MISE_ENV is
+        // exactly `aws`: a bare spawn (the pre-fix behavior) must fail
+        // while every wrapped spawn must carry the variable.
+        std::fs::write(
+            &aws,
+            format!(
+                "#!/bin/sh\necho \"${{MISE_ENV:-<unset>}}\" >> {log}\n[ \"$MISE_ENV\" = aws ] || exit 1\ncase \"$1\" in\n--version) echo 'aws-cli/2.36.32 (stub)' ;;\ns3api) cat > /dev/null ;;\n*) exit 1 ;;\nesac\n",
+                log = log.display()
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&aws, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let bin = aws.to_str().unwrap();
+
+        // Pre-fix behavior: a bare spawn carries no MISE_ENV (removed
+        // explicitly so a developer's active mise environment cannot hide
+        // the regression) and the stub refuses to run.
+        let bare = Command::new(bin)
+            .arg("--version")
+            .env_remove("MISE_ENV")
+            .output()
+            .await
+            .unwrap();
+        assert!(
+            !bare.status.success(),
+            "a bare aws spawn must not carry MISE_ENV=aws"
+        );
+
+        assert!(
+            run_quiet_aws(bin, &["--version"]).await,
+            "run_quiet_aws must carry MISE_ENV=aws"
+        );
+        let version = capture_aws(bin, &["--version"]).await.unwrap();
+        assert!(version.contains("aws-cli/2.36.32"), "{version}");
+        let deleted = run_with_stdin_aws(bin, &["s3api", "delete-objects"], "{}").await;
+        assert!(deleted.is_ok(), "{deleted:?}");
+        // A lossy capture still degrades to an empty string on failure.
+        assert_eq!(capture_lossy_aws(bin, &["ec2", "bogus"]).await, "");
+        // The env log proves the wrapper set the variable and the bare
+        // spawn did not.
+        let envs = std::fs::read_to_string(&log).unwrap();
+        assert_eq!(envs.lines().filter(|l| *l == "aws").count(), 4);
+        assert_eq!(envs.lines().filter(|l| *l == "<unset>").count(), 1);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn quota_preflight_probe_names_the_shim_when_aws_cannot_run() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let aws = dir.path().join("aws");
+        // A stub that fails like a broken mise shim: the preflight must
+        // bail on the probe with a message that names the shim, before
+        // any quota call, instead of a credentials error.
+        std::fs::write(
+            &aws,
+            "#!/bin/sh\necho 'mise ERROR No version is set for shim: aws' >&2\nexit 1\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&aws, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let result =
+            preflight_aws_quotas_with(&teardown_minimal_config(), aws.to_str().unwrap()).await;
+        let error = result.unwrap_err().to_string();
+        assert!(
+            error.contains("shim"),
+            "the probe failure must name the shim: {error}"
+        );
+        assert!(
+            !error.contains("check AWS credentials and permissions"),
+            "the probe failure must not point at credentials: {error}"
+        );
     }
 
     const VALID_AGE_KEY: &str = "# created: 2026-01-01T00:00:00+02:00\n# public key: age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq\nAGE-SECRET-KEY-1SECRETSECRETSECRET\n";

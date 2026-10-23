@@ -198,6 +198,9 @@ jobs:
       - name: Toolbox image trusts the checkout mount (#485)
         run: python3 tests/test-toolbox-git-safe-directory.py
 
+      - name: shell lifecycle scopes MISE_ENV=aws to the aws child (#504)
+        run: python3 tests/test-shell-aws-mise-env.py
+
       - name: cert-manager version consistency (#322)
         run: python3 tests/test-cert-manager-version-consistency.py
 

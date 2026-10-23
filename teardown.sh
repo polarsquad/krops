@@ -26,6 +26,20 @@ set -euo pipefail
 
 PROFILE="${KROPS_PROFILE:-${1:-aws}}"
 
+# ── aws CLI wrapper (issue #504) ─────────────────────────────────────────────
+# In the toolbox image `aws` resolves through a mise shim, and the aws-cli
+# pin lives in mise.aws.toml, which mise loads only when the `aws`
+# environment is active (MISE_ENV=aws). Nothing on the lifecycle path set
+# it, so a bare `aws` failed with "No version is set for shim: aws" and
+# every sweep listing read as "nothing to delete". The wrapper scopes the
+# variable to each aws child process: the shim resolves offline, and the
+# parent process and other tools are left alone. On hosts where `aws` is a
+# plain binary rather than a shim, the variable is inert, so native runs
+# are unchanged.
+aws() {
+  MISE_ENV=aws command aws "$@"
+}
+
 preflight_checks() {
   case "$PROFILE" in
     local-host|aws) ;;
@@ -78,8 +92,13 @@ preflight_checks() {
   fi
 
   if [ "${AWS_ONLY:-0}" = "1" ]; then
-    command -v aws >/dev/null 2>&1 \
-      || { echo "ERROR: aws CLI not found in PATH (required for AWS_ONLY mode)" >&2; exit 1; }
+    # Execution probe (issue #504): a failing `aws --version` means the
+    # aws CLI cannot run at all (missing, or a toolbox mise shim that
+    # cannot resolve the aws-cli pin) and must be named as such.
+    if ! aws --version >/dev/null 2>&1; then
+      echo "ERROR: aws CLI unusable (required for AWS_ONLY mode): 'aws --version' failed. Check that the aws CLI is installed and on PATH; in the toolbox a bare 'aws' fails when the mise shim cannot resolve the aws-cli pin (mise.aws.toml, the 'aws' mise environment) with 'No version is set for shim: aws'. This is a toolchain problem, not an AWS credentials problem." >&2
+      exit 1
+    fi
     AWS_AVAILABLE=true
     echo ">>> AWS_ONLY mode – k8s tools not required"
     return
@@ -91,11 +110,11 @@ preflight_checks() {
   done
 
   AWS_AVAILABLE=false
-  if command -v aws >/dev/null 2>&1; then
+  if aws --version >/dev/null 2>&1; then
     AWS_AVAILABLE=true
     echo ">>> aws CLI available"
   else
-    echo "!   aws CLI not found – AWS orphan cleanup (step 4) will be skipped" >&2
+    echo "!   aws CLI unusable ('aws --version' failed; a broken toolbox mise shim reports 'No version is set for shim: aws') – AWS orphan cleanup (step 4) will be skipped" >&2
   fi
 }
 

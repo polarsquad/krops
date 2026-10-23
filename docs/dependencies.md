@@ -158,6 +158,20 @@ Lifecycle tool versions installed in the image come from `mise.toml` and
 runtime base images, plus the mise installer and Podman remote-client build
 arguments. Renovate manages those base references and build arguments.
 
+### Toolbox `:latest` vs the mise self-pin
+
+The `:latest` tag moves only when a stable `vX.Y.Z` release is cut, while
+Renovate bumps the mise self-pin in `mise.toml` (and the Dockerfile's
+`ARG MISE_VERSION`) on its normal cadence. Between a pin bump and the next
+release, the published `:latest` carries an older mise that refuses to run
+against a fresh main checkout, so the default toolbox path fails for new
+users (issue #639). The `toolbox-mise-drift` workflow watches that window:
+on a schedule, on dispatch, and on main pushes to `mise.toml` or
+`bootstrap-rs/Dockerfile`, it compares `mise.toml`'s `min_version` against
+the mise inside the published image and opens, updates, or closes one
+tracking issue. Until a release refreshes the tag, the workaround is the
+local build documented in `scripts/toolbox-run.sh`'s header.
+
 ## Update procedure
 
 1. Wait for a Renovate PR. For configuration troubleshooting, use the pinned

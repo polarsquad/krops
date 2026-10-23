@@ -19,7 +19,7 @@ class ClusterApiGroupingTest(unittest.TestCase):
             ("kubernetes-sigs/cluster-api", "github-release-attachments", True),
             ("kubernetes-sigs/cluster-api", "github-releases", True),
             ("kubernetes-sigs/cluster-api-addon-provider-helm", "github-releases", True),
-            ("kubernetes-sigs/cluster-api-provider-gcp", "github-releases", True),
+            ("shrinedogg/cluster-api-provider-gcp", "github-releases", True),
             # digest-pinned images the #315/#354 CAPI providers deploy (grouped by #354)
             ("registry.k8s.io/cluster-api/cluster-api-controller", "docker", True),
             ("registry.k8s.io/cluster-api/kubeadm-bootstrap-controller", "docker", True),

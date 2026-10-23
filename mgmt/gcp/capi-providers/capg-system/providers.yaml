@@ -5,13 +5,23 @@
 # the operator-rendered key Secret to the secret-free WIF configuration; the
 # full volume list is declared so the result is identical under strategic and
 # JSON-merge patch semantics (spike S1).
+#
+# Pinned to the fork release, not upstream: upstream CAPG resolves node pools
+# against the zone-stripped regional path (NodePoolLocation() drops the zone),
+# so node pools of zonal GKE clusters never converge (#641). The fork tag is
+# upstream v1.13.1 plus exactly that fix. Re-point this at upstream once a
+# release there includes the zonal node-pool fix (upstream #1309/#1168);
+# retirement is tracked in issue #656.
 apiVersion: operator.cluster.x-k8s.io/v1alpha2
 kind: InfrastructureProvider
 metadata:
   name: gcp
   namespace: capg-system
 spec:
-  version: "v1.13.1"
+  # renovate: datasource=github-releases depName=shrinedogg/cluster-api-provider-gcp
+  version: "v1.13.1-zonal.1"
+  fetchConfig:
+    url: "https://github.com/shrinedogg/cluster-api-provider-gcp/releases"
   configSecret:
     name: capg-variables
   patches:

@@ -86,9 +86,17 @@ if args[:2] == ['account', 'set']:
  sys.exit(0 if session and os.environ['SUBSCRIPTION_FAIL'] != '1' else 1)
 if args[:2] == ['connectedk8s', 'show']: print('https://issuer.example/')
 """)
-        self.stub("kubectl", "")
-        self.stub("docker", "")  # Already-patched apiserver: no waits or mutation.
-        self.stub("sleep", "sys.exit('unexpected sleep')\n")
+        # The hook waits for the restarted apiserver on both paths (issue
+        # #506): the kubectl stub serves the OIDC discovery document with the
+        # Arc issuer the az stub reports (first poll matches, no sleep) and
+        # /readyz succeeds by default (the no-op stub), so the stability
+        # counter reaches 5.
+        self.stub("kubectl", """args = sys.argv[1:]
+if args[:2] == ['get', '--raw=/.well-known/openid-configuration']:
+ print('{"issuer":"https://issuer.example/"}')
+""")
+        self.stub("docker", "")  # Already-patched apiserver: grep matches, so no sed mutation.
+        self.stub("sleep", "")
         script = tomllib.loads((ROOT / "mise.azure.toml").read_text())["tasks"]["arc-federate"]["run"]
         result = subprocess.run(["bash", "-c", script], env=self.env,
                                 capture_output=True, text=True, check=False)

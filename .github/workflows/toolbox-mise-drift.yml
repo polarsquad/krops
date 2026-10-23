@@ -1,0 +1,171 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: toolbox-mise-drift
+
+# The toolbox image publishes :latest only on release (toolbox-release.yml),
+# while Renovate bumps the mise self-pin in mise.toml on its normal cadence.
+# Between a pin bump and the next release the published :latest carries an
+# older mise that refuses to run against a fresh main checkout, breaking the
+# default toolbox path for new users (issue #639). This workflow watches that
+# window: it compares the published image's mise against mise.toml's
+# min_version and opens, updates, or closes one tracking issue. It never
+# blocks PRs and never mutates anything but the issue.
+
+"on":
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - mise.toml
+      - bootstrap-rs/Dockerfile
+
+permissions:
+  contents: read
+
+concurrency:
+  group: toolbox-mise-drift-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  compare:
+    name: Compare published :latest mise with the main self-pin
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'polarsquad'
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    outputs:
+      drift: ${{ steps.compare.outputs.drift }}
+      pinned_mise: ${{ steps.compare.outputs.pinned_mise }}
+      image_mise: ${{ steps.compare.outputs.image_mise }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Pull the published toolbox image
+        run: docker pull ghcr.io/polarsquad/krops-toolbox:latest
+
+      - name: Compare the self-pin with the image mise
+        id: compare
+        run: |
+          set -o pipefail
+          pinned=$(sed -n 's/^min_version = "\(.*\)"$/\1/p' mise.toml | head -1)
+          image=$(docker run --rm --entrypoint mise ghcr.io/polarsquad/krops-toolbox:latest version | awk '{print $1}')
+          echo "main self-pin (mise.toml min_version): ${pinned}"
+          echo "published :latest mise: ${image}"
+          {
+            echo "pinned_mise=${pinned}"
+            echo "image_mise=${image}"
+          } >> "$GITHUB_OUTPUT"
+          if [ -z "$pinned" ] || [ -z "$image" ]; then
+            echo "::error::could not read a mise version (pin=${pinned:-<unreadable>}, image=${image:-<unreadable>})"
+            exit 1
+          fi
+          if [ "$pinned" != "$image" ]; then
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::published :latest carries mise ${image} but main's mise.toml requires ${pinned}: cut a toolbox release to refresh the tag"
+          else
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Add to job summary
+        if: always()
+        run: |
+          {
+            echo "## toolbox :latest vs the main mise self-pin"
+            echo
+            echo "| source | mise |"
+            echo "| --- | --- |"
+            echo "| main \`mise.toml\` | \`${{ steps.compare.outputs.pinned_mise || 'unreadable' }}\` |"
+            echo "| published \`ghcr.io/polarsquad/krops-toolbox:latest\` | \`${{ steps.compare.outputs.image_mise || 'unreadable' }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  report-status:
+    name: Update tracking issue
+    needs: compare
+    if: always() && github.repository_owner == 'polarsquad'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open, update or close the drift issue
+        uses: actions/github-script@v9.0.0
+        env:
+          JOB_RESULT: ${{ needs.compare.result }}
+          DRIFT: ${{ needs.compare.outputs.drift }}
+          PINNED_MISE: ${{ needs.compare.outputs.pinned_mise || 'unknown' }}
+          IMAGE_MISE: ${{ needs.compare.outputs.image_mise || 'unknown' }}
+        with:
+          script: |
+            const title = "toolbox: :latest mise version drift (release needed)";
+            const labels = ["area:operations"];
+            const { owner, repo } = context.repo;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+
+            const jobStatus = process.env.JOB_RESULT;
+            if (jobStatus !== "success" && jobStatus !== "failure") {
+              return; // cancelled or skipped: neither a failure nor a recovery
+            }
+
+            async function getIssue() {
+              const { data: issues } = await github.rest.issues.listForRepo({
+                owner,
+                repo,
+                state: "open",
+                per_page: 100,
+              });
+              return issues.find(i => i.title === title);
+            }
+
+            async function openOrComment(body) {
+              const issue = await getIssue();
+              if (!issue) {
+                const { data: created } = await github.rest.issues.create({
+                  owner,
+                  repo,
+                  title,
+                  labels,
+                  body,
+                });
+                console.log(`Opened issue #${created.number}`);
+              } else {
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: issue.number,
+                  body,
+                });
+                console.log(`Commented on issue #${issue.number}`);
+              }
+            }
+
+            const pinned = process.env.PINNED_MISE;
+            const imageMise = process.env.IMAGE_MISE;
+
+            if (jobStatus === "failure") {
+              await openOrComment(
+                `The drift guard itself failed. Check [workflow run](${runUrl}) for details.`
+              );
+            } else if (process.env.DRIFT === "true") {
+              await openOrComment(
+                `Published \`ghcr.io/polarsquad/krops-toolbox:latest\` carries mise \`${imageMise}\`, but main's \`mise.toml\` self-pin requires mise \`${pinned}\`. The default toolbox path (\`scripts/toolbox-run.sh\`) fails at the first mise-shim tool call for fresh checkouts until a toolbox release refreshes the tag (issue #639).\n\nResolution: cut a toolbox release from current main (bump the \`bootstrap-rs/Cargo.toml\` version and lock in one PR, merge it, then tag \`v<version>\` on the bump's merge commit and push the tag; \`toolbox-release.yml\` republishes \`latest\` for stable versions). Afterwards \`docker run --rm --entrypoint mise ghcr.io/polarsquad/krops-toolbox:latest version\` must report \`${pinned}\`.\n\nUntil then: the local-build workaround documented in \`scripts/toolbox-run.sh\`'s header.\n\nDetected in [workflow run](${runUrl}).`
+              );
+            } else {
+              const issue = await getIssue();
+              if (issue) {
+                await github.rest.issues.update({
+                  owner,
+                  repo,
+                  issue_number: issue.number,
+                  state: "closed",
+                });
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: issue.number,
+                  body: `Resolved: published :latest matches the main self-pin (mise \`${imageMise}\`) in [workflow run](${runUrl}).`,
+                });
+                console.log(`Closed issue #${issue.number}`);
+              }
+            }

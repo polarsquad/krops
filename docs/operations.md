@@ -176,6 +176,13 @@ Inside the toolbox:
   kubeconfig after creation.
 - `/root/.kube` maps to the checkout's `.kube/`, so the exported management
   kubeconfig persists on the host as `.kube/krops-mgmt.yaml`.
+- The image marks `/workspace` as a git `safe.directory` (system scope) so
+  git reads the host-owned checkout when the container runs as root: native
+  rootful Linux Docker needs it, Docker Desktop and rootless engines never
+  hit the ownership check (issue #485). The wrapper's host-side
+  `KROPS_OCI_GIT_*` forwarding remains the primary metadata path for
+  `oci-push`; without it the task's git fallback now prints git's own error
+  instead of hiding it.
 
 ### Helper tasks in the toolbox
 

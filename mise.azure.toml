@@ -116,13 +116,30 @@ else
   docker exec "$KIND_NODE" sed -i -E \
     "s|^(\\s*)- --service-account-issuer=.*$|\\1- --service-account-issuer=$ISSUER\\n\\1- --service-account-issuer=https://kubernetes.default.svc.cluster.local|" \
     /etc/kubernetes/manifests/kube-apiserver.yaml
-  echo "    waiting for the apiserver static pod to come back healthy"
-  for i in $(seq 1 60); do
-    kubectl get --raw=/healthz >/dev/null 2>&1 && break
-    sleep 2
-  done
-  kubectl get --raw=/healthz >/dev/null
 fi
+
+# The kubelet notices the changed static-pod manifest only after a delay, so a
+# /healthz poll can be answered by the old apiserver and the hook can return
+# before the restart finishes (issue #506). The OIDC discovery document
+# advertises the first --service-account-issuer, so only the restarted
+# apiserver names the Arc issuer there; wait for it, then require a stable run
+# of /readyz. Runs on both paths, so a rerun also proves readiness.
+echo "    waiting for the apiserver to serve the Arc issuer"
+served=""
+for i in $(seq 1 90); do
+  served=$(kubectl get --raw=/.well-known/openid-configuration 2>/dev/null \
+    | sed -n 's/.*"issuer":"\([^"]*\)".*/\1/p' || true)
+  [ "$served" = "$ISSUER" ] && break
+  sleep 2
+done
+[ "$served" = "$ISSUER" ] || { echo "apiserver still serves issuer '$served', not $ISSUER" >&2; exit 1; }
+ok=0
+for i in $(seq 1 60); do
+  if kubectl get --raw=/readyz >/dev/null 2>&1; then ok=$((ok + 1)); else ok=0; fi
+  [ "$ok" -ge 5 ] && break
+  sleep 2
+done
+[ "$ok" -ge 5 ] || { echo "apiserver not stably ready after the issuer patch" >&2; exit 1; }
 
 fic() { # <fic-name> <subject>
   echo "==> FIC $1 on krops-capz ($2)"

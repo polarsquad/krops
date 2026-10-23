@@ -195,6 +195,9 @@ jobs:
           python3 tests/test-oci-push-worktree.py
           python3 tests/test-toolbox-run-azure-session.py
 
+      - name: Toolbox image trusts the checkout mount (#485)
+        run: python3 tests/test-toolbox-git-safe-directory.py
+
       - name: cert-manager version consistency (#322)
         run: python3 tests/test-cert-manager-version-consistency.py
 

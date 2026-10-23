@@ -7,9 +7,11 @@ installs without drift. Fails when they disagree, when a declared
 provider-manifest or sync path is missing, when an environment's kind
 does not match its section name (the section name is authoritative for
 profile resolution), or when the file does not parse. Also requires the
-two airgap flux-operator chart pins (the airgap generator's regenerated
-HelmChartProxy and the Zarf component) to agree with each other; their
-alignment against [charts].flux-operator is tracked in issue #633.
+airgap flux-operator chart pins to match [charts].flux-operator: the
+airgap generator derives its regenerated HelmChartProxy version from
+bootstrap.toml at generation time, and the Zarf component pins it
+literally, so neither can drift from the version the gap registry is
+seeded with (issue #633).
 Requires Python 3.11+ (tomllib); mise and CI both provide it.
 """
 
@@ -67,25 +69,51 @@ def block_version(block: str, label: str) -> str:
     return matches[0]
 
 
-def airgap_flux_operator_pins() -> tuple[str, str]:
-    """The two airgap-side flux-operator chart pins: the regenerated
-    HelmChartProxy in build-config-artifact.sh and the Zarf component."""
+# The exact line build-config-artifact.sh must carry to derive the
+# airgap flux-operator chart pin the same way stage-and-create-cluster.sh
+# seeds the gap registry (issue #633).
+FLUX_CHART_DERIVE_LINE = (
+    "flux_chart_version=$(sed -nE 's/^flux-operator = \"(.*)\"/\\1/p' "
+    "bootstrap.toml | head -1)"
+)
+
+
+def airgap_flux_operator_pins() -> str:
+    """The airgap-side flux-operator chart pin (issue #633).
+
+    The generator carries no literal version: it derives
+    ${flux_chart_version} from bootstrap.toml [charts] at generation
+    time, the same way stage-and-create-cluster.sh seeds the gap
+    registry, so the regenerated HelmChartProxy cannot request a version
+    the registry was never seeded with. This asserts that derive line
+    and the ${flux_chart_version} placeholder are intact, and returns
+    the Zarf component's literal pin, which must equal
+    [charts].flux-operator.
+    """
     script = (REPO_ROOT / "airgap/scripts/build-config-artifact.sh").read_text()
+    if FLUX_CHART_DERIVE_LINE not in script:
+        raise SystemExit(
+            "FAILED: build-config-artifact.sh does not derive flux_chart_version "
+            "from bootstrap.toml [charts] (issue #633)"
+        )
     match = re.search(
-        r"^cat > \"\$LH/addons/flux-apps/flux-operator\.yaml\" <<'EOF'\n(.*?)^EOF$",
+        r"^cat > \"\$LH/addons/flux-apps/flux-operator\.yaml\" <<EOF\n(.*?)^EOF$",
         script, re.M | re.S,
     )
     if match is None:
         raise SystemExit("FAILED: no flux-operator.yaml heredoc in build-config-artifact.sh")
-    generator_pin = block_version(match.group(1), "the generator's flux-operator.yaml heredoc")
+    if 'version: "${flux_chart_version}"' not in match.group(1):
+        raise SystemExit(
+            "FAILED: the generator's flux-operator.yaml heredoc does not pin "
+            'version: "${flux_chart_version}" (issue #633)'
+        )
     zarf = (REPO_ROOT / "airgap/zarf.yaml").read_text()
     component = re.search(
         r"^  - name: flux-operator\n.*?(?=^  - name: |\Z)", zarf, re.M | re.S
     )
     if component is None:
         raise SystemExit("FAILED: no flux-operator component in airgap/zarf.yaml")
-    zarf_pin = block_version(component.group(0), "the airgap/zarf.yaml flux-operator component")
-    return generator_pin, zarf_pin
+    return block_version(component.group(0), "the airgap/zarf.yaml flux-operator component")
 
 
 def main() -> int:
@@ -114,19 +142,20 @@ def main() -> int:
                 )
 
     # The gap registry only ever carries the chart version
-    # stage-and-create-cluster.sh derives from bootstrap.toml, so the two
-    # airgap-side pins must agree with each other: a split between them can
-    # never resolve. Their alignment against [charts].flux-operator itself
-    # is tracked in issue #633 (both pins are currently stale at 0.58.0).
+    # stage-and-create-cluster.sh derives from bootstrap.toml, so the
+    # airgap-side pins must equal [charts].flux-operator: the generator
+    # derives its pin from that key at generation time and the Zarf
+    # component pins it literally (issue #633).
     try:
-        generator_pin, zarf_pin = airgap_flux_operator_pins()
+        zarf_pin = airgap_flux_operator_pins()
     except SystemExit as error:
         failures.append(str(error))
     else:
-        if generator_pin != zarf_pin:
+        declared_flux = charts.get("flux-operator")
+        if declared_flux is not None and zarf_pin != declared_flux:
             failures.append(
-                f"airgap flux-operator chart pins disagree: generator heredoc "
-                f"{generator_pin} vs airgap/zarf.yaml {zarf_pin}"
+                f"airgap/zarf.yaml flux-operator pin {zarf_pin} != "
+                f"[charts].flux-operator {declared_flux}"
             )
 
     for name, env in config.get("environments", {}).items():

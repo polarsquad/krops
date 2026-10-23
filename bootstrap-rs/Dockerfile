@@ -104,5 +104,14 @@ RUN cd /opt/krops \
     && "$(mise -E gcp which gcloud)" components install gke-gcloud-auth-plugin --quiet \
     && mise reshim
 
+# The container runs as root while the bind-mounted checkout is owned by the
+# host user, so git refuses to read it on native rootful Linux Docker
+# ("detected dubious ownership", issue #485). Docker Desktop and rootless
+# engines map the mount to the container user and never hit it. /workspace is
+# the only mount that is a git repository (scripts/toolbox-run.sh), so trust
+# that path and nothing else; --system keeps it protected configuration that
+# the mounted repository cannot override.
+RUN git config --system --add safe.directory /workspace
+
 WORKDIR /workspace
 ENTRYPOINT ["/usr/local/bin/toolbox-entrypoint.sh"]

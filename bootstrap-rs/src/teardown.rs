@@ -1961,6 +1961,22 @@ pub async fn run_teardown(cfg: &Config, tcfg: &TeardownConfig) -> Result<()> {
             })
         };
 
+        // Post-pivot toolbox runs: the self-managed management cluster's
+        // API endpoint sits on the kind network (the CAPD load balancer),
+        // which the toolbox's default bridge cannot reach. Since #341 the
+        // join happens in the CLI, and the pre-pivot branch above only
+        // covers the kind bootstrap cluster, so a post-pivot teardown
+        // joined nothing and every kubectl call timed out until the
+        // deletion guard (#248) refused the run (issue #486).
+        if let Some(engine) = should_join_kind_network_post_pivot(
+            cfg,
+            engine.as_deref(),
+            kind_present,
+            tcfg.mgmt_kubeconfig.exists(),
+        ) {
+            join_kind_network_post_pivot(cfg, &engine).await;
+        }
+
         // Suspend the workload Kustomization (prevents Flux recreating
         // the Cluster while CAPD removes its machines), then delete the
         // workload clusters, then remove the controller host.
@@ -2412,6 +2428,31 @@ fn should_join_kind_network(cfg: &Config, engine: Option<&str>) -> Option<String
     }
 }
 
+/// The container engine to use for the post-pivot local-host kind-network
+/// join, or `None` when no join should be attempted. After a pivot the
+/// kind bootstrap cluster is gone, but the self-managed management
+/// cluster's API endpoint still sits on the kind network (the CAPD load
+/// balancer), which the toolbox's default bridge cannot reach - so a
+/// toolbox run with a reachable mgmt kubeconfig joins there even when
+/// the kind cluster no longer exists (issue #486). The pre-pivot branch
+/// is excluded: it already joins when the kind cluster is present, and
+/// a missing mgmt kubeconfig means there is no reachable self-managed
+/// target to join for. Mirrors the gating `should_join_kind_network`
+/// applies on the other join paths; the join itself is best-effort at
+/// the call site, never fatal.
+fn should_join_kind_network_post_pivot(
+    cfg: &Config,
+    engine: Option<&str>,
+    kind_present: bool,
+    mgmt_kubeconfig_exists: bool,
+) -> Option<String> {
+    if cfg.toolbox && !kind_present && mgmt_kubeconfig_exists {
+        engine.map(String::from)
+    } else {
+        None
+    }
+}
+
 /// Join the kind network so `discover_controller_host` can reach the
 /// pre-pivot kind endpoint (`mgmt-control-plane:6443`), mirroring the
 /// bootstrap aws path (`main.rs` `ensure_kind_cluster`) and the local-host
@@ -2449,6 +2490,38 @@ pub(crate) async fn ensure_kind_network_for_discovery(cfg: &Config) {
     if let Err(err) = toolbox_join_kind_network(cfg, &engine).await {
         warn(&format!(
             "could not join the kind network for host discovery ({err}); continuing without it"
+        ));
+    }
+}
+
+/// Join the kind network so a post-pivot toolbox teardown can reach the
+/// self-managed management cluster's API endpoint. The kind bootstrap
+/// cluster is gone after a pivot, but the kind network (and the CAPD load
+/// balancer behind it) survives, and the toolbox's default bridge cannot
+/// route to it (issue #486).
+///
+/// Best-effort, never fatal: a genuinely removed network must not block
+/// the registry/AWS sweep, and a failed join degrades into the existing
+/// "cannot confirm state" guard (#248), which correctly refuses to
+/// continue. The `network inspect` pre-check keeps the output clean: a
+/// `network connect` against a missing network errors with "no such
+/// network".
+pub(crate) async fn join_kind_network_post_pivot(cfg: &Config, engine: &str) {
+    // A host run already resolves the endpoint from its default network,
+    // so only a toolbox run needs the join (mirrors
+    // ensure_kind_network_for_discovery and the pre-pivot local-host
+    // branch, both of which gate on `cfg.toolbox`). Short-circuit before
+    // the probe so host runs spawn nothing.
+    if !cfg.toolbox {
+        return;
+    }
+    if !run_quiet(engine, &["network", "inspect", "kind"]).await {
+        return;
+    }
+    if let Err(err) = toolbox_join_kind_network(cfg, engine).await {
+        warn(&format!(
+            "could not join the kind network for the post-pivot management cluster \
+             ({err}); continuing without it"
         ));
     }
 }
@@ -3013,6 +3086,154 @@ mod tests {
             None
         );
         assert_eq!(should_join_kind_network(&aws_cfg(false), None), None);
+    }
+
+    /// #486: the post-pivot local-host branch must join the kind network
+    /// for a toolbox run that has a reachable mgmt kubeconfig and a
+    /// container engine, even though the kind bootstrap cluster is gone.
+    /// `should_join_kind_network_post_pivot` is the pure gating decision
+    /// `run_teardown` applies before it may probe and join; assert its
+    /// contract directly.
+    #[test]
+    fn post_pivot_join_gates_on_toolbox_post_pivot_kubeconfig_and_engine() {
+        // Toolbox + engine + post-pivot + mgmt kubeconfig present: join.
+        assert_eq!(
+            should_join_kind_network_post_pivot(&aws_cfg(true), Some("docker"), false, true),
+            Some("docker".to_string())
+        );
+        // The kind cluster is still present: the pre-pivot branch already
+        // joins, so this path must not join a second time.
+        assert_eq!(
+            should_join_kind_network_post_pivot(&aws_cfg(true), Some("docker"), true, true),
+            None
+        );
+        // No mgmt kubeconfig: no reachable self-managed target, no join.
+        assert_eq!(
+            should_join_kind_network_post_pivot(&aws_cfg(true), Some("docker"), false, false),
+            None
+        );
+        // Toolbox but no running engine: nothing to join with.
+        assert_eq!(
+            should_join_kind_network_post_pivot(&aws_cfg(true), None, false, true),
+            None
+        );
+        // A host run already resolves the endpoint from its default
+        // network: never join.
+        assert_eq!(
+            should_join_kind_network_post_pivot(&aws_cfg(false), Some("docker"), false, true),
+            None
+        );
+    }
+
+    /// A stub `docker` whose `network inspect`/`network connect` exit
+    /// codes are fixed per scenario. Records argv to `log`, like the
+    /// kubectl stubs above.
+    fn install_docker_stub(
+        dir: &std::path::Path,
+        log: &std::path::Path,
+        inspect_exit: i32,
+        connect_exit: i32,
+    ) -> std::path::PathBuf {
+        let bin = dir.join("docker");
+        let script = format!(
+            "#!/usr/bin/env sh\n[ -n \"${{STUB_PROBE:-}}\" ] && exit 0\necho \"$@\" >> {log}\ncase \"$1 $2\" in\n  \"network inspect\") exit {inspect};;\n  \"network connect\") exit {connect};;\n  *) exit 0;;\nesac\n",
+            log = log.display(),
+            inspect = inspect_exit,
+            connect = connect_exit,
+        );
+        std::fs::write(&bin, script).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        wait_until_executable(&bin);
+        bin
+    }
+
+    /// #486: with the kind network present, the post-pivot join probes
+    /// it and attempts the connect. The connect itself carries the
+    /// toolbox container id read from /etc/hostname (the engine module's
+    /// contract), so on hosts without that file the attempt bails one
+    /// step earlier - still before any connect - and the assertions
+    /// cover what is observable on each host.
+    #[tokio::test]
+    async fn post_pivot_join_probes_and_connects_when_the_network_exists() {
+        let tmp = tempfile::tempdir().unwrap();
+        let log = tmp.path().join("docker.log");
+        let bin = install_docker_stub(tmp.path(), &log, 0, 0);
+        join_kind_network_post_pivot(&aws_cfg(true), &bin.to_string_lossy()).await;
+        let recorded = std::fs::read_to_string(&log).unwrap_or_default();
+        assert!(
+            recorded.contains("network inspect kind"),
+            "the post-pivot join must probe the kind network first, got: {recorded}"
+        );
+        if std::path::Path::new("/etc/hostname").exists() {
+            assert!(
+                recorded.contains("network connect kind"),
+                "with the network present and a container id available, the join must connect, got: {recorded}"
+            );
+        } else {
+            assert!(
+                !recorded.contains("network connect kind"),
+                "without /etc/hostname the engine module bails before the connect, got: {recorded}"
+            );
+        }
+    }
+
+    /// #486: a removed kind network must not block the post-pivot sweep
+    /// - the probe reads it as gone and the join is skipped without
+    /// error.
+    #[tokio::test]
+    async fn post_pivot_join_skips_a_missing_network_without_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let log = tmp.path().join("docker.log");
+        let bin = install_docker_stub(tmp.path(), &log, 1, 1);
+        join_kind_network_post_pivot(&aws_cfg(true), &bin.to_string_lossy()).await;
+        let recorded = std::fs::read_to_string(&log).unwrap_or_default();
+        assert!(
+            recorded.contains("network inspect kind"),
+            "the probe must run, got: {recorded}"
+        );
+        assert!(
+            !recorded.contains("network connect kind"),
+            "a missing network must not be joined, got: {recorded}"
+        );
+    }
+
+    /// #486: a failed join must be non-fatal - the helper warns and
+    /// returns so teardown continues to the deletion guard (#248),
+    /// which is the existing correct refusal for an unreachable target.
+    #[tokio::test]
+    async fn post_pivot_join_failure_is_non_fatal() {
+        let tmp = tempfile::tempdir().unwrap();
+        let log = tmp.path().join("docker.log");
+        let bin = install_docker_stub(tmp.path(), &log, 0, 1);
+        // Must complete without surfacing an error.
+        join_kind_network_post_pivot(&aws_cfg(true), &bin.to_string_lossy()).await;
+        let recorded = std::fs::read_to_string(&log).unwrap_or_default();
+        if std::path::Path::new("/etc/hostname").exists() {
+            assert!(
+                recorded.contains("network connect kind"),
+                "the join must have been attempted with its failure swallowed, got: {recorded}"
+            );
+        }
+    }
+
+    /// #486: a host run never joins - even a direct helper call with a
+    /// host config must spawn nothing (the call site is additionally
+    /// gated by the predicate, which returns None for host runs).
+    #[tokio::test]
+    async fn post_pivot_join_is_a_no_op_for_host_runs() {
+        let tmp = tempfile::tempdir().unwrap();
+        let log = tmp.path().join("docker.log");
+        let bin = install_docker_stub(tmp.path(), &log, 0, 0);
+        join_kind_network_post_pivot(&aws_cfg(false), &bin.to_string_lossy()).await;
+        let recorded = std::fs::read_to_string(&log).unwrap_or_default();
+        assert!(
+            recorded.is_empty(),
+            "a host run must not probe or join the kind network, got: {recorded}"
+        );
     }
 
     /// #494, part 2: a full `aws` teardown whose k8s side was skipped

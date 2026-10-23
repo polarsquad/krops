@@ -273,7 +273,10 @@ Teardown checks required tools before mutation:
 Teardown discovers where the CAPI controllers run: the pre-pivot kind cluster,
 the post-pivot self-managed management cluster, or no reachable cluster. In
 the toolbox, the `aws` path first joins the kind network so the pre-pivot kind
-endpoint resolves before discovery. When no cluster is reachable and the run
+endpoint resolves before discovery. The post-pivot local-host path joins the
+kind network as well whenever it still exists, because the self-managed
+management cluster's endpoint (the CAPD load balancer) is reachable only from
+that network. When no cluster is reachable and the run
 was not `AWS_ONLY=1`, teardown still runs the AWS orphan sweep (the recovery
 for a host that is already gone) but exits non-zero so automation does not
 read the skipped Kubernetes side as success; `AWS_ONLY=1` is the explicit

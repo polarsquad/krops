@@ -225,10 +225,15 @@ impl BootstrapConfig {
         let mut config: BootstrapConfig = toml::from_str(&raw)
             .with_context(|| format!("failed to parse bootstrap config '{path:?}'"))?;
         config.validate()?;
-        // `parent()` of a bare filename is `Some("")`, which canonicalizes
-        // to the caller's working directory: the pre-#260 behavior for
-        // `BOOTSTRAP_CONFIG=./bootstrap.toml`-style relative locations.
-        let dir = path.parent().unwrap_or_else(|| Path::new("."));
+        // A bare filename (the default `bootstrap.toml`, or
+        // `BOOTSTRAP_CONFIG=bootstrap.toml`) has `parent() == Some("")`,
+        // which `canonicalize` rejects with ENOENT: filter the empty
+        // parent out so the root falls back to `.` (the caller's working
+        // directory), the pre-#260 behavior for relative locations.
+        let dir = path
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
         let root = std::fs::canonicalize(dir)
             .with_context(|| format!("failed to resolve bootstrap config directory '{dir:?}'"))?;
         config.root = root;
@@ -515,6 +520,24 @@ manifest = "mgmt/aws/infrastructure/aws-identity/identity.yaml"
         let other_config = BootstrapConfig::load_from(&other_path).unwrap();
         assert_eq!(other_config.root, std::fs::canonicalize(&other).unwrap());
         assert_ne!(config.root, other_config.root);
+    }
+
+    #[test]
+    fn load_from_bare_default_filename_resolves_root_to_cwd() {
+        // Regression pin for the default path (BOOTSTRAP_CONFIG unset):
+        // the bare `bootstrap.toml` has `parent() == Some("")`, which
+        // `canonicalize` rejects, so its root must fall back to the
+        // working directory instead of failing the load.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("bootstrap.toml"), MINIMAL).unwrap();
+        let prev = std::env::current_dir().unwrap();
+        std::env::set_current_dir(dir.path()).unwrap();
+        let loaded = BootstrapConfig::load_from(Path::new("bootstrap.toml"));
+        // Restore before asserting so a failure leaves the process where
+        // it started (the other tests run concurrently in this process).
+        std::env::set_current_dir(&prev).unwrap();
+        let config = loaded.unwrap();
+        assert_eq!(config.root, std::fs::canonicalize(dir.path()).unwrap());
     }
 
     #[test]

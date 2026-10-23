@@ -34,6 +34,21 @@ _PACKAGE_FILES_EVENT = "packageFiles with updates"
 # Shared across test scripts so repeat lookups hit cache, not GitHub (AGENTS.md).
 RENOVATE_CACHE_DIR = Path(tempfile.gettempdir()) / "krops-renovate-harness-cache"
 
+# Signatures of transient registry/datasource lookup failures in Renovate's
+# log stream (issue #181). A lookup that fails this way degrades to "no
+# digest proposed", which is indistinguishable from an unpinnable reference
+# without classifying the event. The docker registry failure messages are
+# verified in the renovate dist's docker datasource.
+LOOKUP_FAILURE_SIGNATURES = (
+    "Error obtaining docker token",
+    "Failed to obtain docker registry token",
+    "Failed to look up",
+    "Invalid registry response",
+    "docker registry failure: too many requests",
+    "docker registry failure: internal error",
+    "docker registry connection failure",
+)
+
 
 class RenovateResult:
     """Parsed outcome of one harness Renovate run."""
@@ -42,6 +57,7 @@ class RenovateResult:
         self.returncode = returncode
         self.deps_by_file = {path: [] for path in fixture_files}
         self.diagnostics = []
+        self.lookup_failures = []
 
     def dep_names(self, package_file):
         """depName strings Renovate extracted from one fixture file."""
@@ -110,6 +126,12 @@ class RenovateResult:
             if len(set(by_file.values())) > 1
         }
 
+    def lookup_failure_dep_names(self):
+        """depNames named on lookup-failure events, when present."""
+        return {
+            entry["depName"] for entry in self.lookup_failures if entry.get("depName")
+        }
+
     def print_diagnostics(self, stream=None):
         stream = stream or sys.stderr
         if self.diagnostics:
@@ -173,7 +195,16 @@ def _parse(returncode, stdout, fixture_files):
             continue
 
         if event.get("level", 0) >= 40:
-            result.diagnostics.append(event.get("msg", line))
+            msg = event.get("msg", line)
+            result.diagnostics.append(msg)
+            if any(signature in msg for signature in LOOKUP_FAILURE_SIGNATURES):
+                result.lookup_failures.append(
+                    {
+                        "msg": msg,
+                        "depName": event.get("depName"),
+                        "datasource": event.get("datasource"),
+                    }
+                )
         if event.get("msg") != _PACKAGE_FILES_EVENT:
             continue
 

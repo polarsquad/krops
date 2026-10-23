@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Verify Renovate proposes digest pins for authoritative air-gap sources."""
+"""Verify Renovate proposes digest pins for authoritative air-gap sources.
+
+A failed registry lookup degrades to "no digest proposed", so it is
+indistinguishable from an unpinnable reference without lookup-failure
+classification (issue #181). When findings coincide with lookup-failure
+diagnostics the dry-run is retried once; persisting failures abort with a
+distinct infrastructure message instead of "missing digest pin".
+"""
 
 import re
 import sys
@@ -27,13 +34,8 @@ REQUIRED_DEP_NAMES = {
 }
 
 
-def main() -> int:
-    # Strip existing digests so the only pinDigest proposals Renovate can
-    # make are new ones: proves the managers propose pins for every ref.
-    result = run_renovate(
-        EXPECTED_FILES, transform=lambda _, text: DIGEST.sub("", text)
-    )
-
+def compute_findings(result):
+    """The finding classes the gate reports, recomputable per run."""
     missing = {}
     for package_file in EXPECTED_FILES:
         dependencies = result.deps_without_pin_digest(
@@ -56,6 +58,44 @@ def main() -> int:
         dependencies = dep_names - result.dep_names(package_file)
         if dependencies:
             missing_extractions[package_file] = sorted(dependencies)
+    return missing, missing_extractions, tag_changes, inconsistent
+
+
+def main() -> int:
+    # Strip existing digests so the only pinDigest proposals Renovate can
+    # make are new ones: proves the managers propose pins for every ref.
+    result = run_renovate(
+        EXPECTED_FILES, transform=lambda _, text: DIGEST.sub("", text)
+    )
+    missing, missing_extractions, tag_changes, inconsistent = compute_findings(result)
+
+    # A failed registry lookup is infrastructure, not a missing pin (issue
+    # #181): retry the transient class once before classifying the outcome.
+    if (missing or tag_changes or inconsistent) and result.lookup_failures:
+        print(
+            "registry lookup failure(s) in Renovate diagnostics; "
+            "retrying the dry-run once",
+            file=sys.stderr,
+        )
+        result = run_renovate(
+            EXPECTED_FILES, transform=lambda _, text: DIGEST.sub("", text)
+        )
+        missing, missing_extractions, tag_changes, inconsistent = compute_findings(
+            result
+        )
+        if (missing or tag_changes or inconsistent) and result.lookup_failures:
+            print(
+                "Renovate digest-pinning check inconclusive: registry lookup "
+                "failed (infrastructure). Re-run the job; this is NOT "
+                "evidence of missing digest pins.",
+                file=sys.stderr,
+            )
+            dep_names = sorted(result.lookup_failure_dep_names())
+            if dep_names:
+                print(f"lookup-failed dependencies: {dep_names}", file=sys.stderr)
+            result.print_diagnostics()
+            return 1
+
     if (
         result.returncode
         or missing

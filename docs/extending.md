@@ -37,6 +37,12 @@ Podinfo pattern in `workload/local-host/`:
 3. Run `mise run validate`, commit, and push. Every workload cluster picks it
    up on its next sync.
 
+The Flux that runs on each workload cluster is installed from the shared
+`mgmt/shared/flux-apps/flux-operator/` base (issue #244): the Flux Operator
+chart pin lives in that single `HelmChartProxy`, the per-env `addons/flux-apps/`
+kustomizations consume the base, and a base change flows to all four
+environments.
+
 ## Using other providers
 
 The management cluster is not AWS-only. Providers are declared as CAPI

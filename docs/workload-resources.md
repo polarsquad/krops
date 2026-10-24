@@ -30,10 +30,9 @@ instance overrides it with the `services.k8s.aws/region` annotation:
 - master password managed by RDS (`manageMasterUserPassword: true`) and stored
   in Secrets Manager: no password is ever declared in Git
 
-> **Known limitation**: the `DBInstance` sets no `dbSubnetGroupName`, so the
-> instance lands in the region's **default VPC**, not the EKS VPC. CAPA
-> creates the EKS VPC dynamically, so its subnet IDs cannot be declared in
-> Git ahead of time.
+> **Known limitation**: the `DBInstance` sets no `dbSubnetGroupName`, so it
+> lands in the region's default VPC, not the EKS VPC; see the [known issues
+> registry](./known-issues.md#aws).
 
 ## GCP resources (management cluster's KCC)
 

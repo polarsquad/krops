@@ -138,14 +138,15 @@ before the next.
 
 ## Known limitations
 
-- No live acceptance run has been performed yet (no subscription at
-  implementation time); placeholders are listed above.
-- The Arc resource uuid (and therefore the issuer URL) changes if the Arc
-  resource is deleted and recreated; the kind-issuer FICs are upserted by
-  `arc-federate` on the next bootstrap, so this self-heals. The
-  `connectedk8s` az extension version is pinned in `mise.azure.toml` but not
-  covered by Renovate.
-- No GPU node pool: GPU quota is 0 on new subscriptions.
-- No reader identity (the `krops-reader` IAM counterpart).
+- No live acceptance run has been performed yet, and teardown is manual.
+  [Known issues registry](./known-issues.md#azure).
+- The Arc resource uuid change rotates the OIDC issuer URL (self-heals on
+  the next bootstrap); the `connectedk8s` az extension pin is not
+  Renovate-covered. [Known issues registry](./known-issues.md#azure).
+- No GPU node pool: GPU quota is 0 on new subscriptions. [Known issues
+  registry](./known-issues.md#azure).
+- No reader identity (the `krops-reader` IAM counterpart). [Known issues
+  registry](./known-issues.md#azure).
 - The Flexible Server's only administrator is the `krops-capz` identity;
-  grant humans through `FlexibleServersAdministrator` resources.
+  grant humans through `FlexibleServersAdministrator` resources. [Known
+  issues registry](./known-issues.md#azure).

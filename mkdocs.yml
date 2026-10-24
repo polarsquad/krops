@@ -81,8 +81,10 @@ nav:
   - AWS authentication and IAM: aws-iam.md
   - Workload resources: workload-resources.md
   - ACK troubleshooting: troubleshooting-ack.md
+  - Known issues: known-issues.md
   - PR review with konflate: konflate.md
   - Dependencies: dependencies.md
+  - Documentation guidelines: documentation.md
   - Air-gapped krops: airgap.md
   - Crossplane resource plane: crossplane.md
   - WireMock e2e spike findings (AWS): wiremock-e2e-spike-findings-aws.md

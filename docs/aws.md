@@ -171,8 +171,5 @@ independently of the provider (see
 
 ## Known limitations
 
-- The ACK RDS `DBInstance` sets no `dbSubnetGroupName`, so the instance lands
-  in the region's **default VPC**, not the EKS VPC (CAPA creates the EKS VPC
-  dynamically). See [Workload resources](./workload-resources.md).
-- No GPU node pools: they would need a GPU instance type and quota, and the
-  default run is the cheapest offered ARM and x86 shapes only.
+- The RDS instance lands in the region's default VPC, and GPU node pools
+  are out of scope: see the [known issues registry](./known-issues.md#aws).

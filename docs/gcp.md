@@ -176,29 +176,15 @@ next Flux reconciliation.
 
 ## Known limitations
 
-- Cloud SQL creates the built-in `postgres` user with no password; it cannot
-  log in, and `cloudsql.iam_authentication` does not remove it. No `rootPassword`
-  is committed; a SOPS-backed one is deliberately skipped because the
-  management cluster's KCC credentials are secret-free WIF files, and wiring
-  it would undermine the WIF "no credentials at rest" posture (follow-up if
-  needed). If an operator needs
-  superuser access: `gcloud sql users set-password postgres --instance=krops-<cluster>-db --prompt-for-password`
-  -- never put it in Git or a cluster Secret. Limit who holds
-  `cloudsql.users.update` (roles/cloudsql.admin, roles/editor) as that
-  permission can enable the user.
-- The first live acceptance run (#319 stage B, 2026-10-19) has been
-  performed; it surfaced the zonal node-pool convergence bug (#641, fixed
-  by the CAPG fork pin above) and the WIF `generateToken` failure (#642).
-  Acceptance is pending the re-run after both are fixed.
+- Cloud SQL creates the built-in `postgres` user with no password, and it
+  cannot log in. [Known issues registry](./known-issues.md#gcp).
+- Acceptance is pending the re-run after the CAPG fixes. [Known issues
+  registry](./known-issues.md#gcp).
 - Zonal clusters (`europe-north1-a`) until multi-zone availability in the
-  project is confirmed (spike S4 of the implementation plan).
-- Cloud SQL instance names have a reuse cooldown after deletion; a
-  teardown-then-bootstrap on the same project can race it.
-- No Arm machine pool yet (machine-type availability in `europe-north1-a`
-  unverified); the x86 pool is the default.
-- The `kind` WIF provider stays in the pool after the pivot; it is harmless
-  (its subject condition matches only the kind cluster's service accounts)
-  and keeps re-bootstrap of a kind cluster cheap.
-- GKE Autopilot, GPU pools and the per-cluster reader's
-  `iam.serviceAccountTokenCreator` grant are follow-ups, not part of this
-  PR.
+  project is confirmed. [Known issues registry](./known-issues.md#gcp).
+- Cloud SQL instance names have a reuse cooldown after deletion. [Known
+  issues registry](./known-issues.md#gcp).
+- The `kind` WIF provider stays in the pool after the pivot (harmless).
+  [Known issues registry](./known-issues.md#gcp).
+- GKE Autopilot and GPU pools are follow-ups. [Known issues
+  registry](./known-issues.md#gcp).

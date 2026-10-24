@@ -240,3 +240,194 @@ jobs:
           name: toolbox-sbom-spdx
           path: sbom.json
           retention-days: 30
+
+  # Publishes the project release record only after the image has been
+  # built, published, signed, and attested (needs sign-attest). A failed or
+  # partial run therefore never advertises a completed release. The
+  # contents:write scope is confined to this job; the workflow-level
+  # permission stays contents:read.
+  release:
+    name: Create GitHub release
+    needs: [resolve, sign-attest]
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      packages: read
+    env:
+      VERSION: ${{ needs.resolve.outputs.version }}
+      TAG: v${{ needs.resolve.outputs.version }}
+      IMAGE: ghcr.io/polarsquad/krops-toolbox
+      INDEX_DIGEST: ${{ needs.merge.outputs.digest }}
+      PUBLISHED_TAGS: ${{ needs.merge.outputs.tags }}
+      COMMIT: ${{ github.sha }}
+      SOURCE_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Download SBOM artifact
+        uses: actions/download-artifact@v8.0.2
+        with:
+          name: toolbox-sbom-spdx
+
+      - name: Docker login to GHCR
+        uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.4.1
+
+      - name: Resolve published digests and signing identity
+        id: published
+        run: |
+          amd64="$(docker buildx imagetools inspect "${IMAGE}:${VERSION}-linux-amd64" --format '{{.Manifest.Digest}}')"
+          arm64="$(docker buildx imagetools inspect "${IMAGE}:${VERSION}-linux-arm64" --format '{{.Manifest.Digest}}')"
+          if [[ "$amd64" != sha256:* ]]; then
+            echo "::error::could not resolve amd64 platform digest (got: ${amd64})"
+            exit 1
+          fi
+          if [[ "$arm64" != sha256:* ]]; then
+            echo "::error::could not resolve arm64 platform digest (got: ${arm64})"
+            exit 1
+          fi
+          identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/toolbox-release.yml@${GITHUB_REF}"
+          {
+            echo "amd64=${amd64}"
+            echo "arm64=${arm64}"
+            echo "identity=${identity}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Write release manifest
+        env:
+          AMD64: ${{ steps.published.outputs.amd64 }}
+          ARM64: ${{ steps.published.outputs.arm64 }}
+          IDENTITY: ${{ steps.published.outputs.identity }}
+        run: |
+          sbom_sha="$(sha256sum sbom.json | awk '{print $1}')"
+          IFS=',' read -r -a tags <<< "$PUBLISHED_TAGS"
+          tags_json="$(printf '%s\n' "${tags[@]}" | jq -R . | jq -s .)"
+          jq -n \
+            --arg version "$VERSION" \
+            --arg tag "$TAG" \
+            --arg commit "$COMMIT" \
+            --arg source_run "$SOURCE_RUN" \
+            --arg image "$IMAGE" \
+            --arg index_digest "$INDEX_DIGEST" \
+            --arg amd64_digest "$AMD64" \
+            --arg arm64_digest "$ARM64" \
+            --arg sbom_sha "$sbom_sha" \
+            --arg identity "$IDENTITY" \
+            --argjson tags "$tags_json" \
+            '{
+              schema_version: 1,
+              version: $version,
+              tag: $tag,
+              commit: $commit,
+              source_run: $source_run,
+              images: [
+                {
+                  name: $image,
+                  version: $version,
+                  tags: $tags,
+                  index_digest: $index_digest,
+                  platforms: [
+                    { platform: "linux/amd64", digest: $amd64_digest, image: ($image + ":" + $version + "-linux-amd64") },
+                    { platform: "linux/arm64", digest: $arm64_digest, image: ($image + ":" + $version + "-linux-arm64") }
+                  ]
+                }
+              ],
+              sbom: { asset: "sbom.json", type: "spdx-json", sha256: $sbom_sha, attestation: "cosign spdxjson" },
+              signature: { scheme: "cosign keyless (GitHub OIDC)", identity: $identity, issuer: "https://token.actions.githubusercontent.com" }
+            }' > release-manifest.json
+
+      - name: Create or verify GitHub release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          AMD64: ${{ steps.published.outputs.amd64 }}
+          ARM64: ${{ steps.published.outputs.arm64 }}
+          IDENTITY: ${{ steps.published.outputs.identity }}
+        run: |
+          core="${VERSION%%-*}"
+          stable=false
+          if [[ "$VERSION" == "$core" && "$core" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            stable=true
+          fi
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # An existing release must still record the same index digest.
+            # Never silently replace a published full-version image.
+            mkdir -p existing-release
+            if ! gh release download "$TAG" --pattern "release-manifest.json" --dir existing-release; then
+              echo "::error::release $TAG exists but has no release-manifest.json asset; refusing to overwrite"
+              exit 1
+            fi
+            recorded="$(jq -r '.images[0].index_digest' existing-release/release-manifest.json)"
+            if [[ "$recorded" != "$INDEX_DIGEST" ]]; then
+              echo "::error::release $TAG records index digest $recorded but this run published $INDEX_DIGEST"
+              echo "::error::refusing to silently replace the full-version image; delete the release (and re-point the tag) to republish"
+              exit 1
+            fi
+            echo "release $TAG already exists and matches index digest $INDEX_DIGEST; nothing to do"
+            exit 0
+          fi
+
+          IFS=',' read -r -a tags <<< "$PUBLISHED_TAGS"
+          tags_human=""
+          for t in "${tags[@]}"; do
+            tags_human="${tags_human}\`${t#"$IMAGE":}\` "
+          done
+
+          {
+            echo "## krops toolbox ${VERSION}"
+            echo
+            echo "Project release for the \`krops-bootstrap\` CLI (version \`${VERSION}\`) and the"
+            echo "\`krops-toolbox\` container image. The machine-readable artifact inventory is"
+            echo "attached as \`release-manifest.json\`; the SPDX SBOM is attached as \`sbom.json\`."
+            echo
+            echo "### Source"
+            echo "- Tag: \`${TAG}\`"
+            echo "- Commit: \`${COMMIT}\`"
+            echo "- Release run: ${SOURCE_RUN}"
+            echo
+            echo "### Container image"
+            echo "- Registry: \`${IMAGE}\`"
+            echo "- Index digest: \`${INDEX_DIGEST}\`"
+            echo "- Tags: ${tags_human}"
+            echo "- Platforms:"
+            echo "  - linux/amd64: \`${AMD64}\`"
+            echo "  - linux/arm64: \`${ARM64}\`"
+            echo
+            echo "### Pull and run"
+            echo '```sh'
+            echo "docker pull ${IMAGE}:${VERSION}"
+            echo "# or pin by digest:"
+            echo "docker pull ${IMAGE}@${INDEX_DIGEST}"
+            echo '```'
+            echo
+            echo "### Verify signature and SBOM"
+            echo '```sh'
+            echo "cosign verify \\"
+            echo "  --certificate-identity \"${IDENTITY}\" \\"
+            echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com \\"
+            echo "  ${IMAGE}@${INDEX_DIGEST}"
+            echo
+            echo "cosign verify-attestation \\"
+            echo "  --type spdxjson \\"
+            echo "  --certificate-identity \"${IDENTITY}\" \\"
+            echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com \\"
+            echo "  ${IMAGE}@${INDEX_DIGEST}"
+            echo '```'
+            echo
+            echo "A published image is available for use. The release does not imply it has been"
+            echo "deployed to production; promotion is a separate process."
+          } > release-notes.md
+
+          if $stable; then
+            gh release create "$TAG" --title "krops toolbox ${VERSION}" --notes-file release-notes.md --latest
+          else
+            gh release create "$TAG" --title "krops toolbox ${VERSION}" --notes-file release-notes.md --prerelease
+          fi
+
+          gh release upload "$TAG" sbom.json release-manifest.json
+          echo "created release $TAG with sbom.json and release-manifest.json"

@@ -311,6 +311,36 @@ cosign verify-attestation \
   "$IMAGE"
 ```
 
+The identity encodes the ref that produced the image: a tag push
+certifies `@refs/tags/vX.Y.Z`, while a manual dispatch certifies
+`@refs/heads/<branch>`. Derive the identity from the run that produced
+the image; when the ref is unknown, accept both forms with a regexp:
+
+```sh
+cosign verify \
+  --certificate-identity-regexp "https://github\.com/polarsquad/krops/\.github/workflows/toolbox-release\.yml@refs/(tags/vX\.Y\.Z|heads/.+)" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  "$IMAGE"
+```
+
+### Retrying a toolbox release (manual dispatch)
+
+A failed or incomplete release cannot be re-fired by pushing the tag
+again (the tag already exists), so the workflow also accepts
+`workflow_dispatch` with an explicit version:
+
+```sh
+gh workflow run toolbox-release.yml --repo polarsquad/krops --ref main -f version=X.Y.Z
+```
+
+The run builds the dispatched ref, so a fix that landed in a new commit
+is picked up by dispatching on the branch that carries it. The dispatch
+version must still match `bootstrap-rs/Cargo.toml` (the same gate as the
+tag path), and a stable version publishes the same tag set as a tag push
+(`X.Y.Z`, `X.Y`, `latest`). A retry re-publishes the same tags, so
+`X.Y.Z` moves to the new build's digest; pull by digest if you need the
+original image.
+
 ### E2E AWS account
 
 **Designation:** Account `120392301094` was designated on 2026-09-20 ([#239](https://github.com/polarsquad/krops/issues/239)) as the single account for all krops end-to-end testing (live acceptance [#143](https://github.com/polarsquad/krops/issues/143), scheduled e2e [#185](https://github.com/polarsquad/krops/issues/185)). It is a Control Tower-managed Organizations member account.

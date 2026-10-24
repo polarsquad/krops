@@ -201,10 +201,11 @@ def check_release_job(jobs: dict) -> list[str]:
 
     failures = []
     needs = _needs_set(job)
-    if not {"resolve", "sign-attest"}.issubset(needs):
+    if not {"resolve", "merge", "sign-attest"}.issubset(needs):
         failures.append(
-            "release must need resolve and sign-attest so a failed run "
-            f"never advertises a completed release, got {needs!r}"
+            "release must need resolve, merge, and sign-attest: its env "
+            "block reads needs.merge.outputs, which only resolves when "
+            f"merge is a direct dependency, got {needs!r}"
         )
 
     perms = job.get("permissions") or {}

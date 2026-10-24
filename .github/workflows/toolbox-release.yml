@@ -248,7 +248,7 @@ jobs:
   # permission stays contents:read.
   release:
     name: Create GitHub release
-    needs: [resolve, sign-attest]
+    needs: [resolve, merge, sign-attest]
     runs-on: ubuntu-26.04-arm
     timeout-minutes: 15
     permissions:

@@ -22,6 +22,7 @@ airgap/archives/
 airgap/rendered/
 airgap/sbom/
 airgap/config-artifact/
+airgap/dependency-graph.json
 airgap/*.tar.zst
 
 # Hermes agent workspace (local plans, never part of the repo)

@@ -7,11 +7,16 @@ up. Three checks:
 1. The five Deployments (WireMock, CAPA, the three ACK controllers) are
    Available while intercepted.
 2. Interception proof: at least MIN_GET_CALLER_IDENTITY STS
-   GetCallerIdentity POSTs arrived at WireMock (one per ACK controller).
-   Without this check, a silently unpatched controller talking to real
-   AWS would look identical. CAPA is expected to make zero AWS calls at
-   boot with no CRs (the spike observed EC2 calls only under an
-   AWSCluster reconcile), so only the ACK controllers are asserted.
+   GetCallerIdentity POSTs arrived at WireMock. ACK S3 (chart 1.11.0, the
+   repo pin) calls STS GetCallerIdentity at startup and treats failure as
+   fatal (Phase 0 spike, docs/wiremock-e2e-spike-findings-aws.md); the
+   availability check above already requires S3 to be Available, so that
+   call has landed - and with the endpoint override in effect it can only
+   have landed at WireMock. RDS, IAM, and CAPA make no AWS calls at boot
+   with no CRs (the spike observed CAPA EC2 calls only under an AWSCluster
+   reconcile), so one arrival is the correct lower bound; per-controller
+   proof is Phase 2/3. Without this check, a silently unpatched S3
+   controller would crash loop on real STS instead of booting.
 3. Zero unmatched requests with an empty allow-list: every call matched a
    stub. If a boot-time call shows up as unmatched, extend
    virtualized-e2e/aws/wiremock/stubs-configmap.yaml - do NOT open the
@@ -47,7 +52,11 @@ DEPLOYMENTS = [
     ("ack-system", "ack-rds-controller-rds-chart"),
     ("ack-system", "ack-iam-controller-iam-chart"),
 ]
-MIN_GET_CALLER_IDENTITY = 3
+# One arrival is the boot-scope lower bound: ACK S3 is the only controller
+# that probes STS GetCallerIdentity at startup (spike), and the availability
+# check above guarantees its call has landed. RDS/IAM/CAPA stay silent at
+# boot with no CRs, so 3 (one per ACK controller) was an over-assertion.
+MIN_GET_CALLER_IDENTITY = 1
 ADMIN_PORT = 18443
 
 
@@ -95,14 +104,23 @@ def admin_get(path: str, ca_cert: Path):
 
 
 def count_get_caller_identity(journal: dict) -> int:
-    """Count STS GetCallerIdentity POSTs in the request journal."""
-    return sum(
-        1
-        for entry in journal.get("requests", [])
-        if entry.get("method") == "POST"
-        and entry.get("url") == "/"
-        and "Action=GetCallerIdentity" in (entry.get("body") or "")
-    )
+    """Count STS GetCallerIdentity POSTs in the full request journal.
+
+    WireMock 3.x's /__admin/requests entries nest the request under an
+    entry["request"] object (the /__admin/requests/unmatched endpoint is
+    flat, but the full journal is not), so method/url/body live one level
+    down. Verified against wiremock/wiremock:3.13.2-2.
+    """
+    total = 0
+    for entry in journal.get("requests", []):
+        request = entry.get("request") or {}
+        if (
+            request.get("method") == "POST"
+            and request.get("url") == "/"
+            and "Action=GetCallerIdentity" in (request.get("body") or "")
+        ):
+            total += 1
+    return total
 
 
 def main() -> int:

@@ -438,6 +438,13 @@ ConfigMap values via `postBuild.substituteFrom` to apply them to:
 - **ACK-managed resources**: S3 Bucket, RDS DBInstance, IAM Role, and IAM User
   CRs apply tags directly in their specs.
 
+The four Kustomizations that substitute these tags set
+`postBuild.substituteStrategy: Always`, so that when the `krops-run`
+ConfigMap is absent the `:=` fallback of each placeholder is rendered;
+with the default `WithVariables` strategy Flux skips substitution when
+no variable is defined and the literal placeholder text is applied as
+the tag value (#505).
+
 **Not tagged:**
 - CloudFormation stacks backing CAPA (account-global, persistent); would need
   stack-level parameters outside the current scope.

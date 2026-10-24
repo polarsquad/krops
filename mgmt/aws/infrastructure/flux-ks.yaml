@@ -106,6 +106,10 @@ spec:
     name: flux-system
   path: ./mgmt/aws/infrastructure/workload-resources
   postBuild:
+    # Always: with the default strategy, an absent krops-run ConfigMap yields no
+    # variables and Flux skips substitution, leaving the literal
+    # ${KROPS_*:=default} text in the tag values (IAM rejects '$', '{', '}').
+    substituteStrategy: Always
     substituteFrom:
       - kind: ConfigMap
         name: krops-run
@@ -129,6 +133,10 @@ spec:
     name: flux-system
   path: ./mgmt/aws/infrastructure/aws-global-iam
   postBuild:
+    # Always: with the default strategy, an absent krops-run ConfigMap yields no
+    # variables and Flux skips substitution, leaving the literal
+    # ${KROPS_*:=default} text in the tag values (IAM rejects '$', '{', '}').
+    substituteStrategy: Always
     substituteFrom:
       - kind: ConfigMap
         name: krops-run

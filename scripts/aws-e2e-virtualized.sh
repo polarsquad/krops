@@ -97,8 +97,18 @@ openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 2 \
   -keyout "$CERTS/ca.key" -out "$CERTS/ca.crt" \
   -subj "/CN=krops-virtualized-e2e-ca"
 
+# One password, three consumers: a JKS key entry has a single protection
+# password, and each consumer can only be satisfied when all are equal
+# (both failure modes verified against the pinned image):
+#   - keytool -certreq unlocks the entry with the STORE password (it has
+#     no -keypass option); keypass != storepass makes it prompt for the
+#     key password and die non-interactively with
+#     "Too many failures - try later".
+#   - WireMock's KeyManagerFactory unlocks the entry with
+#     --key-manager-password; keypass != key-manager-password crashes the
+#     pod at boot with UnrecoverableKeyException (Phase 0 spike finding).
 KEYSTORE_PASSWORD="$(openssl rand -hex 16)"
-KEY_MANAGER_PASSWORD="$(openssl rand -hex 16)"
+KEY_MANAGER_PASSWORD="$KEYSTORE_PASSWORD"
 
 # keytool runs inside the pinned WireMock image (see WIREMOCK_IMAGE note).
 keytool() {
@@ -107,14 +117,12 @@ keytool() {
 }
 
 # Server key lives inside the JKS from the start: genkeypair, certreq,
-# CA sign, import chain (Phase 0 finding). The key entry password must be
-# the KEY MANAGER password: WireMock loads the keystore with
-# --keystore-password but unlocks the key entry with
-# --key-manager-password, so a mismatch crashes the pod with
-# UnrecoverableKeyException (spike finding).
+# CA sign, import chain (Phase 0 finding). -keypass equals the store
+# password (and thus the key manager password): see the password block
+# above for why the three must be one value.
 keytool -genkeypair -alias wiremock -keyalg RSA -keysize 2048 \
   -sigalg SHA256withRSA -storetype JKS -keystore wiremock.jks \
-  -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_MANAGER_PASSWORD" \
+  -storepass "$KEYSTORE_PASSWORD" -keypass "$KEYSTORE_PASSWORD" \
   -validity 2 -dname "CN=wiremock.${WIREMOCK_NAMESPACE}.svc"
 keytool -certreq -alias wiremock -keystore wiremock.jks \
   -storepass "$KEYSTORE_PASSWORD" -file server.csr

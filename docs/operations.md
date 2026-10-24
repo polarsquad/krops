@@ -18,7 +18,9 @@ The host needs the repository checkout and a running Docker engine or Podman
 The toolbox image is published to `ghcr.io/polarsquad/krops-toolbox` for
 Linux amd64 and arm64 as `X.Y.Z`, `X.Y`, and stable `latest`, signed with
 GitHub OIDC and carrying a Syft SPDX JSON SBOM attestation. The
-`toolbox-release` workflow publishes those tags from a matching `v*` tag.
+`toolbox-release` workflow publishes those tags from a matching `v*` tag and
+creates the project's GitHub release (SBOM plus a machine-readable artifact
+inventory as durable assets); see [Publishing a toolbox release](#publishing-a-toolbox-release).
 Use a published tag, or build the current checkout only for unreleased
 changes:
 
@@ -289,6 +291,54 @@ Note: `mise settings add ignored_config_paths <path>` is rejected on current
 mise; that setting must be written to `~/.config/mise/miserc.toml` or set via the env var, not via the CLI.
 Ignoring the checkout also disables `validate` and `podinfo-port-forward` from
 within it.
+
+### Publishing a toolbox release
+
+The project release is the single versioned record for the `krops-bootstrap`
+CLI and the `krops-toolbox` container image: one `X.Y.Z` appears in
+`bootstrap-rs/Cargo.toml`, the Git tag (`vX.Y.Z`), the image tags, and the
+GitHub release (`vX.Y.Z`).
+
+**Version bump.** Edit the `version` field in `bootstrap-rs/Cargo.toml` and
+update the matching entry in `bootstrap-rs/Cargo.lock` in the same commit
+(`cd bootstrap-rs && cargo update -p krops-bootstrap`). The manifest and
+lock must ship together, or the tag's `--locked` builds fail (the first
+`v0.3.0` tag had to be re-pointed for exactly this).
+
+**Trigger.** Tag creation stays manual; the workflow consumes an existing
+tag:
+
+```sh
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+A failed or incomplete release is re-fired with `workflow_dispatch` on the
+ref that carries the fix, without moving the tag (see
+[Retrying a toolbox release](#retrying-a-toolbox-release-manual-dispatch)).
+
+**Stable vs prerelease.** A stable `X.Y.Z` publishes the image tags `X.Y.Z`,
+`X.Y`, and `latest`, and the GitHub release is marked as the repository's
+latest release. A suffixed version (for example `0.4.0-rc.1`) publishes
+`X.Y.Z` and `X.Y` only, leaves `latest` untouched, and the GitHub release is
+marked prerelease. A published image is available for use; the release does
+not claim it is deployed to production unless a separate promotion process
+establishes that.
+
+**What the release carries.** The workflow creates the GitHub release only
+after the image is built, published, signed, and SBOM-attested; a failed run
+never advertises a completed release. The release notes list every published
+artifact with its version, registry location, and immutable digest, and two
+durable assets attach to the release: `release-manifest.json`, the
+extensible machine-readable inventory (source tag, commit, release run,
+per-platform digests, SBOM checksum, signing identity), and `sbom.json`,
+the SPDX SBOM. Future assets (native CLI binaries, archives, offline
+bundles) join that manifest under the same release. Re-running the release
+for an existing version verifies that the published index still matches the
+digest the release records and aborts on mismatch, so an existing
+full-version release is never silently re-pointed. Pull by digest
+([Verifying a toolbox release](#verifying-a-toolbox-release)) when the
+original image must be retained.
 
 ### Verifying a toolbox release
 

@@ -55,6 +55,9 @@ cleanup() {
   if [ "$KROPS_E2E_KEEP" = "1" ]; then
     echo "KROPS_E2E_KEEP=1: leaving kind cluster '$KROPS_E2E_KIND_CLUSTER' and workdir $WORK"
   else
+    if [ "$status" -ne 0 ]; then
+      debug_dump
+    fi
     kind delete cluster --name "$KROPS_E2E_KIND_CLUSTER" || true
     rm -rf "$WORK"
   fi
@@ -63,6 +66,21 @@ cleanup() {
 trap cleanup EXIT
 
 log() { echo "==> $*"; }
+
+debug_dump() {
+  # Failure diagnostics before teardown: pod states plus the tail of every
+  # log in the harness namespaces.
+  echo "==> failure diagnostics (cluster teardown follows)"
+  kubectl get pods -A -o wide 2>/dev/null || true
+  local ns pod
+  for ns in wiremock-system capa-system ack-system; do
+    for pod in $(kubectl get pods -n "$ns" \
+      -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+      echo "---- logs: ${ns}/${pod}"
+      kubectl logs -n "$ns" "$pod" --tail=50 --all-containers 2>/dev/null || true
+    done
+  done
+}
 
 log "step 1/8: kind cluster '$KROPS_E2E_KIND_CLUSTER'"
 KIND_NODE_IMAGE="$(python3 - <<'EOF'
@@ -89,10 +107,14 @@ keytool() {
 }
 
 # Server key lives inside the JKS from the start: genkeypair, certreq,
-# CA sign, import chain (Phase 0 finding).
+# CA sign, import chain (Phase 0 finding). The key entry password must be
+# the KEY MANAGER password: WireMock loads the keystore with
+# --keystore-password but unlocks the key entry with
+# --key-manager-password, so a mismatch crashes the pod with
+# UnrecoverableKeyException (spike finding).
 keytool -genkeypair -alias wiremock -keyalg RSA -keysize 2048 \
   -sigalg SHA256withRSA -storetype JKS -keystore wiremock.jks \
-  -storepass "$KEYSTORE_PASSWORD" -keypass "$KEYSTORE_PASSWORD" \
+  -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_MANAGER_PASSWORD" \
   -validity 2 -dname "CN=wiremock.${WIREMOCK_NAMESPACE}.svc"
 keytool -certreq -alias wiremock -keystore wiremock.jks \
   -storepass "$KEYSTORE_PASSWORD" -file server.csr

@@ -153,7 +153,7 @@ flowchart TD
 
 Enforced with Flux `dependsOn`:
 
-```
+```text
 cert-manager ▶ capi-operator ▶ capi-system ▶ capa-system ▶ clusters (eu-north-1, eu-west-1)
                             │                            └▶ caaph-system ▶ flux-apps
                             └▶ capa-identity ▶ aws-managed-clusters
@@ -187,7 +187,7 @@ write-back, UI access): [PR review: konflate](./konflate.md).
 
 ### Reconciliation order (AWS workload clusters)
 
-```
+```text
 (empty: workload/base reconciles nothing since issue #346; the per-cluster
 Flux instance stays installed, ready for a future application workload)
 ```
@@ -306,7 +306,7 @@ flowchart TD
 
 ### Reconciliation order (Azure management cluster)
 
-```
+```text
 cert-manager ▶ capi-operator ▶ capi-system ▶ capz-system (bundled ASO)
                                            ├▶ azure-identity ▶ aso-workload-identity ▶ workload-resources
                                            ├▶ clusters (swedencentral)
@@ -315,7 +315,7 @@ cert-manager ▶ capi-operator ▶ capi-system ▶ capz-system (bundled ASO)
 
 ### Reconciliation order (Azure workload cluster)
 
-```
+```text
 cert-manager (the Azure resources moved to the management cluster in issue #559)
 ```
 
@@ -411,7 +411,7 @@ flowchart TD
 
 ### Reconciliation order (GCP management cluster)
 
-```
+```text
 gcp-vars ▶ cert-manager ▶ capi-operator ▶ capi-system ▶ capg-system (GCPManaged* CRDs)
                                                         ├▶ caaph-system ▶ flux-apps
 gcp-vars ▶ kcc-operator (StatefulSet Ready) ▶ kcc (cnrm-system) ▶ kcc-identity (krops pool, mgmt provider)
@@ -420,7 +420,7 @@ europe-north1 clusters (dependsOn: capg-system, gcp-vars)
 
 ### Reconciliation order (GCP workload cluster)
 
-```
+```text
 Flux only. The gcp-base root is intentionally empty (issue #560): the
 workload cloud resources reconcile on the management cluster - see the
 management-cluster chain above, where workload-resources depends on
@@ -492,13 +492,15 @@ flowchart TD
 ### Reconciliation order (local-host)
 
 Management cluster:
-```
+
+```text
 cert-manager ▶ capi-operator ▶ capi-system ▶ capd-system ▶ clusters (local-management, local-workload)
                             │                            └▶ caaph-system ▶ cni ▶ flux-apps
 ```
 
 Workload cluster:
-```
+
+```text
 podinfo (HelmRelease reconciled by local workload Flux from OCI artifact)
 ```
 
@@ -574,7 +576,7 @@ flowchart TD
 
 ### Reconciliation order (local-talos)
 
-```
+```text
 cert-manager ▶ capi-operator ▶ capi-system ▶ capt-system (Tinkerbell CAPT) ──┐
                                            ├▶ cabpt-system (Talos bootstrap) ─┼▶ clusters/management (talos-mgmt-01)
                                            └▶ cacppt-system (Talos CP) ───────┘
@@ -636,7 +638,7 @@ reconciles.
 
 ## Repository layout
 
-```
+```text
 .
 ├── .github/workflows/             Validation, Rust/toolbox CI, docs CI and
 │                                  Pages deploy, the konflate PR render gate,

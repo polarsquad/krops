@@ -147,7 +147,7 @@ See [Teardown](./operations.md#teardown) for the controls.
 
 Management cluster (`mgmt/aws/`):
 
-```
+```text
 cert-manager > capi-operator > capi-system > capa-system > clusters (eu-north-1, eu-west-1)
                                      + caaph-system > flux-apps
 ack-controllers > workload-resources
@@ -157,7 +157,7 @@ konflate (no dependencies)
 
 Workload clusters (`workload/<region>-01/`):
 
-```
+```text
 (empty: workload/base reconciles nothing since issue #346; the per-cluster
 Flux instance stays installed, ready for a future application workload)
 ```

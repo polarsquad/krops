@@ -49,7 +49,7 @@ The operator resolves the well-known provider names (`aws`, `azure`, `gcp`,
 `talos`, `k0sproject-k0smotron`) from the same built-in registry `clusterctl` uses, so
 a provider is just a typed CR with a pinned version:
 
-```
+```text
 mgmt/aws/capi-providers/<name>-system/
   namespace.yaml
   kustomization.yaml        # lists namespace.yaml + providers.yaml (+ secrets)
@@ -87,7 +87,9 @@ CAPA is the provider this repo already runs; use it as the template:
 
 ### Azure (CAPZ)
 
-CAPZ v1.27.0 speaks the v1beta1 contract (accepted by CAPI v1.14 until the v1beta1 removal) and bundles Azure Service Operator (ASO) v2.19.0, which backs the managed-AKS path.
+CAPZ v1.27.0 speaks the v1beta1 contract (accepted by CAPI v1.14 until the
+v1beta1 removal) and bundles Azure Service Operator (ASO) v2.19.0, which
+backs the managed-AKS path.
 
 The `azure` environment is the worked example: `mgmt/azure/` (see
 [azure.md](./azure.md)). Reuse it rather than adding CAPZ to `mgmt/aws/`:

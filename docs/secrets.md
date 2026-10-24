@@ -154,7 +154,6 @@ Keep the two tokens separate: the read token (`KONFLATE_TOKEN`) should carry
 no write scope, and the write token is used only for konflate's write-back
 (the PR summary comment and the `Konflate` commit status).
 
-
 ## Age-key compromise recovery
 
 Treat every value decryptable by the compromised identity as exposed, including

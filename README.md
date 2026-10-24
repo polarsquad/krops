@@ -180,7 +180,7 @@ deployment:
 
 ## Repository layout
 
-```
+```text
 .
 ├── mgmt/<env>/                Reconciled by the MANAGEMENT cluster's Flux
 │   ├── infrastructure/        Platform components and cloud-resource controllers
@@ -206,6 +206,7 @@ walkthroughs of the tree structure.
 ## Validation
 
 Every change is verified by local checks (`mise run validate`) and continuous integration:
+
 - Shell scripts and configuration files are syntax-checked.
 - Manifests in `bootstrap.toml` are cross-referenced against Git files.
 - Every Kustomize target under `mgmt/` and `workload/` is built.

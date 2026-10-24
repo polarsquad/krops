@@ -11,6 +11,10 @@ flux2 = "2.9.6"
 sops = "3.13.3"
 age = "1.3.2"
 uv = "0.13.3"
+# Markdown linting (#243): node hosts markdownlint-cli2. Keep the node pin
+# aligned with the setup-node pin in .github/workflows/validate.yml.
+node = "24.22.0"
+"npm:markdownlint-cli2" = "0.24.0"
 
 # Zarf CLI (airgap prototype). See docs/dependencies.md's "Intentional
 # differences" for why version/asset_pattern are written this way.
@@ -387,3 +391,11 @@ run = "uv run mkdocs build --strict"
 description = "Assemble and serve the docs site with live reload"
 depends = ["docs-assemble"]
 run = "uv run mkdocs serve"
+
+[tasks.markdown-lint]
+description = "Lint tracked Markdown files with markdownlint-cli2 (config: .markdownlint-cli2.jsonc)"
+run = "markdownlint-cli2 '**/*.md'"
+
+[tasks.markdown-lint-fix]
+description = "Auto-fix mechanical Markdown lint violations (usage: mise run markdown-lint-fix)"
+run = "markdownlint-cli2 --fix '**/*.md'"

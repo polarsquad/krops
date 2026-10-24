@@ -118,7 +118,7 @@ The `AWSCluster` reconcile called EC2 `DescribeVpcs` against WireMock within
 seconds of the CR landing. The controller logged the expected unmatched-stub
 error (WireMock 404 surfaced by the SDK as `UnknownError`):
 
-```
+```text
 failed to describe VPC resources by name: failed to query ec2 for VPCs by name
 "spike-vpc": operation error EC2: DescribeVpcs, https response error StatusCode: 404
 ```
@@ -155,7 +155,7 @@ were set as well but not separately required for EC2.
 Caveat 1, startup STS dependency. Before patching, the controller crash
 looped at boot:
 
-```
+```text
 Unable to create controller manager ... unable to get caller identity:
 operation error STS: GetCallerIdentity, https response error StatusCode: 403,
 api error InvalidClientTokenId: The security token included in the request is invalid.
@@ -172,7 +172,7 @@ controller booted cleanly and started its Bucket workers.
 Caveat 2, S3 virtual-hosted addressing. Bucket-less operations (`ListBuckets`)
 went straight to the override host and arrived immediately:
 
-```
+```text
 GET https://wiremock.wiremock-system.svc/?x-id=ListBuckets
 user-agent: aws-controllers-k8s/s3.services.k8s.aws-1.11.0 ... api/s3#1.97.3
 authorization: AWS4-HMAC-SHA256 Credential=AKIAIO...MPLE/.../eu-north-1/s3/aws4_request
@@ -189,7 +189,7 @@ real AWS hostnames:
    `template` stanza resolving `*.<wiremock service FQDN>` to the Service
    ClusterIP:
 
-   ```
+   ```text
    template IN A wiremock-system.svc.cluster.local {
        match .*\.wiremock\.wiremock-system\.svc\.cluster\.local\.
        answer "{{ .Name }} 60 IN A <wiremock ClusterIP>"

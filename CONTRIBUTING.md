@@ -185,6 +185,7 @@ Run the checks that match what you touched. CI runs all of them.
 |---|---|
 | Anything | `mise run validate` (shell syntax, air-gap digest gate, `bootstrap.toml` cross-check, every kustomize overlay) |
 | `README.md` or `docs/` | `mise run docs-build` (assembles `build/docs/` and runs the strict MkDocs build that CI gates on) |
+| Any Markdown file | `mise run markdown-lint` (`mise run markdown-lint-fix` for mechanical fixes); the shared rules live in `.markdownlint-cli2.jsonc` |
 | `tools/assemble_docs.py` | `mise run docs-test`, then `mise run docs-build` |
 | `mgmt/` or `workload/` YAML | `yamllint` with the CI settings (line length and document start disabled, `*.sops.yaml` ignored) |
 | `bootstrap-rs/` | `cargo fmt --check`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo build --locked`, `cargo test --locked` |
@@ -204,6 +205,8 @@ Run the checks that match what you touched. CI runs all of them.
   - `bootstrap-rs`: fmt, clippy, build, test for the Rust CLI.
   - `docs`: assembles the MkDocs site and fails on broken links or missing
     nav pages.
+  - `markdown-lint`: markdownlint-cli2 over the tracked Markdown files with
+    the shared rules in `.markdownlint-cli2.jsonc`.
   - `konflate`: the PR rendered as a Flux diff (blast radius, image changes,
     render failures), posted as a PR comment and required for merge. This
     job is skipped for pull requests from forks because it would run

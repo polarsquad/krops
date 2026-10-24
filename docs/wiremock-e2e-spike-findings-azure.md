@@ -114,7 +114,7 @@ what the spike needed to prove.
 With a custom `AZURE_AUTHORITY_HOST`, token acquisition first failed
 against REAL Azure without anything reaching WireMock:
 
-```
+```text
 ClientSecretCredential authentication failed.
 GET https://login.microsoftonline.com/common/discovery/instance
 RESPONSE 400: "error": "invalid_instance",
@@ -181,7 +181,7 @@ controller's switch in `azure/scope/clients.go`
 Creating an `AzureCluster` with `azureEnvironment: AzureStackCloud`
 produced:
 
-```
+```text
 failed to create scope: failed to configure azure settings and credentials
 for Identity: invalid cloud environment name ""
 ```
@@ -205,7 +205,7 @@ Empirical confirmation: patched the capz-controller-manager with
 (DNS rewrite OFF) and let the `AzureCluster` reconcile. CAPZ called REAL
 AAD with the dummy tenant:
 
-```
+```text
 failed to get availability zones: failed to get zones for location
 swedencentral: failed to refresh resource sku cache: could not iterate
 resource skus: ClientSecretCredential authentication failed.
@@ -222,7 +222,7 @@ the earlier test). Both env vars are ignored.
 
 Corefile additions (exact-name rewrites, real hostnames only):
 
-```
+```text
 rewrite name exact login.microsoftonline.com wiremock.wiremock-system.svc.cluster.local.
 rewrite name exact management.azure.com wiremock.wiremock-system.svc.cluster.local.
 ```
@@ -232,7 +232,7 @@ With the WireMock server certificate carrying the real hostnames as SANs
 stubs from the ASO section in place, CAPZ's full reconcile arrived at
 WireMock:
 
-```
+```text
 GET  /common/discovery/instance
 GET  /11111111-1111-1111-1111-111111111111/v2.0/.well-known/openid-configuration
 POST /11111111-1111-1111-1111-111111111111/oauth2/v2.0/token
@@ -279,7 +279,7 @@ by both CAPZ and ASO in principle. In practice WireMock 3.13.2 cannot
 terminate a CONNECT tunnel. From a test pod with
 `HTTPS_PROXY=http://wiremock.wiremock-system.svc:8080`:
 
-```
+```text
 > CONNECT management.azure.com:443 HTTP/1.1
 < HTTP/1.1 200 OK
 * CONNECT tunnel established, response 200

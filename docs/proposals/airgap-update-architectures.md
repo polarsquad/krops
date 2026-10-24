@@ -118,6 +118,7 @@ stored in them are rebuilt from the config artifact.
 ## How B is implemented in this repo
 
 What already exists:
+
 - `stage-and-create-cluster.sh` takes `CLUSTER_NAME`, `REGISTRY_NAME`, and
   `REGISTRY_PORT` (the rehearsal isolation knobs) from the environment, so a
   second kind cluster and registry can be built beside the first.
@@ -130,6 +131,7 @@ What already exists:
 - Staging and verification logic (signature, checksums, SBOM) carries over unchanged.
 
 What is new:
+
 - A slot model: names for blue and green (for example `airgap-mgmt-a` and
   `airgap-mgmt-b`, distinct registry ports, distinct workload names, since the
   CAPD workload nodes are Docker containers and names collide).
@@ -163,7 +165,7 @@ explicit statement that U2 restore is best-effort.
 State machine persisted in the state dir, one journal entry per transition, so
 any crash resumes or cleans up deterministically:
 
-```
+```text
 STAGED -> VERIFIED -> PROVISIONING(green) -> HEALTHY(green)
        -> SWITCHED (active=green) -> SOAKING -> RETIRED(blue)
    any failure before SWITCHED: DESTROY(green), active stays blue
@@ -186,6 +188,7 @@ recorded phase.
 ## Outages and interruptions
 
 Two planes matter, and they fail independently in this repo:
+
 - **Management cluster** (the kind cluster running CAPI, CAPD, Flux, cert-manager
   and the Zarf registry): the control plane. If it is down, nothing can be
   created, changed, scaled, or self-healed, and its Flux stops syncing.
@@ -203,10 +206,16 @@ Each cell says what is interrupted and when.
 | **C: recreate** | Down for the whole window: teardown, rebuild, health gates. On failure, down for a second rebuild as well. | Depends on teardown. If the workload clusters are deleted or rebuilt (S2 behavior), they are down for the full window. If their Docker containers survive the management teardown, they keep serving but are unmanaged and may conflict by name with the rebuilt ones. Which happens must be verified before this option is chosen. | Everything that needs the control plane, for the full window. |
 
 By failure case:
+
 - **U1 (bad package):** no outage in any option.
-- **U2 and U3 (deploy fails or unhealthy):** A: management degraded until restore. B: no outage, green is discarded. C: management outage extended by a second rebuild.
-- **U4 (process dies):** A: management may be left degraded. B: no outage before the switch. C: management is down until the next run rebuilds.
-- **U5 (regression later):** A: another in-place change, same blips as an update. B: near-instant switch back during the soak window, then a rebuild after blue is retired. C: a full rebuild outage.
+- **U2 and U3 (deploy fails or unhealthy):** A: management degraded until
+  restore. B: no outage, green is discarded. C: management outage extended
+  by a second rebuild.
+- **U4 (process dies):** A: management may be left degraded. B: no outage
+  before the switch. C: management is down until the next run rebuilds.
+- **U5 (regression later):** A: another in-place change, same blips as an
+  update. B: near-instant switch back during the soak window, then a
+  rebuild after blue is retired. C: a full rebuild outage.
 
 Unverified assumptions to test before choosing: whether CAPD workload
 containers survive deletion of the management kind cluster, and whether the
@@ -216,6 +225,7 @@ replacement.
 ## Prior art (checked September 2026)
 
 Cluster API (CAPI, the base of CAPA and the other providers):
+
 - Workload clusters are upgraded by replacement, not modification: control
   plane first, then workers, via rolling updates honoring `MaxSurge` and
   `MaxUnavailable`; Kubernetes minors must be taken in sequence. The upgrade
@@ -236,6 +246,7 @@ Cluster API (CAPI, the base of CAPA and the other providers):
   ([clusterctl move](https://cluster-api.sigs.k8s.io/clusterctl/commands/move))
 
 Zarf:
+
 - Upgrading a package means building and deploying the newer package over the
   existing deployment; Zarf does a rolling Helm-based update. Upgrading Zarf
   itself means re-running init with a matching init package. The upgrade
@@ -250,6 +261,7 @@ Zarf:
   ([zarf#2455](https://github.com/zarf-dev/zarf/issues/2455))
 
 What this means here:
+
 - Neither project publishes an offline rollback recipe. The rollback design is
   ours; the ecosystem only supplies the building blocks.
 - CAPI's own upgrade philosophy is replacement, which matches B and C for the

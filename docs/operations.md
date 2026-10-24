@@ -343,11 +343,20 @@ original image.
 
 ### E2E AWS account
 
-**Designation:** Account `120392301094` was designated on 2026-09-20 ([#239](https://github.com/polarsquad/krops/issues/239)) as the single account for all krops end-to-end testing (live acceptance [#143](https://github.com/polarsquad/krops/issues/143), scheduled e2e [#185](https://github.com/polarsquad/krops/issues/185)). It is a Control Tower-managed Organizations member account.
+**Designation:** Account `120392301094` was designated on 2026-09-20
+([#239](https://github.com/polarsquad/krops/issues/239)) as the single
+account for all krops end-to-end testing (live acceptance
+[#143](https://github.com/polarsquad/krops/issues/143), scheduled e2e
+[#185](https://github.com/polarsquad/krops/issues/185)). It is a Control
+Tower-managed Organizations member account.
 
-**Owner and escalation contact:** joseph.shriner@polarsquad.com
+**Owner and escalation contact:** <joseph.shriner@polarsquad.com>
 
-**Shared sandbox warning:** This is a shared account with non-krops resources (training EKS clusters, Terraform VPCs, workshop buckets). Every krops tool filters on `default_*`, `krops-*`, and CAPA ownership tags. Do not run account-wide cleanup commands; use the [teardown](#teardown) path which scopes deletions to krops-owned resources.
+**Shared sandbox warning:** This is a shared account with non-krops
+resources (training EKS clusters, Terraform VPCs, workshop buckets).
+Every krops tool filters on `default_*`, `krops-*`, and CAPA ownership
+tags. Do not run account-wide cleanup commands; use the
+[teardown](#teardown) path which scopes deletions to krops-owned resources.
 
 **Runbook index:**
 
@@ -364,14 +373,20 @@ original image.
 **When a budget alert fires:**
 
 1. Check for live krops clusters:
+
    ```sh
    aws eks list-clusters --region eu-north-1
    aws eks list-clusters --region eu-west-1
    ```
-2. Distinguish krops spend from other shared-account spend with the [Krops-scoped cost view](#krops-scoped-cost-view) (a Cost Explorer tag filter on `krops.io/run-kind`). Until the cost-allocation tags are activated, group by service in the Cost Explorer console.
+
+2. Distinguish krops spend from other shared-account spend with the
+   [Krops-scoped cost view](#krops-scoped-cost-view) (a Cost Explorer tag
+   filter on `krops.io/run-kind`). Until the cost-allocation tags are
+   activated, group by service in the Cost Explorer console.
 3. If the spend is from leftover krops resources, clean them up through the [teardown](#teardown) path.
-4. If the spend is from non-krops resources, escalate to the account owner (joseph.shriner@polarsquad.com).
-5. To adjust the ceiling, update the budget in the AWS Budgets console and update the budget paragraph in `docs/operations.md` in the same PR.
+4. If the spend is from non-krops resources, escalate to the account owner (<joseph.shriner@polarsquad.com>).
+5. To adjust the ceiling, update the budget in the AWS Budgets console and
+   update the budget paragraph in `docs/operations.md` in the same PR.
 
 ### AWS service quotas (common first-run blockers)
 
@@ -380,7 +395,10 @@ original image.
 | EC2-VPC Elastic IPs (per region) | `L-0263D0A3` | ≥ 6 free in `eu-north-1`, ≥ 3 free in `eu-west-1` | One EIP per NAT gateway (3 AZs): two clusters in `eu-north-1` (management + workload), one in `eu-west-1` |
 | VPCs per region | `L-F678F1CE` | ≥ 2 free in `eu-north-1`, ≥ 1 free in `eu-west-1` | One VPC per cluster: two clusters in a full run in `eu-north-1`, one cluster in `eu-west-1`. In e2e account 120392301094, as of 2026-09-20 (#382), the `eu-north-1` total quota was 8 (5 in use, 3 free) and the `eu-west-1` total quota was 5 (3 in use, 2 free). This is a dated snapshot, not guaranteed headroom; usage in the shared account drifts, so re-check it before every run. |
 
-Both quotas default to 5 per region. The EIP quota stalls the run mid-way through the second `eu-north-1` cluster (6 EIPs needed); insufficient free VPC capacity fails the run at VPC creation. Before every run, query the configured quota and current usage for both resources in both target regions:
+Both quotas default to 5 per region. The EIP quota stalls the run mid-way
+through the second `eu-north-1` cluster (6 EIPs needed); insufficient free
+VPC capacity fails the run at VPC creation. Before every run, query the
+configured quota and current usage for both resources in both target regions:
 
 ```sh
 for region in eu-north-1 eu-west-1; do
@@ -406,9 +424,16 @@ for region in eu-north-1 eu-west-1; do
 done
 ```
 
-Subtract usage from the configured quota to calculate free capacity. EIPs require at least 6 free in `eu-north-1` and 3 free in `eu-west-1`; request an increase in each region where that capacity is unavailable. VPCs require at least 2 free in `eu-north-1` and 1 free in `eu-west-1`; request a VPC increase only in a region where its required free capacity is unavailable.
+Subtract usage from the configured quota to calculate free capacity. EIPs
+require at least 6 free in `eu-north-1` and 3 free in `eu-west-1`; request
+an increase in each region where that capacity is unavailable. VPCs require
+at least 2 free in `eu-north-1` and 1 free in `eu-west-1`; request a VPC
+increase only in a region where its required free capacity is unavailable.
 
-For quota-increase requests, `--desired-value` is the new **total regional quota**, not the amount of additional capacity. Set it to at least the current usage plus the required free slots. To increase the Elastic IP quota where needed:
+For quota-increase requests, `--desired-value` is the new **total regional
+quota**, not the amount of additional capacity. Set it to at least the
+current usage plus the required free slots. To increase the Elastic IP quota
+where needed:
 
 ```sh
 region=eu-north-1 # Set the region that lacks the required free capacity.
@@ -438,7 +463,7 @@ The e2e AWS account 120392301094 carries a monthly cost budget
 `krops-e2e-monthly` with a $200 ceiling. Notifications publish to the SNS
 topic `krops-e2e-budget-alerts` (us-east-1) at 80% forecasted and 100%
 actual spend. The escalation path for budget alerts is the topic's email
-subscriber joseph.shriner@polarsquad.com.
+subscriber <joseph.shriner@polarsquad.com>.
 
 An email subscription only activates after the SNS confirmation email is
 accepted, and SNS auto-deletes unconfirmed email subscriptions after 48
@@ -539,6 +564,7 @@ no variable is defined and the literal placeholder text is applied as
 the tag value (#505).
 
 **Not tagged:**
+
 - CloudFormation stacks backing CAPA (account-global, persistent); would need
   stack-level parameters outside the current scope.
 - kind bootstrap cluster (ephemeral, purely local); lifecycle tags are
@@ -598,6 +624,7 @@ the `KROPS_OCI_GIT_SHA` checkout SHA the toolbox wrapper forwards, then
 #### Lookup and cleanup
 
 Find resources by run-id:
+
 ```sh
 aws resourcegroupstaggingapi get-resources --region <region> \
   --tag-filters Key=krops.io/run-id,Values=<run-id>
@@ -790,6 +817,7 @@ after the pivot with the persisted `.kube/krops-mgmt.yaml` and
 for the full management plane (`allowSchedulingOnControlPlanes`).
 
 **OCI Registry (local-host environment only):**
+
 - Provides a local container registry for development workflows
 - Enables developers to build and push OCI artifacts from git checkouts
 - Flux syncs and deploys the OCI artifact without external dependencies
@@ -808,6 +836,7 @@ supplied tuple fails with an error. Without an origin, the source is a
 `file://` URL for the checkout.
 
 **Workflow:**
+
 ```bash
 # Republish the local management and workload folders after making changes
 # Resolve metadata on the host, including when this checkout is a linked worktree.

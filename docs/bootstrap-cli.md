@@ -180,7 +180,9 @@ The defaults above are the binary's generic fallbacks, not repository
 configuration: [`bootstrap.toml`](../bootstrap.toml) is the canonical source
 for the repository-owned values.
 
-The pivot's target node-readiness wait uses a fixed 15m budget (`MGMT_NODE_READY_TIMEOUT` in `pivot.sh` and `bootstrap-rs/src/main.rs`). It is not an environment knob and is separate from `MGMT_READY_TIMEOUT`.
+The pivot's target node-readiness wait uses a fixed 15m budget
+(`MGMT_NODE_READY_TIMEOUT` in `pivot.sh` and `bootstrap-rs/src/main.rs`).
+It is not an environment knob and is separate from `MGMT_READY_TIMEOUT`.
 
 ### Concurrent runs on one host
 

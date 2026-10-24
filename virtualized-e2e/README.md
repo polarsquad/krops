@@ -14,7 +14,7 @@ plus one arm per cloud.
 
 ## Layout
 
-```
+```text
 virtualized-e2e/
 ├── lib/                  Shared harness components, identical across clouds:
 │   │                     WireMock manifest templates, the recording

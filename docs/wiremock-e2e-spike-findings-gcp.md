@@ -37,7 +37,7 @@ cloud resources created.
 
 From the pinned `go.mod` at tag v1.13.1:
 
-```
+```text
 google.golang.org/api v0.284.0          # REST discovery clients (gdcl)
 google.golang.org/grpc v1.81.1
 cloud.google.com/go/compute v1.64.0     # GAPIC compute
@@ -61,7 +61,7 @@ Which client each code path constructs (source at v1.13.1):
 
 Live user-agent evidence from the WireMock journal matches both stacks:
 
-```
+```text
 x-goog-api-client: gl-go/1.25.11 gdcl/0.284.0     (REST compute calls)
 user-agent: gcp.cluster.x-k8s.io/... grpc-go/1.81.1   (container gRPC calls)
 ```
@@ -146,7 +146,7 @@ clients' trust anchor via `SSL_CERT_FILE`; no CA chain needed, so no
 openssl involvement at all). CoreDNS in the kind cluster rewrites each
 hostname to the WireMock ClusterIP:
 
-```
+```text
 rewrite name exact container.googleapis.com wiremock.wiremock-system.svc.cluster.local
 rewrite name exact compute.googleapis.com wiremock.wiremock-system.svc.cluster.local
 rewrite name exact oauth2.googleapis.com wiremock.wiremock-system.svc.cluster.local

@@ -89,7 +89,7 @@ at verification time.
 
 Two registries, two image layers, one package.
 
-```
+```text
 connected side (build)                        gap (deploy)
 ----------------------                        --------------
 airgap/scripts/build-package.sh               airgap/scripts/offline-run.sh
@@ -320,26 +320,27 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
    `pause:3.10.2` is now in `workload-pod-images.tar` and the artifact's
    `preLoadImages`. Re-check this list whenever the node image is bumped.
 11. **Supporting changes that keep the deploy verifiable.**
-   - The chart values under `airgap/values/` hold bare digests, which the image
+
+- The chart values under `airgap/values/` hold bare digests, which the image
      digest gate cannot parse, so it exempts them.
      `test-airgap-cert-manager-digest-values.py` ties them to `images.txt`
      instead. `airgap/manifests/flux-instance.yaml` is now digest-pinned, so
      the gate covers it and its old tag-only exemption is gone.
-   - The seeded podinfo chart version is read from
+- The seeded podinfo chart version is read from
      `workload/local-host/podinfo/helm.yaml`, so the chart in the gap registry
      cannot drift from the tag the workload OCIRepository requests.
-   - `zarf init` and the FluxInstance wait fail after 1m.
-   - `zarf package deploy` uses `--timeout 5m` because that single flag limits
+- `zarf init` and the FluxInstance wait fail after 1m.
+- `zarf package deploy` uses `--timeout 5m` because that single flag limits
      both Helm `--wait` and each component's healthChecks. Zarf health checks
      have no per-entry `maxTotalSeconds`, so cert-manager's three Deployments
      share that deploy timeout.
-   - The workload cluster gets 20m to become Available. A healthy deploy job
+- The workload cluster gets 20m to become Available. A healthy deploy job
      takes about 10 minutes and the whole workflow about 14, so the deploy job
      limit is 30 minutes.
-   - When the workload cluster or its Flux does not come up, `offline-run.sh`
+- When the workload cluster or its Flux does not come up, `offline-run.sh`
      writes cluster, machine, controller-log, container and event state to
      `/tmp/airgap-workload-debug.txt`, which the workflow uploads.
-   - The signature check derives the expected signer from
+- The signature check derives the expected signer from
      `AIRGAP_VERIFY_WORKFLOW_REF: ${{ github.workflow_ref }}`, which GitHub
      already populates as `owner/repo/.github/workflows/<file>@<ref>` for
      every workflow and trigger, the same string keyless signing embeds in
@@ -348,7 +349,7 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
      on a schedule, a fork, or a differently-named workflow entirely
      (`prototype-k3s-mgmt.yml`, issue #333) — no workflow name, repo, or ref
      needs hardcoding, and none of it breaks if a workflow file is renamed.
-   - Each kind/CAPD "node" is a container running a full nested systemd, and
+- Each kind/CAPD "node" is a container running a full nested systemd, and
      a job with a management cluster plus a CAPD workload cluster runs four
      of them at once. Default host inotify limits are sized for one, so
      whichever node's systemd starts second can fail outright ("Failed to
@@ -402,7 +403,8 @@ its sha256, swap the staged archive in, then run the deploy command
 active archive untouched. A failed deploy restores the prior archive and exits
 3. A successful deploy leaves `phase=awaiting-confirm`: a second `apply` is
 refused until you run `confirm` (drops the `.bak`) or `rollback` (restores the
-`.bak`). An `.update-state` with any other content also refuses `apply` (exit 1); inspect it and run `rollback` or remove it manually.
+`.bak`). An `.update-state` with any other content also refuses `apply`
+(exit 1); inspect it and run `rollback` or remove it manually.
 
 Files, all under `airgap/archives/` (gitignored):
 

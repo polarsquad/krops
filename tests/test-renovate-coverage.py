@@ -54,7 +54,7 @@ EXPECTED = {
         "siderolabs/talos",
     },
     "mise.local-talos.toml": {"siderolabs/talos"},
-    "mise.toml": {"astral-sh/uv"},
+    "mise.toml": {"astral-sh/uv", "markdownlint-cli2", "nodejs/node"},
     "mgmt/azure/capi-providers/capz-system/providers.yaml": {
         "kubernetes-sigs/cluster-api-provider-azure",
     },

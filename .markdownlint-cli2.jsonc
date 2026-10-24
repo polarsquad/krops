@@ -1,0 +1,50 @@
+// markdownlint-cli2 configuration (issue #243).
+//
+// markdownlint-cli2 reads this file as its CLI options file. Rule
+// settings are nested under the "config" key (flat rule keys here would
+// be silently ignored as unknown options); "ignores" stays top-level.
+//
+// All markdownlint default rules are on except where "config" overrides
+// them. Each override documents a deliberate, repo-wide choice rather
+// than a per-file exception:
+//
+// MD013 (line-length): 120 characters, code blocks and tables exempt.
+//   Prose wraps well under the limit, but code fences and padded table
+//   cells routinely exceed it, and rewrapping them would break them or
+//   their alignment.
+// MD060 (table-column-style): off. Repo tables use padded cells with
+//   compact |---| separators; the rule is style-only with no rendering
+//   effect, and forcing one alignment would churn every table in the repo.
+// MD033 (inline-html): off. MkDocs pages deliberately use inline HTML
+//   (details/summary, anchors) that markdownlint does not model.
+//
+// AGENTS.md is excluded (top-level "ignores"): it is an agent-managed
+// file with an owner-curated layout, and rewrapping it for line length
+// is out of scope for the documentation style gate.
+//
+// Generated directories are ignored as well: markdownlint-cli2 does not
+// read .gitignore, and a local run after `uv sync` or `mise run
+// docs-build` would otherwise sweep .venv/ and build/ into the lint.
+{
+  "config": {
+    "MD013": {
+      "line_length": 120,
+      "code_blocks": false,
+      "tables": false
+    },
+    "MD060": false,
+    "MD033": false
+  },
+  "ignores": [
+    "AGENTS.md",
+    ".venv/**",
+    "build/**",
+    ".hermes/**",
+    ".wip/**",
+    ".setup/**",
+    "airgap/archives/**",
+    "airgap/rendered/**",
+    "airgap/sbom/**",
+    "airgap/config-artifact/**"
+  ]
+}

@@ -153,7 +153,7 @@ Then, to browse the repo-created resources in the AWS console:
    name `krops-eu-north-1-workload-reader` or
    `krops-eu-west-1-workload-reader`, or use the direct link:
 
-   ```
+   ```text
    https://signin.aws.amazon.com/switchrole?roleName=krops-eu-north-1-workload-reader&account=<account-id>
    ```
 
@@ -163,16 +163,17 @@ Then, to browse the repo-created resources in the AWS console:
 ## CI access: GitHub Actions OIDC and the `krops-ci-e2e` role
 
 CI authenticates to the e2e account (`120392301094`) through GitHub's OIDC
-provider and assumes a least-privilege role for the e2e lifecycle (issue
-#379). No AWS access keys are stored; every session is short-lived. Created
-imperatively, additive only.
+provider and assumes a least-privilege role for the e2e lifecycle
+(issue #379). No AWS access keys are stored; every session is short-lived.
+Created imperatively, additive only.
 
 ### Resources
 
 - OIDC provider:
   `arn:aws:iam::120392301094:oidc-provider/token.actions.githubusercontent.com`
   (audience `sts.amazonaws.com`).
-- Role: `arn:aws:iam::120392301094:role/krops-ci-e2e` (max session duration 4 hours; e2e runs must complete within this window).
+- Role: `arn:aws:iam::120392301094:role/krops-ci-e2e` (max session duration
+  4 hours; e2e runs must complete within this window).
 - Five customer-managed policies, grouped by concern:
   `krops-ci-e2e-capa-ec2`, `krops-ci-e2e-capa-eks`, `krops-ci-e2e-ack-mgmt`,
   `krops-ci-e2e-sweep`, `krops-ci-e2e-self-deny`.
@@ -293,10 +294,15 @@ If a credential is suspected compromised, contain it immediately, then assess im
 **(a) `capi-demo` long-lived IAM key** (stored in `.env` only; used by ambient credential flow):
 
 1. Disable the key immediately:
+
    ```sh
    aws iam update-access-key --user-name capi-demo --access-key-id <ACCESS_KEY_ID> --status Inactive
    ```
-2. Issue a new key and update `.env`, following [Setting / rotating AWS credentials](./secrets.md#setting--rotating-aws-credentials). No re-encryption of SOPS secrets is needed: credentials are seeded imperatively from `.env` at bootstrap/pivot time.
+
+2. Issue a new key and update `.env`, following
+   [Setting / rotating AWS credentials](./secrets.md#setting--rotating-aws-credentials).
+   No re-encryption of SOPS secrets is needed: credentials are seeded
+   imperatively from `.env` at bootstrap/pivot time.
 3. Verify Flux reconciliation and successful AWS operations from CAPA and all
    management ACK controllers (S3, RDS, IAM), plus replacement adoption by any
    running bootstrap process. Keep the compromised key disabled throughout
@@ -312,6 +318,7 @@ If a credential is suspected compromised, contain it immediately, then assess im
    sessions were issued before the block became effective. See
    [AWS role-session revocation](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_revoke-sessions.html)
    for the cutoff and propagation behavior:
+
    ```json
    {
      "Version": "2012-10-17",
@@ -329,6 +336,7 @@ If a credential is suspected compromised, contain it immediately, then assess im
      ]
    }
    ```
+
 3. Verify the deployed policy and denied access with affected session
    credentials. Keep the Deny until **every affected session has expired**,
    even if the investigation finishes sooner: removing it can restore access
@@ -343,9 +351,11 @@ If a credential is suspected compromised, contain it immediately, then assess im
 **(c) `krops-reader` console login:**
 
 1. Delete the login profile to revoke console access:
+
    ```sh
    aws iam delete-login-profile --user-name krops-reader
    ```
+
 2. Deleting a login profile prevents new password logins; it does not revoke
    existing console or assumed-role credentials. In
    `mgmt/aws/infrastructure/aws-global-iam/reader-user.yaml`, add an explicit
@@ -422,12 +432,15 @@ aws cloudtrail lookup-events \
   --region eu-west-1
 ```
 
-The member-account CloudTrail covers API calls made within the account. The long-term organization trail is in the log-archive account (Control Tower-managed); contact the account owner (joseph.shriner@polarsquad.com) to retrieve it.
+The member-account CloudTrail covers API calls made within the account.
+The long-term organization trail is in the log-archive account
+(Control Tower-managed); contact the account owner
+(<joseph.shriner@polarsquad.com>) to retrieve it.
 
 ### Cleanup and notification
 
 1. Clean up any resources provisioned by the compromised credential using the [teardown](./operations.md#teardown) path.
-2. Notify the account owner (joseph.shriner@polarsquad.com) and, for OIDC or age-key compromise, the repository maintainers.
+2. Notify the account owner (<joseph.shriner@polarsquad.com>) and, for OIDC or age-key compromise, the repository maintainers.
 
 ## EKS worker lifecycle tag reconciliation
 

@@ -234,6 +234,25 @@
       "versioningTemplate": "semver",
       "autoReplaceStringTemplate": "gcloud = \"{{newValue}}\""
     },
+    {
+      "customType": "regex",
+      "description": "mise: node toolchain pin (hosts the npm:markdownlint-cli2 tool, #243)",
+      "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
+      "matchStrings": ["node = \"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "nodejs/node",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.+)",
+      "autoReplaceStringTemplate": "node = \"{{newValue}}\""
+    },
+    {
+      "customType": "regex",
+      "description": "mise: markdownlint-cli2 pin (npm backend, #243)",
+      "managerFilePatterns": ["/(^|/)mise\\.toml$/"],
+      "matchStrings": ["\"npm:markdownlint-cli2\" = \"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "markdownlint-cli2",
+      "datasourceTemplate": "npm",
+      "autoReplaceStringTemplate": "\"npm:markdownlint-cli2\" = \"{{newValue}}\""
+    },
     // ── bootstrap.toml chart pins (annotation-driven) ─────────────────────
     // Datasource and depName live in `# renovate:` comments next to the
     // chart pins in bootstrap.toml (consumed by the Rust binary since the

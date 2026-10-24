@@ -60,7 +60,7 @@ anything.
 
 Each environment gets a selector directory next to both planes:
 
-```
+```text
 mgmt/<env>/infrastructure/resource-plane/
   kustomization.yaml   # resources: [native] or [crossplane], selects the manifests
   native/              # the cloud's native operator and its CRs

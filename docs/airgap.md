@@ -406,6 +406,21 @@ refused until you run `confirm` (drops the `.bak`) or `rollback` (restores the
 `.bak`). An `.update-state` with any other content also refuses `apply`
 (exit 1); inspect it and run `rollback` or remove it manually.
 
+Disk budget: `apply` verifies the staged package, and `zarf package verify`
+and `zarf package inspect sbom` each extract the package to a temporary
+directory during verification. The extraction is a full unpack of the package
+(measured 1.7-2.5 GiB for the current 1.6 GiB package), so the peak footprint
+of `apply` is active + .staging + one extraction (~5.8 GiB for the current
+package). `verify-package.sh` points zarf's temporary directory (global
+`--tmpdir` flag, zarf 0.88.0) at a sibling of the SBOM output directory and
+removes it on every exit path; zarf 0.88.0 leaves the extraction directory
+behind when verification fails, so that cleanup is what reclaims the space on
+a rejected package. Budget the peak on the filesystem holding `archives/`.
+The nightly `update-rollback` job (air-gapped.yml) keeps all test scratch on
+that filesystem (the test fixtures hardlink the pristine package, which
+requires the same filesystem) and checks free space against this model before
+running the scenarios.
+
 Files, all under `airgap/archives/` (gitignored):
 
 | Path | Purpose |

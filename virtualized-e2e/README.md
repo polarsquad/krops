@@ -44,12 +44,14 @@ the auth path. All three arms are built.
 
 - Recordings (Phase 2, needs live runs to record).
 - Scenario content (Phase 3; the JSON shape is `lib/scenario-schema.json`).
-- mise tasks and the CI workflow (Phase 4; there is deliberately no
-  `mise run <cloud>-e2e-virtualized` yet, and nothing here is Flux-reconciled,
-  so there are no `flux-ks.yaml` files and nothing under `mgmt/` or
-  `workload/` references this tree).
-- Assertion scripts (Phase 5; `lib/assertions.py` carries the shared helpers
-  those scripts will call).
+- The Azure and GCP Phase 4 legs: the AWS leg is wired (`mise run
+  aws-e2e-virtualized` + `.github/workflows/e2e-virtualized.yml`), boot
+  scope only - controllers Available while intercepted, STS boot-call
+  arrivals, zero unmatched requests.
+- The Azure and GCP assertion scripts (Phase 5; the AWS leg ships
+  `aws/tests/test-aws-virtualized-e2e.py` on top of `lib/assertions.py`).
+- Nothing here is Flux-reconciled, so there are no `flux-ks.yaml` files and
+  nothing under `mgmt/` or `workload/` references this tree.
 
 ## Local sanity checks
 

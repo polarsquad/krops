@@ -1,0 +1,94 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: e2e-virtualized
+
+# WireMock-virtualized e2e (issue #355): the controllers run on a
+# throwaway kind cluster with their cloud endpoints intercepted by an
+# in-cluster WireMock. One leg per cloud; slice 1 wires the AWS arm
+# (boot scope: controllers Available while intercepted, STS boot-call
+# arrivals, zero unmatched requests). The legs burn in non-blocking:
+# promotion to required checks is an owner/admin step after burn-in.
+
+on:
+  pull_request:
+    paths:
+      # AWS leg (slices 2/3 append their own paths and leg outputs).
+      - "mgmt/aws/**"
+      - "virtualized-e2e/aws/**"
+      - "virtualized-e2e/lib/**"
+      - "scripts/aws-e2e-virtualized.sh"
+      - "mise.aws.toml"
+      - "mise.toml"
+      - ".github/workflows/e2e-virtualized.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-virtualized-aws-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Dependency-free path gating: one output per cloud leg so per-leg
+  # filtering works without a matrix (a matrix cannot be path-filtered
+  # per leg) and without a third-party paths-filter action.
+  # workflow_dispatch (no base ref) forces every leg on.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      aws: ${{ steps.filter.outputs.aws }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Filter changed paths
+        id: filter
+        shell: bash
+        run: |
+          if [ -z "${GITHUB_BASE_REF:-}" ]; then
+            echo "aws=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git diff --name-only "origin/${GITHUB_BASE_REF}...HEAD" > "$RUNNER_TEMP/changed.txt"
+          echo "changed paths:"
+          cat "$RUNNER_TEMP/changed.txt"
+          aws=false
+          while IFS= read -r path; do
+            case "$path" in
+              mgmt/aws/*|virtualized-e2e/aws/*|virtualized-e2e/lib/*|scripts/aws-e2e-virtualized.sh|mise.aws.toml|mise.toml|.github/workflows/e2e-virtualized.yml)
+                aws=true
+                ;;
+            esac
+          done < "$RUNNER_TEMP/changed.txt"
+          echo "aws=$aws" >> "$GITHUB_OUTPUT"
+
+  aws:
+    name: AWS arm (boot scope)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: changes
+    if: needs.changes.outputs.aws == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Install mise
+        uses: jdx/mise-action@v5.2.1
+        with:
+          version: 2026.10.17
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MISE_ENV: aws
+
+      # Docker is preinstalled on ubuntu-latest (the JKS keystore step
+      # runs keytool inside the WireMock image); kind/kubectl/helm/
+      # clusterctl come from the mise pins.
+      - name: Run the virtualized e2e
+        env:
+          MISE_ENV: aws
+        run: mise run aws-e2e-virtualized

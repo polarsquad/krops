@@ -36,3 +36,7 @@ echo "Use with:  export KUBECONFIG=$KUBECONFIG_FILE"
 echo "Or merged: export KUBECONFIG=$HOME/.kube/config:$KUBECONFIG_FILE"
 exit $fail
 '''
+
+[tasks.aws-e2e-virtualized]
+description = "WireMock-virtualized e2e, AWS arm (boot scope): throwaway kind cluster, CAPA + the three ACK controllers intercepted by an in-cluster WireMock, arrival and unmatched assertions (issue #355)"
+run = "bash scripts/aws-e2e-virtualized.sh"

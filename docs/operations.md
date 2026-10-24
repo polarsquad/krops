@@ -608,7 +608,8 @@ Runtime environment variables take precedence over configurable defaults, and
 ## Bootstrap
 
 Every environment boots through the same lifecycle wrapper; the profile
-selects the environment (the default is `aws` from `bootstrap.toml`):
+selects the environment (the default is the `default-environment` key in
+`bootstrap.toml`, checked in as `aws`):
 
 ```sh
 TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh bootstrap            # aws

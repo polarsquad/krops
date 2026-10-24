@@ -212,6 +212,8 @@ Run the checks that match what you touched. CI runs all of them.
   - `bootstrap-rs`: fmt, clippy, build, test for the Rust CLI.
   - `docs`: assembles the MkDocs site and fails on broken links or missing
     nav pages.
+  - `links`: external links in Markdown files are checked with lychee; runs
+    on PRs that touch `**.md`.
   - `markdown-lint`: markdownlint-cli2 over the tracked Markdown files with
     the shared rules in `.markdownlint-cli2.jsonc`.
   - `konflate`: the PR rendered as a Flux diff (blast radius, image changes,

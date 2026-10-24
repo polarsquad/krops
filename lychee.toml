@@ -1,0 +1,12 @@
+# External-link checking for Markdown sources (workflow: .github/workflows/links.yml).
+# Internal/relative links are covered by the strict mkdocs build (docs.yml); this file is URLs only.
+exclude = [
+  "^https?://localhost",
+  "^https?://127\\.0\\.0\\.1",
+  "^https?://10\\.96\\.0\\.1",
+  "\\.svc([:/.]|$)",                            # in-cluster DNS names (wiremock examples)
+  "<",                                          # placeholder URLs
+  "^https://token\\.actions\\.githubusercontent\\.com",  # OIDC issuer host, 404 on bare GET
+  "^https://login\\.microsoftonline\\.com",              # tenant authority host, 404 on bare GET
+]
+accept = ["200", "204", "429"]

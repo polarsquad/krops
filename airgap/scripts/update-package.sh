@@ -2,6 +2,13 @@
 # update-package.sh: staged, verified, transactional update of the air-gap Zarf
 # package archive (archive-level rollback only; see docs/airgap.md).
 #
+# Disk model for `apply` (docs/airgap.md#updating-a-deployed-bundle):
+# peak = active + .staging + one zarf verify extraction (a full unpack of the
+# package, 1.7-2.5 GiB for the current 1.6 GiB package). verify-package.sh
+# keeps the extraction under a sibling of the SBOM dir (zarf --tmpdir) and
+# removes it on every exit path, so only one extraction is live at a time.
+# Budget that peak on the filesystem holding archives/.
+#
 # Usage: update-package.sh apply <package> | confirm | rollback | status
 set -euo pipefail
 

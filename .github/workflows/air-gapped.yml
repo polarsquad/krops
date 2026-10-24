@@ -232,10 +232,36 @@ jobs:
           [ -f "$1" ] || { echo "no package found matching glob" >&2; exit 1; }
           [ "$#" -eq 1 ] || { echo "expected exactly one package, found $#" >&2; exit 1; }
           pkg=$1
+
+          # Disk model (Part of #612): the scenarios peak at ACTIVE + .staging
+          # + one zarf verify extraction (a full unpack of the package;
+          # measured 1.7-2.5 GiB for the 1.6 GiB package). verify-package.sh
+          # redirects that extraction via zarf --tmpdir to a sibling of the
+          # SBOM dir and removes it on every exit path (zarf 0.88.0 also
+          # leaks it on a failed verify, so the cleanup is load-bearing).
+          # The fixtures hardlink the pristine package, which only works on
+          # the same filesystem, so all test scratch lives under the
+          # workspace next to the pristine:
+          #   peak = 2 x pkg + extraction <= 3.6 x pkg (~5.8 GiB)
+          # The preflight requires 4 x pkg free so the peak fits with margin.
+          # ubuntu-26.04-arm is the only hosted ARM runner; a preflight
+          # failure here means its disk is below the model above, not flaky.
+          scratch="$GITHUB_WORKSPACE/.airgap-update-rollback"
+          mkdir -p "$scratch"
+          trap 'rm -rf "$scratch"' EXIT
+          avail_kb=$(df --output=avail -k "$scratch" | tail -n 1 | tr -d '[:space:]')
+          pkg_kb=$(( $(stat -c %s "$pkg") / 1024 ))
+          need_kb=$(( pkg_kb * 4 ))
+          if [ "$avail_kb" -lt "$need_kb" ]; then
+            echo "preflight: $((avail_kb / 1024 / 1024)) GiB free under $scratch < $((need_kb / 1024 / 1024)) GiB required (4 x package size)" >&2
+            exit 1
+          fi
+
           sudo unshare --net -- env \
             PATH="$(dirname "$zarf_bin"):$PATH" \
             ZARF="$zarf_bin" \
             AIRGAP_VERIFY_WORKFLOW_REF="$AIRGAP_VERIFY_WORKFLOW_REF" \
+            TMPDIR="$scratch" \
             python3 airgap/tests/test-airgap-update-rollback.py --zarf-package "$pkg" \
             2>&1 | tee /tmp/airgap-update-rollback.log
 

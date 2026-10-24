@@ -175,7 +175,7 @@ deployment:
 - [Dependencies](docs/dependencies.md): Renovate-managed automated updates across the repository
 - [Extending](docs/extending.md): adding new clusters, applications, and custom providers
 - [AWS IAM](docs/aws-iam.md), [Workload resources](docs/workload-resources.md), and [ACK troubleshooting](docs/troubleshooting-ack.md)
-- [Known issues](docs/known-issues.md): limitations, provider constraints, and platform constraints with linked sources and confirmed status
+- [Known issues](docs/known-issues.md): known limitations and constraints with linked sources and confirmed status
 - [konflate](docs/konflate.md): rendered pull request reviews and GitHub Actions gating
 - [Air-gapped krops](docs/airgap.md): Zarf bundle generation, offline installation, and update drills
 

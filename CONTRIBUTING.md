@@ -147,7 +147,14 @@ Additional conventions:
   validate` and in CI.
 - When a change affects repository structure, workflows, or how to navigate
   the repository, update `AGENTS.md` and the relevant `docs/` page in the
-  same PR.
+  same PR. The same applies when the repository moves forward in a way the
+  docs describe: a provider or operator pin bump, a lifecycle change, a new
+  environment or component, or a discovered or resolved limitation updates
+  the affected `docs/` pages in the same PR, and a discovered or resolved
+  limitation, provider constraint, or platform constraint is recorded in the
+  known issues registry (`docs/known-issues.md`) with linked sources. Remove
+  a registry entry only when the fix is merged or confirmed gone in a live
+  run, and note what closed it.
 
 ## Making a change
 

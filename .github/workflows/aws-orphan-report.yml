@@ -90,10 +90,15 @@ jobs:
     permissions:
       issues: write
     steps:
+      # A failed discover job leaves no artifact; the download must not fail the job or
+      # the tracking-issue logic below never runs, which exists precisely for that
+      # failure class. The github-script step reads only the JOB_RESULT and
+      # ORPHAN_COUNT env vars, never the artifact files.
       - name: Download report artifacts
         uses: actions/download-artifact@v8.0.2
         with:
           name: orphan-report
+        continue-on-error: true
 
       - name: Open, update or close the orphan discovery issue
         uses: actions/github-script@v9.0.0

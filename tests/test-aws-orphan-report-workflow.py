@@ -123,6 +123,30 @@ def check_report_status_job(jobs: dict) -> list[str]:
     if not has_github_script:
         failures.append("report-status must use actions/github-script")
 
+    # Check the artifact download tolerates a missing artifact: a failed discover job
+    # uploads nothing, and a download failure would mask the tracking-issue step that
+    # exists precisely for that failure class (the github-script step reads only the
+    # JOB_RESULT and ORPHAN_COUNT env vars, never the artifact files).
+    has_download = False
+    for step in steps:
+        uses = step.get("uses", "")
+        if "actions/download-artifact@" not in uses:
+            continue
+        has_download = True
+        with_block = step.get("with", {})
+        if with_block.get("name") != "orphan-report":
+            failures.append(
+                "report-status download-artifact must download 'orphan-report', "
+                f"got {with_block.get('name')!r}"
+            )
+        if step.get("continue-on-error") is not True:
+            failures.append(
+                "report-status download-artifact must set continue-on-error: true "
+                "so a missing artifact cannot mask the tracking-issue step"
+            )
+    if not has_download:
+        failures.append("report-status missing download-artifact step")
+
     return failures
 
 

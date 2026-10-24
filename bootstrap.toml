@@ -1,9 +1,11 @@
 # Repository-owned configuration for krops-bootstrap (issue #98).
 #
 # Everything krops-specific the binary needs is declared here; the binary
-# itself is a generic bootstrap engine. Environment variables (REGISTRY_PORT,
-# GIT_REPO_URL, BOOTSTRAP_KUBECONTEXT, ...) keep their precedence over these
-# values at runtime. Locate this file with BOOTSTRAP_CONFIG when not running
+# itself is a generic bootstrap engine. docs/bootstrap-cli.md is the prose
+# reference for the file's sections and the binary's generic fallback
+# defaults. Environment variables (REGISTRY_PORT, GIT_REPO_URL,
+# BOOTSTRAP_KUBECONTEXT, ...) keep their precedence over these values at
+# runtime. Locate this file with BOOTSTRAP_CONFIG when not running
 # from the repository root; the file's directory becomes the repository
 # root that relative manifests and repository mise tasks resolve against
 # (issue #260).

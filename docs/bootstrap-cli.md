@@ -90,8 +90,8 @@ krops-bootstrap teardown local-host     # local-host teardown
 
 - `PROFILE` is the CLI's retained positional name. Its value names a section
   under `[environments.*]` in
-  [`bootstrap.toml`](../bootstrap.toml). The checked-in environments are
-  `aws`, `local-host`, `local-talos`, `azure`, and `gcp`.
+  [`bootstrap.toml`](../bootstrap.toml); the checked-in environments are
+  those sections.
 - A non-empty `KROPS_PROFILE` overrides the positional profile. If
   neither is set, `bootstrap.default-environment` from `bootstrap.toml` is
   used.
@@ -175,6 +175,10 @@ pins together with their declarative counterparts. See
 | `KROPS_RUN_TTL` | `86400s` (24h) | Unsigned decimal seconds with optional `s`, `m`, or `h` (e.g. `3600`, `2h`); whitespace trimmed, empty defaults to 24h; `none` disables expiry |
 | `KROPS_REVISION` | Git branch HEAD SHA, else the forwarded `KROPS_OCI_GIT_SHA` checkout SHA, else `unknown` | Git revision tag for resource tagging; auto-extracted from GitHub during bootstrap, else the checkout SHA the toolbox wrapper forwards |
 | `KROPS_RUN_KIND` | `manual` | Bootstrap/pivot invocation kind for resource tagging (e.g. `manual`, `scheduled`, `emergency`) |
+
+The defaults above are the binary's generic fallbacks, not repository
+configuration: [`bootstrap.toml`](../bootstrap.toml) is the canonical source
+for the repository-owned values.
 
 The pivot's target node-readiness wait uses a fixed 15m budget (`MGMT_NODE_READY_TIMEOUT` in `pivot.sh` and `bootstrap-rs/src/main.rs`). It is not an environment knob and is separate from `MGMT_READY_TIMEOUT`.
 

@@ -126,6 +126,10 @@ def main() -> int:
         return 1
 
     charts = config.get("charts", {})
+    # Expected-environments policy guard: bootstrap.toml is the canonical
+    # environment list, but canonicality cannot protect against accidental
+    # deletion of an environment, so the test pins the set that must exist.
+    # This list is policy, not a value duplication of the file.
     for required_env in ("local-host", "aws", "local-talos", "azure", "gcp"):
         if required_env not in config.get("environments", {}):
             failures.append(f"environments.{required_env} section missing from bootstrap.toml")

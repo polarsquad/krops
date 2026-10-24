@@ -168,6 +168,15 @@ for flux_ks_path in (REPO / "mgmt/aws").rglob("flux-ks.yaml"):
             errors.append(
                 f"{flux_ks_path.relative_to(REPO)}: Kustomization {ks.get('metadata',{}).get('name')} covers taggable kinds but lacks substituteFrom krops-run optional:true"
             )
+        if has_run_cm and (
+            ks.get("spec", {}).get("postBuild", {}).get("substituteStrategy")
+            != "Always"
+        ):
+            errors.append(
+                f"{flux_ks_path.relative_to(REPO)}: Kustomization "
+                f"{ks.get('metadata',{}).get('name')} substitutes from krops-run "
+                f"but lacks postBuild.substituteStrategy: Always"
+            )
 
 # (f) Constants appear literally in run_tags.rs
 run_tags_text = (REPO / "bootstrap-rs/src/run_tags.rs").read_text()

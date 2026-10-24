@@ -311,6 +311,36 @@ cosign verify-attestation \
   "$IMAGE"
 ```
 
+The identity encodes the ref that produced the image: a tag push
+certifies `@refs/tags/vX.Y.Z`, while a manual dispatch certifies
+`@refs/heads/<branch>`. Derive the identity from the run that produced
+the image; when the ref is unknown, accept both forms with a regexp:
+
+```sh
+cosign verify \
+  --certificate-identity-regexp "https://github\.com/polarsquad/krops/\.github/workflows/toolbox-release\.yml@refs/(tags/vX\.Y\.Z|heads/.+)" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  "$IMAGE"
+```
+
+### Retrying a toolbox release (manual dispatch)
+
+A failed or incomplete release cannot be re-fired by pushing the tag
+again (the tag already exists), so the workflow also accepts
+`workflow_dispatch` with an explicit version:
+
+```sh
+gh workflow run toolbox-release.yml --repo polarsquad/krops --ref main -f version=X.Y.Z
+```
+
+The run builds the dispatched ref, so a fix that landed in a new commit
+is picked up by dispatching on the branch that carries it. The dispatch
+version must still match `bootstrap-rs/Cargo.toml` (the same gate as the
+tag path), and a stable version publishes the same tag set as a tag push
+(`X.Y.Z`, `X.Y`, `latest`). A retry re-publishes the same tags, so
+`X.Y.Z` moves to the new build's digest; pull by digest if you need the
+original image.
+
 ### E2E AWS account
 
 **Designation:** Account `120392301094` was designated on 2026-09-20 ([#239](https://github.com/polarsquad/krops/issues/239)) as the single account for all krops end-to-end testing (live acceptance [#143](https://github.com/polarsquad/krops/issues/143), scheduled e2e [#185](https://github.com/polarsquad/krops/issues/185)). It is a Control Tower-managed Organizations member account.
@@ -338,7 +368,7 @@ cosign verify-attestation \
    aws eks list-clusters --region eu-north-1
    aws eks list-clusters --region eu-west-1
    ```
-2. Use the AWS Cost Explorer console (group by service) to distinguish krops spend from other shared-account spend.
+2. Distinguish krops spend from other shared-account spend with the [Krops-scoped cost view](#krops-scoped-cost-view) (a Cost Explorer tag filter on `krops.io/run-kind`). Until the cost-allocation tags are activated, group by service in the Cost Explorer console.
 3. If the spend is from leftover krops resources, clean them up through the [teardown](#teardown) path.
 4. If the spend is from non-krops resources, escalate to the account owner (joseph.shriner@polarsquad.com).
 5. To adjust the ceiling, update the budget in the AWS Budgets console and update the budget paragraph in `docs/operations.md` in the same PR.
@@ -407,10 +437,73 @@ and `ec2:DescribeAddresses` permissions.
 The e2e AWS account 120392301094 carries a monthly cost budget
 `krops-e2e-monthly` with a $200 ceiling. Notifications publish to the SNS
 topic `krops-e2e-budget-alerts` (us-east-1) at 80% forecasted and 100%
-actual spend, and the topic's email subscription delivers them to
-joseph.shriner@polarsquad.com, the escalation path for budget alerts. The
-email subscription only activates after the SNS confirmation email is
-accepted.
+actual spend. The escalation path for budget alerts is the topic's email
+subscriber joseph.shriner@polarsquad.com.
+
+An email subscription only activates after the SNS confirmation email is
+accepted, and SNS auto-deletes unconfirmed email subscriptions after 48
+hours. As of 2026-10-24 the topic has no subscribers (the 2026-09-20
+subscription was never confirmed and was auto-deleted), so budget alerts
+currently have no recipient. To restore delivery:
+
+```sh
+aws sns subscribe \
+  --topic-arn arn:aws:sns:us-east-1:<ACCOUNT>:krops-e2e-budget-alerts \
+  --protocol email \
+  --notification-endpoint joseph.shriner@polarsquad.com \
+  --region us-east-1
+```
+
+then confirm the email within 48 hours, and verify that a real
+`SubscriptionArn` is listed:
+
+```sh
+aws sns list-subscriptions-by-topic \
+  --topic-arn arn:aws:sns:us-east-1:<ACCOUNT>:krops-e2e-budget-alerts \
+  --region us-east-1
+```
+
+#### Krops-scoped cost view
+
+The budget covers the whole shared account, so the account total is not
+krops spend. For a krops-scoped view, activate the cost-allocation tags
+`krops.io/run-id` and `krops.io/run-kind` from the [E2E resource tagging
+standard](#e2e-resource-tagging-standard) in the payer account, either in
+the Billing console (Cost Allocation Tags) or:
+
+```sh
+aws ce update-cost-allocation-tags-status \
+  --cost-allocation-tags-status TagKey=krops.io/run-id,Status=Active \
+  TagKey=krops.io/run-kind,Status=Active
+```
+
+Member-account credentials get `AccessDeniedException` on this operation
+(verified 2026-10-24); only the payer can activate. Tag-based cost queries
+then cover taggable spend only, after activation.
+
+Query the current month of krops spend, grouped by service:
+
+```sh
+aws ce get-cost-and-usage \
+  --time-period Start=<YYYY-MM-01>,End=<next-month-01> \
+  --granularity MONTHLY \
+  --metrics UnblendedCost \
+  --group-by Type=DIMENSION,Key=SERVICE \
+  --filter '{"Tags":{"Key":"krops.io/run-kind","Values":["manual","scheduled"],"MatchOptions":["EQUALS"]}}'
+```
+
+The Cost Explorer console alternative is a tag filter on
+`krops.io/run-kind` with the same values.
+
+The account budget deliberately stays account-wide: it is the tripwire for
+the whole shared account. A second tag-filtered budget via CLI
+`CostFilters` is an optional owner follow-up and cannot replace the
+account budget, because it sees only taggable spend after activation.
+
+The ceiling is not Git-managed: the ACK budgets-controller had no
+releases as of 2026-10-24, so the repo's published-Helm-chart ACK pattern
+cannot install it. The budget and its notifications are maintained
+imperatively; revisit this section when a release ships.
 
 ### E2E resource tagging standard
 
@@ -437,6 +530,13 @@ ConfigMap values via `postBuild.substituteFrom` to apply them to:
   automatically.
 - **ACK-managed resources**: S3 Bucket, RDS DBInstance, IAM Role, and IAM User
   CRs apply tags directly in their specs.
+
+The four Kustomizations that substitute these tags set
+`postBuild.substituteStrategy: Always`, so that when the `krops-run`
+ConfigMap is absent the `:=` fallback of each placeholder is rendered;
+with the default `WithVariables` strategy Flux skips substitution when
+no variable is defined and the literal placeholder text is applied as
+the tag value (#505).
 
 **Not tagged:**
 - CloudFormation stacks backing CAPA (account-global, persistent); would need
@@ -608,7 +708,8 @@ Runtime environment variables take precedence over configurable defaults, and
 ## Bootstrap
 
 Every environment boots through the same lifecycle wrapper; the profile
-selects the environment (the default is `aws` from `bootstrap.toml`):
+selects the environment (the default is the `default-environment` key in
+`bootstrap.toml`, checked in as `aws`):
 
 ```sh
 TOOLBOX_IMAGE="$TOOLBOX_IMAGE" scripts/toolbox-run.sh bootstrap            # aws

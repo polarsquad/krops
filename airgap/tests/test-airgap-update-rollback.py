@@ -111,10 +111,11 @@ def check(condition, message):
 
 
 class Harness:
-    def __init__(self, base, zarf, fixtures):
+    def __init__(self, base, zarf, fixtures, pristine=None):
         self.base = base
         self.zarf = zarf
         self.v1, self.v2, self.truncated, self.corrupted = fixtures
+        self.pristine = pristine
         self.trees = 0
         self.bin_dir = base / "bin"
         self.bin_dir.mkdir()
@@ -158,6 +159,12 @@ class Harness:
 
     def write_package(self, tree, name, data):
         path = tree / name
+        if self.pristine is not None and data is self.v1:
+            try:
+                os.link(self.pristine, path)
+                return path
+            except OSError:
+                pass  # cross-device or unsupported fs: fall back to a copy
         path.write_bytes(data)
         return path
 
@@ -501,6 +508,7 @@ def main(argv):
         base = Path(tmp)
         if args.zarf_package is None:
             zarf = None
+            pristine = None
             v1 = make_valid_package(base / "fixture-v1", b"release-1").read_bytes()
             v2 = make_valid_package(base / "fixture-v2", b"release-2").read_bytes()
             truncated = make_truncated_package(base / "fixture-truncated", v1).read_bytes()
@@ -512,16 +520,24 @@ def main(argv):
             if not zarf:
                 print("FAIL: real-zarf mode needs ZARF or zarf on PATH", file=sys.stderr)
                 return 1
+            # Keep the pristine package as the single on-disk copy: scenarios
+            # that need the full bytes hardlink it (write_package), and the
+            # truncated/corrupted variants are derived in RAM. The runner
+            # cannot hold several 1.7 GB copies alongside the workspace.
             real = args.zarf_package.read_bytes()
             v1 = real
             v2 = real
-            truncated = make_truncated_package(base / "fixture-truncated", real, keep=1000).read_bytes()
-            corrupted = make_corrupted_package(base / "fixture-corrupted", real).read_bytes()
+            truncated = real[:1000]
+            corrupted_buf = bytearray(real)
+            corrupted_buf[len(corrupted_buf) // 2] ^= 0x01
+            corrupted = bytes(corrupted_buf)
+            pristine = args.zarf_package.resolve()
             scenarios = real_scenarios()
             print(f"mode: real zarf ({zarf}) on {args.zarf_package.name}")
+            print(f"disk: {shutil.disk_usage(base).free / 2**30:.1f} GiB free under {base}")
 
         def h_factory(scenario_dir):
-            return Harness(scenario_dir, zarf, (v1, v2, truncated, corrupted))
+            return Harness(scenario_dir, zarf, (v1, v2, truncated, corrupted), pristine=pristine)
 
         failed = run_scenarios(scenarios, h_factory, base)
 

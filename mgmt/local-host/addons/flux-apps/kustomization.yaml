@@ -1,5 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - flux-operator.yaml
+  - ../../../shared/flux-apps/flux-operator
   - flux-apps-rset.yaml
+patches:
+  - patch: |-
+      - op: add
+        path: /spec/clusterSelector/matchLabels/krops.polarsquad.com~1environment
+        value: local-host
+    target:
+      kind: HelmChartProxy

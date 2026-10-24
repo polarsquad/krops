@@ -25,8 +25,12 @@ Renovate discovers and updates versions in:
   dependencies through Renovate's Cargo manager.
 - `bootstrap.toml`: the Flux Operator, cert-manager, and CAPI Operator chart
   pins consumed by `krops-bootstrap`. One annotation-driven custom manager reads
-  the adjacent `# renovate:` metadata. `mise run validate` cross-checks these
-  pins against their declarative Helm releases and proxies. cert-manager's
+  the adjacent `# renovate:` metadata. The workload Flux Operator
+  HelmChartProxy chart pin in the shared base
+  `mgmt/shared/flux-apps/flux-operator/flux-operator.yaml` has its own
+  annotation-driven manager (issue #244). `mise run validate` cross-checks the
+  `[charts]` pins against their declarative Helm releases and proxies,
+  including the shared base. cert-manager's
   pin, its `pivot.sh`/HelmRelease counterparts, its `airgap/zarf.yaml` chart
   pin, and its four `airgap/images.txt`/`airgap/zarf.yaml` image tags all
   share the `platform-charts` group so they can't drift apart (issue #322).

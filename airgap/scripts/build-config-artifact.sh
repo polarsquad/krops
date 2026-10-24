@@ -17,13 +17,6 @@ set -euo pipefail
 REPO_ROOT=$(git rev-parse --show-toplevel)
 cd "$REPO_ROOT"
 
-# The gap registry only ever carries the chart version
-# stage-and-create-cluster.sh derives from bootstrap.toml [charts], so
-# derive the same value here (issue #633): a stale literal pin would
-# request a version the registry was never seeded with.
-flux_chart_version=$(sed -nE 's/^flux-operator = "(.*)"/\1/p' bootstrap.toml | head -1)
-[ -n "$flux_chart_version" ] || { echo "ERROR: no flux-operator chart version in bootstrap.toml [charts]" >&2; exit 1; }
-
 REGISTRY_PORT="${REGISTRY_PORT:-5001}"
 OCI_REPOSITORY="${OCI_REPOSITORY:-krops-airgap}"
 OCI_TAG="${OCI_TAG:-latest}"
@@ -42,37 +35,42 @@ cp -R mgmt/local-host/clusters/docker "$LH/clusters/docker"
 cp mgmt/local-host/addons/cni/kindnet.yaml "$LH/addons/cni/kindnet.yaml"
 cp mgmt/local-host/addons/cni/kustomization.yaml "$LH/addons/cni/kustomization.yaml"
 cp mgmt/local-host/addons/cni/flux-ks.yaml "$LH/addons/cni/flux-ks.yaml"
-cp mgmt/local-host/addons/flux-apps/kustomization.yaml "$LH/addons/flux-apps/kustomization.yaml"
 cp mgmt/local-host/addons/flux-apps/flux-apps-rset.yaml "$LH/addons/flux-apps/flux-apps-rset.yaml"
 cp -R mgmt/local-host/addons/flux-apps/regions "$LH/addons/flux-apps/regions"
 
-# Airgap variant of the per-cluster flux-operator HelmChartProxy: fetch the
-# chart from krops-registry (seeded by stage-and-create-cluster.sh) instead of
-# ghcr.io, which is unreachable in the gap.
-cat > "$LH/addons/flux-apps/flux-operator.yaml" <<EOF
-apiVersion: addons.cluster.x-k8s.io/v1alpha1
-kind: HelmChartProxy
-metadata:
-  name: flux-operator
-  namespace: default
-spec:
-  clusterSelector:
-    matchLabels:
-      fluxcd: enabled
-      krops.polarsquad.com/environment: local-host
-  repoURL: oci://krops-registry:5000/charts
-  chartName: flux-operator
-  version: "${flux_chart_version}"
-  # Pinned release name, matching mgmt/*/addons/flux-apps/flux-operator.yaml:
-  # keeps the release stable across proxy generations and cluster recreations.
-  releaseName: flux-operator
-  namespace: flux-system
-  options:
-    waitForJobs: true
-    wait: true
-    timeout: 5m
-    install:
-      createNamespace: true
+# Shared flux-operator HelmChartProxy base (issue #244): copied at the same
+# relative depth as in the repo, so the kustomization's base ref below
+# resolves inside the trimmed artifact tree instead of reaching back into
+# the repo at deploy time. The version flows from the base, which
+# tests/test-bootstrap-config.py pins to bootstrap.toml [charts] -- the
+# same value stage-and-create-cluster.sh seeds the gap registry with
+# (issue #633); the Zarf component pins it literally.
+mkdir -p "$ARTIFACT_ROOT/mgmt/shared/flux-apps"
+cp -R mgmt/shared/flux-apps/flux-operator "$ARTIFACT_ROOT/mgmt/shared/flux-apps/flux-operator"
+
+# Airgap variant of the per-cluster flux-operator kustomization: the
+# local-host selector patch from the repo, plus a gap-only rewrite of
+# spec.repoURL to krops-registry (seeded by stage-and-create-cluster.sh)
+# instead of ghcr.io, which is unreachable in the gap.
+cat > "$LH/addons/flux-apps/kustomization.yaml" <<'EOF'
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../../shared/flux-apps/flux-operator
+  - flux-apps-rset.yaml
+patches:
+  - patch: |-
+      - op: add
+        path: /spec/clusterSelector/matchLabels/krops.polarsquad.com~1environment
+        value: local-host
+    target:
+      kind: HelmChartProxy
+  - patch: |-
+      - op: replace
+        path: /spec/repoURL
+        value: oci://krops-registry:5000/charts
+    target:
+      kind: HelmChartProxy
 EOF
 
 # Airgap variant of the per-region FluxInstance (regions/docker/):

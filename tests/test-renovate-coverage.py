@@ -115,6 +115,7 @@ def assert_single_registry_per_helm_package(result) -> list[str]:
 KINDEST_NODE_DIGEST_FILES = [
     "mgmt/local-host/clusters/docker/cluster-class.yaml",
     "mgmt/local-host/clusters/management/cluster-class.yaml",
+    "bootstrap.toml",
 ]
 
 
@@ -123,6 +124,9 @@ def assert_kindest_node_digests_extracted(result) -> list[str]:
 
     A tag-only match would let Renovate bump the tag while leaving the old
     sha256 in place, producing an image that no longer matches its tag.
+    The captured currentValue must also keep the `v` prefix: Docker Hub only
+    has `v`-prefixed tags, so a stripped value makes the digest lookup 404
+    and Renovate silently drops the update (#187).
     """
     errors = []
     for package_file in KINDEST_NODE_DIGEST_FILES:
@@ -133,6 +137,15 @@ def assert_kindest_node_digests_extracted(result) -> list[str]:
                 errors.append(
                     f"{package_file}: kindest/node extracted without currentDigest (tag-only bump would leave a stale digest)"
                 )
+            if not str(dep.get("currentValue") or "").startswith("v"):
+                errors.append(
+                    f"{package_file}: kindest/node currentValue {dep.get('currentValue')!r} lacks the 'v' prefix (digest lookup would 404)"
+                )
+            for warning in dep.get("warnings") or []:
+                if "Could not determine new digest" in str(warning):
+                    errors.append(
+                        f"{package_file}: kindest/node warning: {warning}"
+                    )
     return errors
 
 
@@ -141,7 +154,9 @@ def assert_no_repo_registry_warnings() -> list[str]:
 
     The custom-regex harness cannot see the merge warning because it never enables
     the full repo config mode. This check ensures the repo-level dry-run remains
-    free of "Excess registryUrls found for datasource lookup".
+    free of "Excess registryUrls found for datasource lookup". Also checks for
+    "Could not determine new digest for update" to catch the digest-lookup-404
+    regression from #187.
     """
     env = os.environ.copy()
     env.setdefault("LOG_LEVEL", "debug")
@@ -166,6 +181,8 @@ def assert_no_repo_registry_warnings() -> list[str]:
     errors = []
     if "Excess registryUrls found for datasource lookup" in output:
         errors.append("full dry-run: Excess registryUrls found for datasource lookup")
+    if "Could not determine new digest for update" in output:
+        errors.append("full dry-run: Could not determine new digest for update (#187)")
     if completed.returncode not in (0, 1):
         errors.append(f"full dry-run: unexpected exit code {completed.returncode}")
     return errors

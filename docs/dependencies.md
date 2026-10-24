@@ -86,7 +86,9 @@ keeps a freshly published, possibly compromised release from landing on
 
 The `kubernetes-version` group (#142) covers `kindest/node` (docker datasource:
 the local-host node image, the `kind-node-image` pin in `bootstrap.toml`, and
-both Cluster `topology.version` pins),
+both Cluster `topology.version` pins; the digest-pinned `kindest/node` managers
+must capture the `v` inside `currentValue`, because Renovate resolves digests
+by the literal tag, and without `v` the lookup 404s and updates are dropped),
 `kubernetes/kubernetes` (github-releases datasource: the `kubectl` pin in
 `mise.toml` and the local-talos `TalosControlPlane.spec.version` annotation),
 and the `airgap/images.txt` images kubeadm itself deploys for that release

@@ -93,9 +93,31 @@ EOF
 kind create cluster --name "$KROPS_E2E_KIND_CLUSTER" --image "$KIND_NODE_IMAGE"
 
 log "step 2/8: throwaway CA, server certificate, JKS keystore"
+# Full CA extensions: Python >= 3.13 enables VERIFY_X509_STRICT (RFC 5280)
+# by default in ssl.create_default_context and rejects a CA without
+# keyUsage keyCertSign ("CA cert does not include key usage extension",
+# X509_V_ERR_CA_CERT_MISSING_KEY_USAGE); the assertions (mise python 3.15)
+# verify the admin TLS against this CA. `openssl req -x509` adds no
+# keyUsage, so the extensions go through a config file (portable across
+# OpenSSL/LibreSSL, where -addext forms differ).
+cat > "$CERTS/ca-ext.cnf" <<'EOF'
+[req]
+distinguished_name = dn
+x509_extensions = v3_ca
+prompt = no
+
+[dn]
+CN = krops-virtualized-e2e-ca
+
+[v3_ca]
+basicConstraints = critical, CA:TRUE
+keyUsage = critical, keyCertSign, cRLSign
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always
+EOF
 openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 2 \
   -keyout "$CERTS/ca.key" -out "$CERTS/ca.crt" \
-  -subj "/CN=krops-virtualized-e2e-ca"
+  -config "$CERTS/ca-ext.cnf"
 
 # One password, three consumers: a JKS key entry has a single protection
 # password, and each consumer can only be satisfied when all are equal
@@ -130,9 +152,16 @@ keytool -certreq -alias wiremock -keystore wiremock.jks \
 # SANs per the lib contract (lib/wiremock/deployment.yaml.tmpl): both
 # Service name forms, the wildcard of both (S3 virtual-hosted bucket
 # addressing dials the unqualified host form), and localhost for admin
-# access over kubectl port-forward.
+# access over kubectl port-forward. SKID/AKID/keyUsage/EKU make the leaf
+# pass the same strict RFC 5280 checks (VERIFY_X509_STRICT, Python >= 3.13
+# default): a v3 leaf without an Authority Key Identifier fails with
+# "Missing Authority Key Identifier".
 cat > "$CERTS/san.cnf" <<EOF
 subjectAltName=DNS:wiremock.${WIREMOCK_NAMESPACE}.svc,DNS:wiremock.${WIREMOCK_NAMESPACE}.svc.cluster.local,DNS:*.wiremock.${WIREMOCK_NAMESPACE}.svc,DNS:*.wiremock.${WIREMOCK_NAMESPACE}.svc.cluster.local,DNS:localhost
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
 EOF
 openssl x509 -req -in "$CERTS/server.csr" -CA "$CERTS/ca.crt" \
   -CAkey "$CERTS/ca.key" -CAcreateserial -out "$CERTS/server.crt" \

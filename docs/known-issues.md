@@ -215,9 +215,8 @@ values: `open`, `mitigated`, `upstream-tracked`, `fixed in <PR>`.
 - **What**: the GKE cluster is zonal (`europe-north1-a`) until multi-zone
   availability in the project is confirmed.
 - **Where it bites**: GCP, bootstrap.
-- **Why**: platform constraint: machine availability in the project is not
-  yet confirmed for multi-zone
-  ([#319](https://github.com/polarsquad/krops/issues/319) spike S4).
+- **Why**: platform constraint: multi-zone machine availability in the
+  project is unverified.
 - **Workaround / status**: switch the cluster to a regional topology once
   multi-zone is confirmed in the project.
 - **Status**: open
@@ -238,18 +237,6 @@ values: `open`, `mitigated`, `upstream-tracked`, `fixed in <PR>`.
   reusable.
 - **Status**: open
 
-### No Arm machine pool
-
-- **What**: no Arm machine pool yet; machine-type availability in
-  `europe-north1-a` is unverified; the x86 pool is the default.
-- **Where it bites**: GCP, bootstrap and run (no arm64 scheduling).
-- **Why**: platform constraint (availability unverified;
-  [#319](https://github.com/polarsquad/krops/issues/319) spike S4).
-- **Workaround / status**: check availability with
-  `gcloud compute machine-types list --zones europe-north1-a
-  --filter="name~'^(c4a|t2a)'"` and add an Arm `MachinePool` if present.
-- **Status**: open
-
 ### kind WIF provider stays in the pool after the pivot
 
 - **What**: the `kind` workload-identity provider remains in the `krops`
@@ -263,10 +250,9 @@ values: `open`, `mitigated`, `upstream-tracked`, `fixed in <PR>`.
   bootstrapping of the GCP environment is retired.
 - **Status**: open
 
-### Autopilot, GPU pools, and the reader token grant are follow-ups
+### Autopilot and GPU pools are follow-ups
 
-- **What**: GKE Autopilot, GPU machine pools, and the per-cluster reader's
-  `iam.serviceAccountTokenCreator` grant are not part of the current
+- **What**: GKE Autopilot and GPU machine pools are not part of the current
   environment.
 - **Where it bites**: GCP, run (capability gap for those workloads).
 - **Why**: krops design choice (scope of the initial GCP support,
@@ -364,8 +350,8 @@ by the registry; this section is the canonical copy of its entries).
 ### cert-manager 1.21.2 runs outside its published Kubernetes support window
 
 - **What**: the pinned cert-manager 1.21.2 officially supports Kubernetes
-  1.33-1.36, while the repo pins v1.37.0 for the local-host and local-talos
-  environments.
+  1.33-1.36, while the repo pins v1.37.0 (local-host) and v1.37.1
+  (local-talos).
 - **Where it bites**: local-host and local-talos, bootstrap (and any
   bootstrap.toml PR that bumps one side without the other).
 - **Why**: platform risk from the krops pin choice. The support window is

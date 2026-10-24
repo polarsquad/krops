@@ -184,10 +184,7 @@ next Flux reconciliation.
   project is confirmed. [Known issues registry](./known-issues.md#gcp).
 - Cloud SQL instance names have a reuse cooldown after deletion. [Known
   issues registry](./known-issues.md#gcp).
-- No Arm machine pool yet (availability in `europe-north1-a` unverified).
-  [Known issues registry](./known-issues.md#gcp).
 - The `kind` WIF provider stays in the pool after the pivot (harmless).
   [Known issues registry](./known-issues.md#gcp).
-- GKE Autopilot, GPU pools, and the per-cluster reader's
-  `iam.serviceAccountTokenCreator` grant are follow-ups. [Known issues
+- GKE Autopilot and GPU pools are follow-ups. [Known issues
   registry](./known-issues.md#gcp).

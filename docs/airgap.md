@@ -299,21 +299,34 @@ destination port 53 to non-loopback destinations (restored on step exit,
 before the evidence upload, which the runner agent performs over DNS).
 The job:
 
-1. probes the baseline first, with only the egress block active: an
-   external name must still resolve from a container on the kind network,
-   proving the hole exists. A missing baseline fails the job, because the
-   assertions below would be vacuous;
-2. applies the DNS block and asserts that the external name now fails to
-   resolve from the kind network;
+1. probes the baseline first, with only the egress block active: a
+   fresh external name must get an authoritative answer from a container
+   on the kind network (an NXDOMAIN from the real authoritative
+   servers), proving the hole exists. A missing baseline fails the job,
+   because the assertions below would be vacuous;
+2. applies the DNS block and asserts that a fresh external name now gets
+   no authoritative answer at all from the kind network (the resolver
+   cannot reach any upstream server);
 3. runs the deploy under both blocks;
-4. re-asserts from the mgmt node that the external name still fails and
-   that the `krops-registry-airgap` container name still resolves, and
-   asserts that no component degraded because of a failed lookup: no
-   crash-looping or image-pull-failing pods, and no events mentioning
-   DNS, on both the mgmt cluster and the workload cluster.
+4. re-asserts that the block is still installed, that a fresh external
+   name still gets no answer from the kind network, and that the
+   `krops-registry-airgap` container name still resolves from the mgmt
+   node, and asserts that no component degraded because of a failed
+   lookup: no crash-looping or image-pull-failing pods, and no events
+   mentioning DNS, on both the mgmt cluster and the workload cluster.
 
 The probe transcript is retained with the deployment evidence as
 `airgap-dns-probe.txt`.
+
+The probe names are fresh random subdomains of a real domain
+(`krops-<random>.github.com`), one per phase, because both obvious
+alternatives are spoofable: a well-known name (e.g. `github.com`) can
+still be answered from the runner's resolver cache with the egress
+blocked — cached entries remain valid in the gap — and a reserved TLD
+(`.invalid`, `.test`) is answered locally by systemd-resolved without
+any network traffic. A name that has never existed cannot sit in any
+cache, and its authoritative NXDOMAIN is a response only the external
+chain can give.
 
 ### Required CoreDNS configuration: none
 

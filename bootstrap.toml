@@ -33,6 +33,15 @@ mgmt-context = "krops-mgmt"
 # tests/test-kind-node-image-consistency.py enforces it (#647). Renovate
 # bumps it in the kubernetes-version group via the dedicated manager.
 kind-node-image = "kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
+# OCI repository name for the local-host artifact (OCI_REPOSITORY). The
+# environment variable keeps its precedence at runtime; a missing key
+# falls back to the built-in "krops" (#261).
+oci-repository = "krops"
+# Management kubeconfig path (MGMT_KUBECONFIG). The environment variable
+# keeps its precedence at runtime; a missing key falls back to the
+# built-in ".kube/krops-mgmt.yaml". A relative value resolves against
+# $HOME, matching the built-in (#261).
+mgmt-kubeconfig = ".kube/krops-mgmt.yaml"
 
 [charts]
 # Chart versions installed imperatively before Flux exists. Keep in sync

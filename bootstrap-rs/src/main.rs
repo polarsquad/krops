@@ -48,13 +48,23 @@ const DEFAULT_REGISTRY_READY_RETRIES: u32 = 120;
 const DEFAULT_LOCAL_RECONCILE_TIMEOUT: &str = "15m";
 const DEFAULT_GITHUB_USER: &str = "git";
 const DEFAULT_AGE_KEY_FILE: &str = "age.agekey";
+/// Built-in fallback for `bootstrap.toml`'s `oci-repository` (issue #261);
+/// the `OCI_REPOSITORY` environment variable keeps its precedence over
+/// both.
 const DEFAULT_OCI_REPOSITORY: &str = "krops";
+/// Intentionally generic built-in, not externalized to bootstrap.toml
+/// (issue #261): `latest` encodes no repository-specific choice, and the
+/// issue's scope names only the OCI repository and mgmt kubeconfig. The
+/// `OCI_TAG` environment variable overrides it.
 const DEFAULT_OCI_TAG: &str = "latest";
 const NODE_READY_TIMEOUT: &str = "120s";
 
 // Pivot defaults mirroring pivot.sh's `${VAR:-default}` values. The
 // repository-specific defaults (mgmt cluster names, ready timeouts, kind
-// names, contexts, namespaces) come from bootstrap.toml instead.
+// names, contexts, namespaces) come from bootstrap.toml instead;
+// `DEFAULT_MGMT_KUBECONFIG_RELATIVE` is the built-in fallback for its
+// `mgmt-kubeconfig` value (issue #261), which the `MGMT_KUBECONFIG`
+// environment variable overrides.
 const DEFAULT_MGMT_KUBECONFIG_RELATIVE: &str = ".kube/krops-mgmt.yaml";
 const DEFAULT_MGMT_POLL_INTERVAL: u64 = 10;
 /// Phase 2 node readiness budget (the previous bare `kubectl wait node
@@ -333,16 +343,24 @@ impl Config {
             github_user: with_default("GITHUB_USER", DEFAULT_GITHUB_USER),
             age_key_file: PathBuf::from(with_default("AGE_KEY_FILE", DEFAULT_AGE_KEY_FILE)),
             age_public_key: value("AGE_PUBLIC_KEY"),
-            oci_repository: with_default("OCI_REPOSITORY", DEFAULT_OCI_REPOSITORY),
+            oci_repository: value("OCI_REPOSITORY")
+                .or_else(|| repo.bootstrap.oci_repository.clone())
+                .unwrap_or_else(|| DEFAULT_OCI_REPOSITORY.to_string()),
             oci_tag: with_default("OCI_TAG", DEFAULT_OCI_TAG),
-            // `${BOOTSTRAP_PIVOT:-1}" = 1` semantics: only the literal "1"
+            // `${BOOTSTRAP_PIVOT:-1}` = 1` semantics: only the literal "1"
             // enables; anything else opts out (pivot.sh uses the same trick
             // for PIVOT_SKIP_DELETE).
             bootstrap_pivot: with_default("BOOTSTRAP_PIVOT", "1") == "1",
             pivot_skip_delete: with_default("PIVOT_SKIP_DELETE", "0") == "1",
+            // An explicit MGMT_KUBECONFIG keeps its semantics untouched
+            // (a relative value stays relative to the caller's working
+            // directory); the fallback chain is the bootstrap.toml value,
+            // then the built-in (issue #261).
             mgmt_kubeconfig: value("MGMT_KUBECONFIG")
                 .map(PathBuf::from)
-                .unwrap_or_else(default_mgmt_kubeconfig),
+                .unwrap_or_else(|| {
+                    default_mgmt_kubeconfig(repo.bootstrap.mgmt_kubeconfig.as_deref())
+                }),
             mgmt_ready_timeout,
             mgmt_poll_interval,
             bootstrap_kubecontext,
@@ -355,13 +373,15 @@ impl Config {
     }
 }
 
-/// Default management kubeconfig path: `$HOME/.kube/krops-mgmt.yaml`
-/// (pivot.sh `MGMT_KUBECONFIG` default).
-fn default_mgmt_kubeconfig() -> PathBuf {
+/// Management kubeconfig path: `$HOME/<relative>` (pivot.sh
+/// `MGMT_KUBECONFIG` default semantics). `relative` is the bootstrap.toml
+/// `mgmt-kubeconfig` value, or the built-in constant when the key is
+/// absent (issue #261).
+fn default_mgmt_kubeconfig(relative: Option<&str>) -> PathBuf {
     std::env::var_os("HOME")
         .map(PathBuf::from)
         .unwrap_or_default()
-        .join(DEFAULT_MGMT_KUBECONFIG_RELATIVE)
+        .join(relative.unwrap_or(DEFAULT_MGMT_KUBECONFIG_RELATIVE))
 }
 
 // ── Pure helpers (unit-tested) ────────────────────────────────────────────────
@@ -3790,7 +3810,7 @@ else:
         // Host-local names default to the repository config values (#640).
         assert_eq!(cfg.kind_cluster, "mgmt");
         assert_eq!(cfg.registry_name, "krops-registry");
-        assert_eq!(cfg.mgmt_kubeconfig, default_mgmt_kubeconfig());
+        assert_eq!(cfg.mgmt_kubeconfig, default_mgmt_kubeconfig(None));
         // Values now sourced from the repository config.
         assert_eq!(cfg.environment.mgmt_cluster, "local-management");
         assert_eq!(cfg.environment.sync_path, "mgmt/local-host");
@@ -3805,6 +3825,92 @@ else:
         assert_eq!(cfg.repo.bootstrap.flux_namespace, "flux-system");
         assert_eq!(cfg.repo.bootstrap.mgmt_namespace, "default");
         assert_eq!(cfg.repo.charts["flux-operator"], "0.61.0");
+    }
+
+    #[test]
+    fn oci_repository_and_mgmt_kubeconfig_resolution_layers() {
+        // Issue #261: env var > bootstrap.toml value > built-in
+        // constant, for both the OCI repository name and the management
+        // kubeconfig.
+        const MINIMAL: &str = r##"[bootstrap]
+default-environment = "local-host"
+git-branch = "main"
+kind-cluster = "mgmt"
+kind-context = "kind-mgmt"
+registry-name = "krops-registry"
+flux-namespace = "flux-system"
+github-pat-secret = "flux-github-pat"
+sops-age-secret = "sops-age"
+mgmt-namespace = "default"
+mgmt-context = "krops-mgmt"
+kind-node-image = "kindest/node:v1.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+[charts]
+flux-operator = "0.58.0"
+
+[environments.local-host]
+kind = "local-host"
+sync = "oci"
+sync-path = "mgmt/local-host"
+mgmt-cluster = "local-management"
+mgmt-ready-timeout = "15m"
+infra-provider-namespace = "capd-system"
+infra-provider-name = "docker"
+provider-manifests = []
+"##;
+
+        // A file value beats the built-in constant.
+        let dir_with = tempfile::tempdir().unwrap();
+        let with = dir_with.path().join("bootstrap.toml");
+        std::fs::write(
+            &with,
+            MINIMAL.replace(
+                "[charts]",
+                "oci-repository = \"other-repo\"\nmgmt-kubeconfig = \".kube/other-mgmt.yaml\"\n[charts]",
+            ),
+        )
+        .unwrap();
+        let repo = BootstrapConfig::load_from(&with).unwrap();
+        let cfg = Config::from_env(
+            &Cli::try_parse_from(["krops-bootstrap", "local-host"]).unwrap(),
+            repo,
+            |_| None,
+        )
+        .unwrap();
+        assert_eq!(cfg.oci_repository, "other-repo");
+        assert_eq!(
+            cfg.mgmt_kubeconfig,
+            default_mgmt_kubeconfig(Some(".kube/other-mgmt.yaml"))
+        );
+
+        // Absent keys fall back to the built-in constants.
+        let dir_absent = tempfile::tempdir().unwrap();
+        let absent = dir_absent.path().join("bootstrap.toml");
+        std::fs::write(&absent, MINIMAL).unwrap();
+        let repo = BootstrapConfig::load_from(&absent).unwrap();
+        let cfg = Config::from_env(
+            &Cli::try_parse_from(["krops-bootstrap", "local-host"]).unwrap(),
+            repo,
+            |_| None,
+        )
+        .unwrap();
+        assert_eq!(cfg.oci_repository, DEFAULT_OCI_REPOSITORY);
+        assert_eq!(cfg.mgmt_kubeconfig, default_mgmt_kubeconfig(None));
+
+        // The environment keeps precedence over the (checked-in) file
+        // values.
+        let cfg = Config::from_env(
+            &Cli::try_parse_from(["krops-bootstrap", "local-host"]).unwrap(),
+            repo_config(),
+            |name| match name {
+                "OCI_REPOSITORY" => Some("env-repo".into()),
+                "MGMT_KUBECONFIG" => Some("/tmp/env-mgmt.yaml".into()),
+                _ => None,
+            },
+        )
+        .unwrap();
+        assert_eq!(cfg.oci_repository, "env-repo");
+        assert_eq!(cfg.mgmt_kubeconfig, PathBuf::from("/tmp/env-mgmt.yaml"));
     }
 
     #[test]

@@ -332,7 +332,12 @@ any network traffic. A name that has never existed cannot sit in any
 cache, and only the external chain can produce a response for it (the
 upstream may answer with NXDOMAIN or with an empty response, depending
 on the resolver; both prove the chain is reachable, and a blocked path
-produces neither).
+produces neither). The assertions read the probe output text, not the
+nslookup exit code: nslookup exits nonzero for a negative answer and
+for "no servers" alike, and the step shell runs with `set -e`, so each
+probe captures its exit code to keep a failing lookup from aborting the
+step; the code is only treated as a hard failure at the docker level
+(rc >= 125, e.g. the container could not run).
 
 ### Required CoreDNS configuration: none
 

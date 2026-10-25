@@ -244,9 +244,16 @@ jobs:
             echo "===== DNS baseline probe (bridge block only, no DNS block) ====="
             echo "\$ docker run --rm --network kind $probe_image nslookup $baseline_name"
           } >> "$dns_probe"
+          baseline_rc=0
           baseline_out=$(timeout 60 docker run --rm --network kind "$probe_image" \
-            nslookup "$baseline_name" 2>&1)
+            nslookup "$baseline_name" 2>&1) || baseline_rc=$?
           printf '%s\n' "$baseline_out" >> "$dns_probe"
+          echo "nslookup rc: $baseline_rc" >> "$dns_probe"
+          if [ "$baseline_rc" -ge 125 ]; then
+            echo "::error::DNS baseline probe failed to run (docker rc=$baseline_rc)"
+            cat "$dns_probe"
+            exit 1
+          fi
           if printf '%s\n' "$baseline_out" | grep -qiE "$dns_dead_re"; then
             echo "::error::DNS baseline probe failed: $baseline_name got no response (dead-chain signature) under the bridge block only; external DNS is not working on this runner and the block assertions below would be vacuous"
             cat "$dns_probe"
@@ -282,9 +289,16 @@ jobs:
             echo "===== DNS block assertion (fresh external name must get no answer) ====="
             echo "\$ docker run --rm --network kind $probe_image nslookup $blocked_name"
           } >> "$dns_probe"
+          blocked_rc=0
           blocked_out=$(timeout 60 docker run --rm --network kind "$probe_image" \
-            nslookup "$blocked_name" 2>&1)
+            nslookup "$blocked_name" 2>&1) || blocked_rc=$?
           printf '%s\n' "$blocked_out" >> "$dns_probe"
+          echo "nslookup rc: $blocked_rc" >> "$dns_probe"
+          if [ "$blocked_rc" -ge 125 ]; then
+            echo "::error::DNS block probe failed to run (docker rc=$blocked_rc)"
+            cat "$dns_probe"
+            exit 1
+          fi
           if printf '%s\n' "$blocked_out" | grep -qiE "$dns_answer_re"; then
             echo "::error::External DNS still answers a fresh name with the DNS block active: the block is ineffective"
             cat "$dns_probe"
@@ -360,6 +374,7 @@ jobs:
             post_out=$(timeout 60 docker run --rm --network kind "$probe_image" \
               nslookup "$post_name" 2>&1) || post_rc=$?
             printf '%s\n' "$post_out" >> "$dns_probe"
+            echo "nslookup rc: $post_rc" >> "$dns_probe"
             if [ "$post_rc" -ge 125 ]; then
               echo "::error::Post-deploy DNS probe failed to run (docker rc=$post_rc)"
               cat "$dns_probe"

@@ -49,6 +49,8 @@ jobs:
           OCI_REGISTRY: localhost:5001
           WORKLOAD_REGISTRY_HOST: krops-registry-airgap
           ZARF_KEYLESS_SIGNING: "1"
+          KROPS_DEPENDENCY_GRAPH_GIT_REF: ${{ github.ref }}
+          KROPS_DEPENDENCY_GRAPH_WORKFLOW_REF: ${{ github.workflow_ref }}
 
       - name: Store air-gap package
         uses: actions/upload-artifact@v7.0.2
@@ -69,6 +71,17 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           compression-level: 0
+
+      # The dependency graph record (#606) outlives the throwaway nightly
+      # package: it is a few KB and retained 30 days for offline inspection
+      # of what a given package version contains.
+      - name: Store air-gap dependency graph
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: krops-airgap-dependency-graph
+          path: airgap/dependency-graph.json
+          if-no-files-found: error
+          retention-days: 30
 
   isolated-deploy:
     name: Deploy without external egress

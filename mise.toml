@@ -47,6 +47,11 @@ if ! python3 airgap/tests/test-airgap-ownership.py; then
   echo "    FAILED: air-gap ownership invariant" >&2
   fail=1
 fi
+echo "==> air-gap dependency graph record (#606)"
+if ! uv run python airgap/tests/test-airgap-dependency-graph.py; then
+  echo "    FAILED: air-gap dependency graph record" >&2
+  fail=1
+fi
 echo "==> air-gap kubeadm inventory regressions (offline)"
 if ! python3 airgap/tests/test-airgap-kubeadm-images-regressions.py; then
   echo "    FAILED: air-gap kubeadm inventory regressions" >&2

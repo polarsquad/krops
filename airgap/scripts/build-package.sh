@@ -8,6 +8,7 @@
 #      images, and OCI charts into archives/
 #   4. zarf package create (including per-component Syft SBOMs)
 #   5. sign the completed package
+#   6. render the dependency graph record (#606) next to the package
 #
 # Output: zarf-package-krops-airgap-arm64-0.1.0.tar.zst next to airgap/.
 set -euo pipefail
@@ -25,10 +26,10 @@ if [ -z "${ZARF_SIGNING_KEY:-}" ] && [ "${ZARF_KEYLESS_SIGNING:-0}" != "1" ]; th
   exit 1
 fi
 
-echo "==> 1/5 validate"
+echo "==> 1/6 validate"
 mise run validate
 
-echo "==> 2/5 config artifact"
+echo "==> 2/6 config artifact"
 "$SCRIPT_DIR/build-config-artifact.sh"
 
 # The package must pull the same config artifact that the preceding step
@@ -60,7 +61,7 @@ if [ -n "${OCI_REGISTRY:-}" ]; then
   echo "    zarf config artifact: ${CONFIG_ARTIFACT}"
 fi
 
-echo "==> 3/5 offline host assets, workload-node images, and OCI charts"
+echo "==> 3/6 offline host assets, workload-node images, and OCI charts"
 mkdir -p airgap/archives
 
 INIT_STAGING=$(mktemp -d "${TMPDIR:-/tmp}/krops-zarf-init.XXXXXX")
@@ -140,7 +141,7 @@ podinfo_chart_version=$(sed -nE 's/^ *tag: "?([0-9][^"]*)"?.*/\1/p' workload/loc
 helm pull oci://ghcr.io/stefanprodan/charts/podinfo --version "$podinfo_chart_version" -d airgap/archives/charts
 echo "    staged charts: $(ls airgap/archives/charts/)"
 
-echo "==> 4/5 zarf package create (SBOM generation enabled)"
+echo "==> 4/6 zarf package create (SBOM generation enabled)"
 cd airgap
 mise x -- zarf package create . --confirm
 
@@ -150,7 +151,7 @@ if [ ! -f "$PACKAGE" ]; then
   exit 1
 fi
 
-echo "==> 5/5 sign package"
+echo "==> 5/6 sign package"
 if [ "${ZARF_KEYLESS_SIGNING:-0}" = "1" ]; then
   mise x -- zarf package sign "$PACKAGE" --keyless --confirm
 else
@@ -161,5 +162,20 @@ else
   mise x -- zarf package sign "$PACKAGE" "${sign_args[@]}"
 fi
 
+echo "==> 6/6 dependency graph record"
+# Declared-source render of the exact dependency graph behind this build
+# (#606): image refs with digests, chart versions, tool versions, and build
+# metadata. Stored next to the package archive and retained as its own CI
+# artifact. The renderer reads Git sources only, so it is fully offline.
+if command -v sha256sum >/dev/null 2>&1; then
+  PACKAGE_SHA256=$(sha256sum "$PACKAGE" | awk '{print $1}')
+else
+  PACKAGE_SHA256=$(shasum -a 256 "$PACKAGE" | awk '{print $1}')
+fi
+mise x -- uv run python scripts/render-dependency-graph.py \
+  --out "$REPO_ROOT/airgap/dependency-graph.json" \
+  --package-name "$(basename "$PACKAGE")" \
+  --package-sha256 "$PACKAGE_SHA256"
+
 echo "==> Built:"
-ls -lh "$PACKAGE"
+ls -lh "$PACKAGE" "$REPO_ROOT/airgap/dependency-graph.json"

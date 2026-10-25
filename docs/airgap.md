@@ -85,6 +85,62 @@ instead uses GitHub OIDC keyless signing; its Sigstore bundle and Rekor
 inclusion proof are embedded in the Zarf archive and require no online lookup
 at verification time.
 
+### Dependency graph record
+
+The per-component Syft SBOMs describe image *content*; they do not say which
+chart versions were resolved, which tool versions were used, or which source
+image refs mapped to which digests at build time. To close that gap, every
+build renders a machine-readable dependency graph record before it ends:
+`airgap/scripts/build-package.sh` step 6 runs
+`airgap/scripts/render-dependency-graph.py`, which stores
+`airgap/dependency-graph.json` (gitignored) next to the package archive and
+prints the path.
+
+The record is rendered from the DECLARED sources only — `airgap/images.txt`
+(image refs with digests, one entry per inventory line, category `M`/`H`/`W`
+as in the inventory's sections), `airgap/zarf.yaml` (per-component chart
+versions, per-component images, and the release-asset URL/sha256/target
+triples), `bootstrap.toml` (`[charts]` and the `kind-node-image` pin),
+`mise.toml` (tool versions: zarf, clusterctl, flux, helm), and
+`workload/local-host/podinfo/helm.yaml` (podinfo chart tag) — never from
+pulled or live state, so the render is fully offline and cannot drift from
+what the build consumed. It also fails closed when a declared source no
+longer agrees with the inventory (for example a zarf.yaml image whose
+digest is absent from `images.txt`).
+
+Schema (version 1):
+
+```json
+{
+  "schema_version": 1,
+  "build": {"git_sha": "...", "git_ref": "...", "workflow_ref": "...",
+            "timestamp_utc": "...", "package": {"name": "...", "sha256": "..."}},
+  "tools": [{"name": "...", "version": "...", "pin_source": "mise.toml"}],
+  "charts": [{"name": "...", "version": "...", "source_file": "..."}],
+  "images": [{"ref": "...", "tag": "...", "digest": "sha256:...", "category": "M"}],
+  "release_assets": [{"url": "...", "sha256": "...", "target": "..."}]
+}
+```
+
+`build.workflow_ref` is set from the `air-gapped` workflow's
+`github.workflow_ref` (and `build.git_ref` from `github.ref`) in CI, and is
+`null`/branch-local for operator builds. The locally built
+`localhost:5001/krops-airgap:latest` config artifact is the one image in
+`zarf.yaml` that is not a remote digest pin and is excluded, like
+`test-airgap-ownership.py`.
+
+In the `air-gapped` workflow the record is uploaded as its own artifact,
+`krops-airgap-dependency-graph`, with `retention-days: 30` — deliberately
+separate from the 1-day throwaway package artifacts, so an operator can
+download the few-KB record long after a nightly package has expired and
+inspect exactly what that package version contains, offline. The offline
+gate is `airgap/tests/test-airgap-dependency-graph.py` (in `mise run
+validate` and the `air-gapped` build job, which runs `mise run validate`
+before packaging): it renders the record against the repository and checks
+the schema version, the required fields, that every zarf.yaml component
+image and every `images.txt` line are present, and that a malformed
+package digest is rejected.
+
 ## Architecture
 
 Two registries, two image layers, one package.

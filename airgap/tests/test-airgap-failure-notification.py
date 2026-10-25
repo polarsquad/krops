@@ -16,7 +16,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 AIR_GAPPED_YML = REPO_ROOT / ".github/workflows/air-gapped.yml"
 
-REQUIRED_NEEDS = {"build", "isolated-deploy", "update-rollback"}
+REQUIRED_NEEDS = {"build", "isolated-deploy", "update-rollback", "stale-clock"}
 
 
 def check_job(jobs: dict, name: str) -> list[str]:

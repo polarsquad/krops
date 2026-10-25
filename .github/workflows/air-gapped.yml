@@ -206,10 +206,10 @@ jobs:
           # and workload container uses (Docker's built-in DNS). The probe
           # names are fresh random subdomains of a real domain, one per
           # phase: a resolver cache cannot hold a name that has never
-          # existed, and the authoritative servers answer them (NXDOMAIN),
-          # which the blocked path cannot. A reserved TLD (.invalid,
-          # .test) would not work: systemd-resolved answers it locally,
-          # never touching the network.
+          # existed, and the external chain answers them (NXDOMAIN or an
+          # empty answer), which the blocked path cannot. A reserved TLD
+          # (.invalid, .test) would not work: systemd-resolved answers it
+          # locally, never touching the network.
           : > "$dns_probe"
           registry_tar=$(ls airgap/archives/docker.io_library_registry_*.tar 2>/dev/null | head -n 1)
           if [ -z "$registry_tar" ]; then
@@ -222,12 +222,23 @@ jobs:
             exit 1
           fi
 
+          # Probe signatures. nslookup prints an answer section header for
+          # any response it receives - NXDOMAIN, an empty (NODATA) answer,
+          # or a real one; resolvers differ in which of those they return
+          # for a nonexistent name, so the assertion keys off the header,
+          # not the RCODE text. A dead chain (upstream unreachable, i.e. the
+          # DNS block in effect) prints a timeout/no-servers/SERVFAIL
+          # signature and no answer header. The two are mutually exclusive.
+          dns_answer_re='Non-authoritative answer:|Authoritative answer:|can.t find|NXDOMAIN|Name error'
+          dns_dead_re='no servers could be reached|connection timed out|Servfail|server failure'
+
           # Baseline (bridge block only, no DNS block yet): a fresh external
-          # name must get an authoritative answer from a container on the
-          # kind network, proving the egress block alone leaves a DNS hole
-          # (the dockerd built-in DNS forwards upstream from the host
-          # network namespace). If the external chain does not answer, the
-          # block assertions below would be vacuous.
+          # name must get a response from the external chain - any answer,
+          # NXDOMAIN or otherwise - from a container on the kind network,
+          # proving the egress block alone leaves a DNS hole (the dockerd
+          # built-in DNS forwards upstream from the host network
+          # namespace). If the chain does not answer, the block assertions
+          # below would be vacuous.
           baseline_name="krops-$(openssl rand -hex 12).github.com"
           {
             echo "===== DNS baseline probe (bridge block only, no DNS block) ====="
@@ -236,12 +247,17 @@ jobs:
           baseline_out=$(timeout 60 docker run --rm --network kind "$probe_image" \
             nslookup "$baseline_name" 2>&1)
           printf '%s\n' "$baseline_out" >> "$dns_probe"
-          if ! printf '%s\n' "$baseline_out" | grep -qiE 'NXDOMAIN|Name error'; then
-            echo "::error::DNS baseline probe failed: $baseline_name did not get an authoritative answer from a container on the kind network without the DNS block; the block assertions below would be vacuous"
+          if printf '%s\n' "$baseline_out" | grep -qiE "$dns_dead_re"; then
+            echo "::error::DNS baseline probe failed: $baseline_name got no response (dead-chain signature) under the bridge block only; external DNS is not working on this runner and the block assertions below would be vacuous"
             cat "$dns_probe"
             exit 1
           fi
-          echo "PROBE: $baseline_name got an authoritative answer under the bridge block only: external DNS is not covered by the egress block (the hole this test closes)" >> "$dns_probe"
+          if ! printf '%s\n' "$baseline_out" | grep -qiE "$dns_answer_re"; then
+            echo "::error::DNS baseline probe failed: $baseline_name got neither a response nor a failure signature under the bridge block only; the probe is inconclusive"
+            cat "$dns_probe"
+            exit 1
+          fi
+          echo "PROBE: $baseline_name got a response from the external chain under the bridge block only: external DNS is not covered by the egress block (the hole this test closes)" >> "$dns_probe"
 
           # Block external DNS at the host (both protocols) and verify the
           # rules landed.
@@ -259,8 +275,8 @@ jobs:
           dns_block_installed=1
 
           # The block must be effective from inside the kind network: a
-          # fresh external name must now get no authoritative answer at
-          # all (the resolver cannot reach any upstream server).
+          # fresh external name must now get no response at all (the
+          # resolver cannot reach any upstream server).
           blocked_name="krops-$(openssl rand -hex 12).github.com"
           {
             echo "===== DNS block assertion (fresh external name must get no answer) ====="
@@ -269,12 +285,17 @@ jobs:
           blocked_out=$(timeout 60 docker run --rm --network kind "$probe_image" \
             nslookup "$blocked_name" 2>&1)
           printf '%s\n' "$blocked_out" >> "$dns_probe"
-          if ! printf '%s\n' "$blocked_out" | grep -qiE 'no servers could be reached|timed out|Servfail|server failure'; then
+          if printf '%s\n' "$blocked_out" | grep -qiE "$dns_answer_re"; then
             echo "::error::External DNS still answers a fresh name with the DNS block active: the block is ineffective"
             cat "$dns_probe"
             exit 1
           fi
-          echo "PROBE: $blocked_name got no authoritative answer with the DNS block active (expected): the block is effective" >> "$dns_probe"
+          if ! printf '%s\n' "$blocked_out" | grep -qiE "$dns_dead_re"; then
+            echo "::error::DNS block assertion inconclusive: the probe got no answer but no failure signature either; the probe did not run as intended"
+            cat "$dns_probe"
+            exit 1
+          fi
+          echo "PROBE: $blocked_name got no response with the DNS block active (expected): the block is effective" >> "$dns_probe"
 
           if airgap/scripts/offline-run.sh \
             airgap/zarf-package-krops-airgap-*.tar.zst; then
@@ -344,12 +365,12 @@ jobs:
               cat "$dns_probe"
               exit 1
             fi
-            if ! printf '%s\n' "$post_out" | grep -qiE 'no servers could be reached|timed out|Servfail|server failure'; then
+            if ! printf '%s\n' "$post_out" | grep -qiE "$dns_dead_re"; then
               echo "::error::External DNS answers a fresh name from the kind network after the deploy: the DNS block is not holding"
               cat "$dns_probe"
               exit 1
             fi
-            echo "PROBE: $post_name got no authoritative answer from the kind network after the deploy (expected)" >> "$dns_probe"
+            echo "PROBE: $post_name got no response from the kind network after the deploy (expected)" >> "$dns_probe"
             # Cluster-local (Docker-internal) DNS must still work: only
             # external lookups are blocked.
             if ! docker exec airgap-mgmt-control-plane timeout 60 getent hosts krops-registry-airgap >> "$dns_probe" 2>&1; then

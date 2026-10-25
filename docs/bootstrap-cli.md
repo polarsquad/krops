@@ -102,8 +102,9 @@ krops-bootstrap teardown local-host     # local-host teardown
 
 ## Repository configuration
 
-Repository-owned cluster names, paths, chart versions, provider manifests, and
-teardown targets live in [`bootstrap.toml`](../bootstrap.toml). The binary
+Repository-owned cluster names, paths, chart versions, provider manifests,
+teardown targets, the local-host OCI repository name, and the management
+kubeconfig path live in [`bootstrap.toml`](../bootstrap.toml). The binary
 retains generic fallback defaults and sequence-level contracts. It reads
 `./bootstrap.toml` by default; `BOOTSTRAP_CONFIG` selects another path.
 
@@ -164,9 +165,9 @@ pins together with their declarative counterparts. See
 | `GITHUB_USER` | `git` | Basic-auth username paired with the PAT |
 | `AGE_KEY_FILE` | `age.agekey` | SOPS age private key loaded into `sops-age`; relative to the caller's working directory |
 | `AGE_PUBLIC_KEY` | derived from `AGE_KEY_FILE` | Public key override during secret creation; must match the key file's public key when both are known (preflight fails fast on a mismatch) |
-| `OCI_REPOSITORY` / `OCI_TAG` | `krops` / `latest` | Local-host OCI artifact name |
+| `OCI_REPOSITORY` / `OCI_TAG` | config value `krops` / `latest` | Local-host OCI artifact name; `OCI_TAG` is the one intentionally generic built-in, not externalized (issue #261) |
 | `BOOTSTRAP_PIVOT` | `1` | Any value other than literal `1` skips pivot |
-| `MGMT_KUBECONFIG` | `~/.kube/krops-mgmt.yaml` | Exported management kubeconfig for native fallback runs; a relative value stays relative to the caller's working directory |
+| `MGMT_KUBECONFIG` | config value `.kube/krops-mgmt.yaml` (relative to `$HOME`) | Exported management kubeconfig for native fallback runs; an explicit relative value stays relative to the caller's working directory |
 | `MGMT_READY_TIMEOUT` | `40m` for aws, `15m` for local-host, `30m` for local-talos (PXE install + first Talos boot) | Management cluster definition and provisioning waits |
 | `MGMT_POLL_INTERVAL` | `10` seconds | Management cluster definition, provisioning, and node-readiness polls |
 | `BOOTSTRAP_KUBECONTEXT` | `kind-<KROPS_KIND_CLUSTER>` when the cluster name is overridden, else the config value `kind-mgmt` | Source context required by pivot; wins over the derived context |
@@ -178,7 +179,11 @@ pins together with their declarative counterparts. See
 
 The defaults above are the binary's generic fallbacks, not repository
 configuration: [`bootstrap.toml`](../bootstrap.toml) is the canonical source
-for the repository-owned values.
+for the repository-owned values, including its `oci-repository` and
+`mgmt-kubeconfig` keys (issue #261). The one repository-specific built-in
+that remains is `OCI_TAG` (`latest`), kept intentionally generic; a config
+written before those two keys existed still parses, and the binary falls
+back to the built-in values (`krops`, `.kube/krops-mgmt.yaml`).
 
 The pivot's target node-readiness wait uses a fixed 15m budget
 (`MGMT_NODE_READY_TIMEOUT` in `pivot.sh` and `bootstrap-rs/src/main.rs`).

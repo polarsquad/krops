@@ -49,6 +49,9 @@ EXPECTED = {
     "mgmt/local-talos/capi-providers/capt-system/provider.yaml": {
         "shrinedogg/cluster-api-provider-tinkerbell",
     },
+    "mgmt/shared/flux-apps/flux-operator/flux-operator.yaml": {
+        "ghcr.io/controlplaneio-fluxcd/charts/flux-operator",
+    },
     "mgmt/local-talos/clusters/management/cluster.yaml": {
         "kubernetes/kubernetes",
         "siderolabs/talos",

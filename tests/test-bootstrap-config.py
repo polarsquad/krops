@@ -8,10 +8,10 @@ provider-manifest or sync path is missing, when an environment's kind
 does not match its section name (the section name is authoritative for
 profile resolution), or when the file does not parse. Also requires the
 airgap flux-operator chart pins to match [charts].flux-operator: the
-airgap generator derives its regenerated HelmChartProxy version from
-bootstrap.toml at generation time, and the Zarf component pins it
-literally, so neither can drift from the version the gap registry is
-seeded with (issue #633).
+airgap artifact derives its HelmChartProxy from the shared base that
+this test pins to [charts] (issue #244), and the Zarf component pins
+the same version literally, so neither can drift from the version the
+gap registry is seeded with (issue #633).
 Requires Python 3.11+ (tomllib); mise and CI both provide it.
 """
 
@@ -25,10 +25,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # chart key in [charts] -> manifest files that must carry the same version
 CHART_MANIFESTS = {
     "flux-operator": [
-        "mgmt/aws/addons/flux-apps/flux-operator.yaml",
-        "mgmt/local-host/addons/flux-apps/flux-operator.yaml",
-        "mgmt/azure/addons/flux-apps/flux-operator.yaml",
-        "mgmt/gcp/addons/flux-apps/flux-operator.yaml",
+        "mgmt/shared/flux-apps/flux-operator/flux-operator.yaml",
     ],
     "cert-manager": [
         "mgmt/aws/infrastructure/cert-manager/helmrelease.yaml",
@@ -69,43 +66,40 @@ def block_version(block: str, label: str) -> str:
     return matches[0]
 
 
-# The exact line build-config-artifact.sh must carry to derive the
-# airgap flux-operator chart pin the same way stage-and-create-cluster.sh
-# seeds the gap registry (issue #633).
-FLUX_CHART_DERIVE_LINE = (
-    "flux_chart_version=$(sed -nE 's/^flux-operator = \"(.*)\"/\\1/p' "
-    "bootstrap.toml | head -1)"
+# The exact copy build-config-artifact.sh must carry so the airgap
+# artifact's flux-operator HelmChartProxy derives its version from the
+# shared base (issue #244), which this test pins to [charts].flux-operator
+# via CHART_MANIFESTS -- the value stage-and-create-cluster.sh seeds the
+# gap registry with (issue #633).
+FLUX_CHART_BASE_COPY_LINE = (
+    'cp -R mgmt/shared/flux-apps/flux-operator '
+    '"$ARTIFACT_ROOT/mgmt/shared/flux-apps/flux-operator"'
 )
 
 
 def airgap_flux_operator_pins() -> str:
-    """The airgap-side flux-operator chart pin (issue #633).
+    """The airgap-side flux-operator chart pin (issues #244, #633).
 
-    The generator carries no literal version: it derives
-    ${flux_chart_version} from bootstrap.toml [charts] at generation
-    time, the same way stage-and-create-cluster.sh seeds the gap
-    registry, so the regenerated HelmChartProxy cannot request a version
-    the registry was never seeded with. This asserts that derive line
-    and the ${flux_chart_version} placeholder are intact, and returns
-    the Zarf component's literal pin, which must equal
-    [charts].flux-operator.
+    The generator carries no flux-operator manifest of its own: it copies
+    the shared base into the artifact at the same relative depth, so the
+    artifact's HelmChartProxy version is the base's, which
+    CHART_MANIFESTS pins to [charts].flux-operator. This asserts that
+    copy line is intact and that no separate flux-operator.yaml heredoc
+    remains, and returns the Zarf component's literal pin, which must
+    equal [charts].flux-operator.
     """
     script = (REPO_ROOT / "airgap/scripts/build-config-artifact.sh").read_text()
-    if FLUX_CHART_DERIVE_LINE not in script:
+    if FLUX_CHART_BASE_COPY_LINE not in script:
         raise SystemExit(
-            "FAILED: build-config-artifact.sh does not derive flux_chart_version "
-            "from bootstrap.toml [charts] (issue #633)"
+            "FAILED: build-config-artifact.sh does not copy the shared "
+            "flux-operator base into the artifact (issue #244)"
         )
-    match = re.search(
-        r"^cat > \"\$LH/addons/flux-apps/flux-operator\.yaml\" <<EOF\n(.*?)^EOF$",
-        script, re.M | re.S,
-    )
-    if match is None:
-        raise SystemExit("FAILED: no flux-operator.yaml heredoc in build-config-artifact.sh")
-    if 'version: "${flux_chart_version}"' not in match.group(1):
+    if re.search(
+        r"^cat > \"\$LH/addons/flux-apps/flux-operator\.yaml\" <<EOF", script, re.M
+    ):
         raise SystemExit(
-            "FAILED: the generator's flux-operator.yaml heredoc does not pin "
-            'version: "${flux_chart_version}" (issue #633)'
+            "FAILED: build-config-artifact.sh still writes a separate "
+            "flux-operator.yaml heredoc (issue #244)"
         )
     zarf = (REPO_ROOT / "airgap/zarf.yaml").read_text()
     component = re.search(
@@ -147,9 +141,10 @@ def main() -> int:
 
     # The gap registry only ever carries the chart version
     # stage-and-create-cluster.sh derives from bootstrap.toml, so the
-    # airgap-side pins must equal [charts].flux-operator: the generator
-    # derives its pin from that key at generation time and the Zarf
-    # component pins it literally (issue #633).
+    # airgap-side pins must equal [charts].flux-operator: the artifact's
+    # HelmChartProxy version flows from the shared base pinned in
+    # CHART_MANIFESTS, and the Zarf component pins it literally
+    # (issues #244, #633).
     try:
         zarf_pin = airgap_flux_operator_pins()
     except SystemExit as error:

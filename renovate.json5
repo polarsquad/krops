@@ -10,6 +10,7 @@
   //   - kind node images (cluster classes, airgap scripts, image inventory)
   //   - airgap image inventory and zarf.yaml image lists
   //   - annotated chart pins in bootstrap.toml (consumed by the Rust binary)
+  //   - the shared flux-operator HelmChartProxy base under mgmt/shared/
   //   - imperative Helm chart pins in pivot.sh
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
@@ -264,6 +265,16 @@
       "managerFilePatterns": ["/(^|/)bootstrap\\.toml$/"],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z0-9-]+)(?: registryUrl=(?<registryUrl>\\S+))? depName=(?<depName>\\S+)(?: versioning=(?<versioning>[a-z0-9-]+))?\\n[a-zA-Z0-9_-]+ = \\\"(?<currentValue>[^\\\"]+)\\\""
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "shared flux-operator HelmChartProxy chart pin (issue #244)",
+      "managerFilePatterns": [
+        "/(^|/)mgmt/shared/flux-apps/flux-operator/flux-operator\\.yaml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z0-9-]+) depName=(?<depName>\\S+)\\n\\s+version: \"(?<currentValue>[^\"]+)\""
       ]
     },
     {

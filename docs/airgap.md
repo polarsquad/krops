@@ -222,11 +222,14 @@ only to the build job.
 
 The `air-gapped` GitHub Actions workflow runs nightly (cron `17 2 * * *`,
 default branch) or by manual dispatch, with no branch or fork guard, so a
-change can be verified before merge. It builds the ARM64 bundle, then runs a
-single `isolated-deploy` job that blocks new external connections from the
-kind network and fails if any public packet is observed or attempted, plus a
-`report-status` job that files or closes the nightly failure issue. The
-workflow retains the bundle and verification evidence as one-day artifacts.
+change can be verified before merge. It builds the ARM64 bundle, then runs
+the `isolated-deploy` job (blocks new external connections from the kind
+network, fails if any public packet is observed or attempted), the
+`update-rollback` job (staged update rejection and offline rollback), and
+the `stale-clock` job (system clock skewed past certificate validity; see
+Known limitations below), plus a `report-status` job that files or closes
+the nightly failure issue. The workflow retains the bundle and verification
+evidence as one-day artifacts.
 
 The nightly schedule starts at 02:17 UTC rather than at the top of the hour to
 reduce GitHub Actions queue contention. Build and deployment remain separate
@@ -434,6 +437,24 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
 - **AWS flavor is out of scope** here but shapes the design: in a disconnected
   AWS region the same package pattern covers CAPA/ACK/EKS via in-region
   endpoints; on-prem it maps to the provider-swap path in `docs/extending.md`.
+- **Clock skew: none supported.** Certificates and tokens in the bundle have
+  fixed validity windows (the kubeadm CA and the API server certificates are
+  valid for 1 year from cluster creation), so an air-gapped machine whose
+  system clock drifts past them can no longer validate its own cluster. The
+  failure is loud, not silent: `kubectl` exits non-zero with
+  `x509: certificate has expired or is not yet valid` instead of hanging or
+  no-op-ing, and nothing in the bundle performs NTP synchronization or
+  automatic clock repair (a non-goal by design). The nightly `stale-clock`
+  job (air-gapped.yml) proves the behavior: it deploys the bundle at the real
+  system clock with external egress blocked, skews the system clock two years
+  ahead, asserts exactly that validity failure, restores the clock, and
+  asserts that the cluster recovers. Recovery on an operator machine: restore
+  the correct system time (re-enable NTP with `sudo timedatectl set-ntp true`
+  after setting the time back); TLS validity is checked per handshake, so the
+  API plane recovers without a restart. Certificates that cert-manager
+  re-issues while the clock is skewed carry a notBefore in the future and
+  stay unusable until real time reaches it; force a re-issue at the correct
+  time by deleting the serving Secret that holds them.
 
 ## Updating a deployed bundle
 

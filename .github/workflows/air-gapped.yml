@@ -286,9 +286,207 @@ jobs:
           path: /tmp/airgap-update-rollback.log
           retention-days: 1
 
+  stale-clock:
+    name: Stale system clock failure mode
+    needs: build
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      # See docs/airgap.md for why (nested node containers exhaust the default host inotify limits).
+      - name: Raise inotify limits for nested node containers
+        run: |
+          sudo sysctl -w fs.inotify.max_user_watches=524288
+          sudo sysctl -w fs.inotify.max_user_instances=512
+
+      - name: Install mise
+        uses: jdx/mise-action@v5.2.1
+        with:
+          version: 2026.10.17
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Download air-gap package
+        uses: actions/download-artifact@v8.0.2
+        with:
+          name: krops-airgap-arm64-package
+          path: airgap
+
+      - name: Download air-gap bundle
+        uses: actions/download-artifact@v8.0.2
+        with:
+          name: krops-airgap-arm64
+          path: airgap
+
+      # Deploy at the real system clock, with external egress blocked exactly
+      # as isolated-deploy blocks it, so this whole test (deploy, skew, and
+      # assertions) runs without external network access. The block is lifted
+      # when this step exits; the skew phase below makes no assertion that
+      # depends on egress.
+      - name: Deploy at the real system clock (egress blocked)
+        env:
+          SKIP_OFFLINE_CHECK: "1"
+          AIRGAP_VERIFY_WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          set -uo pipefail
+
+          firewall_comment=krops-airgap-stale-clock
+          bridge_interface=
+
+          cleanup() {
+            if [ -n "$bridge_interface" ]; then
+              sudo iptables -D DOCKER-USER \
+                -i "$bridge_interface" ! -o "$bridge_interface" \
+                -m conntrack --ctstate NEW \
+                -m comment --comment "$firewall_comment" -j DROP \
+                2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          docker network inspect kind >/dev/null 2>&1 || \
+            docker network create kind >/dev/null
+          network_id=$(docker network inspect kind --format '{{.Id}}')
+          bridge_interface="br-${network_id:0:12}"
+
+          sudo iptables -I DOCKER-USER 1 \
+            -i "$bridge_interface" ! -o "$bridge_interface" \
+            -m conntrack --ctstate NEW \
+            -m comment --comment "$firewall_comment" -j DROP
+          if ! sudo iptables -C DOCKER-USER \
+            -i "$bridge_interface" ! -o "$bridge_interface" \
+            -m conntrack --ctstate NEW \
+            -m comment --comment "$firewall_comment" -j DROP; then
+            echo "::error::Failed to block external egress from the kind network"
+            exit 1
+          fi
+
+          if airgap/scripts/offline-run.sh \
+            airgap/zarf-package-krops-airgap-*.tar.zst; then
+            deploy_result=0
+          else
+            deploy_result=$?
+          fi
+
+          exit "$deploy_result"
+
+      - name: Skew the system clock and assert the validity failure
+        run: |
+          set -uo pipefail
+
+          kubectl_bin=$(mise which kubectl)
+          [ -n "$kubectl_bin" ] && [ -x "$kubectl_bin" ] || {
+            echo "::error::mise has no kubectl on PATH" >&2
+            exit 1
+          }
+
+          original_epoch=$(date +%s)
+          printf '%s\n' "$original_epoch" > /tmp/airgap-stale-clock-original
+
+          # Skew the host clock (and, with it, the kind node containers that
+          # share the kernel clock) two years ahead: every certificate minted
+          # at deploy time (kubeadm CA and serving certificates, 1-year
+          # validity) is now past its validity window.
+          sudo timedatectl set-ntp false || \
+            echo "::warning::timedatectl set-ntp failed (the drift check below is authoritative)"
+          sudo date -s "+2 years"
+          skewed_epoch=$(date +%s)
+          drift=$(( skewed_epoch - original_epoch ))
+          if [ "$drift" -lt 60 ]; then
+            echo "::error::system clock did not move (drift ${drift}s); the skew injection failed"
+            exit 1
+          fi
+          echo "system clock skewed to $(date -u) (drift $((drift / 3600))h)"
+
+          # The previously minted TLS surfaces must now be rejected. The
+          # failure must be a fast, clear error (client-side validation of
+          # the API server certificate), not a silent hang or no-op.
+          # Capture the exit code with `|| status=$?` before the if: after
+          # a failed if-condition the if statement itself exits 0, so
+          # `$?` there would lose kubectl's status (and the hang check).
+          skew_status=0
+          timeout 60 "$kubectl_bin" --context kind-airgap-mgmt get nodes \
+              >/tmp/airgap-stale-clock-skew.out 2>&1 || skew_status=$?
+          if [ "$skew_status" -eq 0 ]; then
+            echo "::error::kubectl get nodes SUCCEEDED under the skewed clock; expected a certificate validity failure"
+            cat /tmp/airgap-stale-clock-skew.out
+            exit 1
+          fi
+          if [ "$skew_status" -eq 124 ]; then
+            echo "::error::kubectl HUNG under the skewed clock; expected a fast, clean failure"
+            cat /tmp/airgap-stale-clock-skew.out
+            exit 1
+          fi
+          if ! grep -Eq 'x509: certificate has expired|tls: failed to verify certificate' \
+              /tmp/airgap-stale-clock-skew.out; then
+            echo "::error::expected a certificate validity error under the skewed clock, got exit $skew_status:"
+            cat /tmp/airgap-stale-clock-skew.out
+            exit 1
+          fi
+          echo "expected validity failure observed (exit $skew_status):"
+          cat /tmp/airgap-stale-clock-skew.out
+
+      - name: Restore the system clock and assert recovery
+        if: always()
+        run: |
+          set -uo pipefail
+
+          kubectl_bin=$(mise which kubectl) || kubectl_bin=
+          if [ -f /tmp/airgap-stale-clock-original ]; then
+            sudo date -s "@$(cat /tmp/airgap-stale-clock-original)"
+            if ! sudo timedatectl set-ntp true; then
+              echo "::warning::could not re-enable NTP (best effort; the runner is recycled)"
+            fi
+            drift=$(( $(date +%s) - $(cat /tmp/airgap-stale-clock-original) ))
+            [ "$drift" -lt 0 ] && drift=$((-drift))
+            echo "system clock restored to $(date -u) (off by ${drift}s)"
+          fi
+
+          # The recovery assertion only runs if the skew step ran (the
+          # marker file exists): a failed deploy never skewed the clock and
+          # leaves the job's result with the deploy step.
+          if [ -f /tmp/airgap-stale-clock-original ] && [ -n "$kubectl_bin" ]; then
+            recovered=
+            for _ in 1 2 3 4 5 6; do
+              if timeout 30 "$kubectl_bin" --context kind-airgap-mgmt get nodes \
+                  >/tmp/airgap-stale-clock-recovery.out 2>&1; then
+                recovered=1
+                break
+              fi
+              sleep 5
+            done
+            if [ -z "$recovered" ]; then
+              echo "::error::cluster did not recover after the clock was restored:"
+              cat /tmp/airgap-stale-clock-recovery.out
+              exit 1
+            fi
+            echo "cluster recovered after the clock was restored:"
+            cat /tmp/airgap-stale-clock-recovery.out
+          fi
+
+      - name: Store stale clock evidence
+        # Runs after the clock restore: the runner agent's own TLS
+        # verification is time-sensitive, so nothing uploads under a skewed
+        # clock.
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: krops-airgap-stale-clock-results
+          path: |
+            /tmp/airgap-offline-run.log
+            /tmp/airgap-offline-summary.txt
+            /tmp/airgap-cert-manager-debug.txt
+            /tmp/airgap-workload-debug.txt
+            /tmp/airgap-stale-clock-skew.out
+            /tmp/airgap-stale-clock-recovery.out
+          if-no-files-found: warn
+          retention-days: 1
+
   report-status:
     name: File or close failure issue
-    needs: [build, isolated-deploy, update-rollback]
+    needs: [build, isolated-deploy, update-rollback, stale-clock]
     if: always() && github.event_name == 'schedule'
     runs-on: ubuntu-latest
     permissions:

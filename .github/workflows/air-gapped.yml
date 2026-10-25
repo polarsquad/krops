@@ -390,13 +390,17 @@ jobs:
           # The previously minted TLS surfaces must now be rejected. The
           # failure must be a fast, clear error (client-side validation of
           # the API server certificate), not a silent hang or no-op.
-          if timeout 60 "$kubectl_bin" --context kind-airgap-mgmt get nodes \
-              >/tmp/airgap-stale-clock-skew.out 2>&1; then
+          # Capture the exit code with `|| status=$?` before the if: after
+          # a failed if-condition the if statement itself exits 0, so
+          # `$?` there would lose kubectl's status (and the hang check).
+          skew_status=0
+          timeout 60 "$kubectl_bin" --context kind-airgap-mgmt get nodes \
+              >/tmp/airgap-stale-clock-skew.out 2>&1 || skew_status=$?
+          if [ "$skew_status" -eq 0 ]; then
             echo "::error::kubectl get nodes SUCCEEDED under the skewed clock; expected a certificate validity failure"
             cat /tmp/airgap-stale-clock-skew.out
             exit 1
           fi
-          skew_status=$?
           if [ "$skew_status" -eq 124 ]; then
             echo "::error::kubectl HUNG under the skewed clock; expected a fast, clean failure"
             cat /tmp/airgap-stale-clock-skew.out

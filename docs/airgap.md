@@ -278,6 +278,63 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
   `Available=True`; `clusterctl describe cluster` machines Running.
 - Workload cluster: `kubectl get nodes` Ready; flux + podinfo pods Running.
 
+## DNS in the gap
+
+No component in the bundle needs external DNS. Every name resolved in the
+gap is served locally: Docker's built-in DNS (container names on the kind
+network, from its internal table, without an upstream query) or the
+clusters' CoreDNS (cluster service names, from its `kubernetes` plugin).
+
+The leak the egress block alone cannot cover: containers on the kind
+network resolve through Docker's built-in DNS at 127.0.0.11, and dockerd
+forwards any name it does not know to the host's upstream resolvers from
+the host network namespace. That path never crosses the kind bridge, so
+the `isolated-deploy` egress rule and its pcap cannot see it: external
+names can still resolve — while every public IP address is unreachable —
+until the TCP connection that would follow the answer is dropped.
+
+The nightly `isolated-deploy` job therefore also blocks external DNS for
+the duration of the deploy: host `OUTPUT` rules drop UDP and TCP
+destination port 53 to non-loopback destinations (restored on step exit,
+before the evidence upload, which the runner agent performs over DNS).
+The job:
+
+1. probes the baseline first, with only the egress block active: an
+   external name must still resolve from a container on the kind network,
+   proving the hole exists. A missing baseline fails the job, because the
+   assertions below would be vacuous;
+2. applies the DNS block and asserts that the external name now fails to
+   resolve from the kind network;
+3. runs the deploy under both blocks;
+4. re-asserts from the mgmt node that the external name still fails and
+   that the `krops-registry-airgap` container name still resolves, and
+   asserts that no component degraded because of a failed lookup: no
+   crash-looping or image-pull-failing pods, and no events mentioning
+   DNS, on both the mgmt cluster and the workload cluster.
+
+The probe transcript is retained with the deployment evidence as
+`airgap-dns-probe.txt`.
+
+### Required CoreDNS configuration: none
+
+The clusters run kind's stock CoreDNS Corefile: the `kubernetes` plugin
+answers `cluster.local` names, and everything else falls through to
+`forward . /etc/resolv.conf`, and the kind node's `/etc/resolv.conf`
+points at the Docker daemon's built-in DNS (127.0.0.11 on the CI
+runner). In the gap that means external lookups end in SERVFAIL after
+the resolver timeout — and nothing in the bundle issues them: the Zarf
+internal registry and krops-registry are dialed by IP or by a name
+served locally, and Flux pulls from the OCI repositories it was given.
+No `forward` override and no stub zones are required.
+
+If an operator site needs external names to fail fast, or to never reach
+an upstream resolver at all (for example behind a DNS firewall that
+answers authoritatively), the supported posture is to point the node
+`resolv.conf` — and therefore CoreDNS's forward target — at the site's
+internal resolver, or to add CoreDNS stub zones for the external domains.
+That is operator-site hardening; the bundle and the nightly do not
+enforce it.
+
 ## Empirical findings (why the package looks the way it does)
 
 1. **CAPI provider components are clusterctl templates.** The capi-operator

@@ -125,9 +125,12 @@ jobs:
           set -uo pipefail
 
           capture=/tmp/airgap-public-egress.pcap
+          dns_probe=/tmp/airgap-dns-probe.txt
           firewall_comment=krops-airgap-egress
+          dns_comment=krops-airgap-dns
           bridge_interface=
           tcpdump_pid=
+          dns_block_installed=0
 
           stop_capture() {
             if [ -n "$tcpdump_pid" ]; then
@@ -136,7 +139,26 @@ jobs:
               tcpdump_pid=
             fi
           }
+          # External DNS is blocked at the host OUTPUT chain, because the DNS
+          # path from the kind network never crosses the kind bridge:
+          # containers resolve through Docker's built-in DNS (127.0.0.11),
+          # and dockerd forwards unknown names to the host's upstream
+          # resolvers from the host network namespace (the egress rule and
+          # the pcap below never see it). Only non-loopback destinations are
+          # dropped. See docs/airgap.md (DNS in the gap). The block is
+          # lifted on step exit, before the evidence upload: the runner
+          # agent needs DNS for it.
+          remove_dns_block() {
+            if [ "$dns_block_installed" = "1" ]; then
+              sudo iptables -D OUTPUT -p udp --dport 53 ! -d 127.0.0.0/8 \
+                -m comment --comment "$dns_comment" -j DROP 2>/dev/null || true
+              sudo iptables -D OUTPUT -p tcp --dport 53 ! -d 127.0.0.0/8 \
+                -m comment --comment "$dns_comment" -j DROP 2>/dev/null || true
+              dns_block_installed=0
+            fi
+          }
           cleanup() {
+            remove_dns_block
             stop_capture
             if [ -n "$bridge_interface" ]; then
               sudo iptables -D DOCKER-USER \
@@ -178,6 +200,68 @@ jobs:
             exit 1
           fi
 
+          # External DNS isolation. The probe image is loaded from the
+          # downloaded bundle (no network access): a throwaway container on
+          # the kind network exercises exactly the DNS path every kind node
+          # and workload container uses (Docker's built-in DNS).
+          : > "$dns_probe"
+          registry_tar=$(ls airgap/archives/docker.io_library_registry_*.tar 2>/dev/null | head -n 1)
+          if [ -z "$registry_tar" ]; then
+            echo "::error::No registry image archive found in the downloaded bundle"
+            exit 1
+          fi
+          probe_image=$(docker load -i "$registry_tar" | sed -n 's/^Loaded image: //p' | head -n 1)
+          if [ -z "$probe_image" ]; then
+            echo "::error::Could not determine the loaded registry probe image ref"
+            exit 1
+          fi
+
+          # Baseline (bridge block only, no DNS block yet): an external name
+          # must resolve from a container on the kind network, proving the
+          # egress block alone leaves a DNS hole (the dockerd built-in DNS
+          # forwards upstream from the host network namespace). If it does
+          # not resolve, the block assertions below would be vacuous.
+          {
+            echo "===== DNS baseline probe (bridge block only, no DNS block) ====="
+            echo "\$ docker run --rm --network kind $probe_image getent hosts github.com"
+          } >> "$dns_probe"
+          if timeout 60 docker run --rm --network kind "$probe_image" \
+            getent hosts github.com >> "$dns_probe" 2>&1; then
+            echo "PROBE: github.com resolved under the bridge block only: external DNS is not covered by the egress block (the hole this test closes)" >> "$dns_probe"
+          else
+            echo "::error::DNS baseline probe failed: github.com did not resolve from a container on the kind network without the DNS block; the block assertions below would be vacuous"
+            cat "$dns_probe"
+            exit 1
+          fi
+
+          # Block external DNS at the host (both protocols) and verify the
+          # rules landed.
+          sudo iptables -I OUTPUT 1 -p udp --dport 53 ! -d 127.0.0.0/8 \
+            -m comment --comment "$dns_comment" -j DROP
+          sudo iptables -I OUTPUT 1 -p tcp --dport 53 ! -d 127.0.0.0/8 \
+            -m comment --comment "$dns_comment" -j DROP
+          if ! sudo iptables -C OUTPUT -p udp --dport 53 ! -d 127.0.0.0/8 \
+                -m comment --comment "$dns_comment" -j DROP || \
+              ! sudo iptables -C OUTPUT -p tcp --dport 53 ! -d 127.0.0.0/8 \
+                -m comment --comment "$dns_comment" -j DROP; then
+            echo "::error::Failed to block external DNS from the host"
+            exit 1
+          fi
+          dns_block_installed=1
+
+          # The block must be effective from inside the kind network:
+          # external resolution must now fail (timeout/SERVFAIL).
+          {
+            echo "===== DNS block assertion (external must fail) ====="
+          } >> "$dns_probe"
+          if timeout 60 docker run --rm --network kind "$probe_image" \
+            getent hosts github.com >> "$dns_probe" 2>&1; then
+            echo "::error::External DNS still resolves with the DNS block active: the block is ineffective"
+            cat "$dns_probe"
+            exit 1
+          fi
+          echo "PROBE: github.com failed to resolve with the DNS block active (expected)" >> "$dns_probe"
+
           if airgap/scripts/offline-run.sh \
             airgap/zarf-package-krops-airgap-*.tar.zst; then
             deploy_result=0
@@ -188,6 +272,63 @@ jobs:
           stop_capture
           sudo tcpdump -n -r "$capture" \
             > /tmp/airgap-public-egress.txt 2>/dev/null
+
+          # The deploy came up under both blocks. With the mgmt node and
+          # krops-registry-airgap now on the kind network, re-assert the DNS
+          # posture from the mgmt node itself (external still fails,
+          # Docker-internal names still resolve) and assert no component
+          # degraded because of a failed lookup: no crash loops, no image
+          # pull failures, and no events mentioning DNS.
+          assert_cluster_clean() {
+            local label=$1; shift
+            local bad dns_events
+            bad=$("$@" get pods -A \
+              -o jsonpath='{range .items[*]}{range .status.containerStatuses[*]}{.state.waiting.reason}{"\n"}{end}{end}' 2>/dev/null \
+              | grep -E '^(CrashLoopBackOff|ErrImagePull|ImagePullBackOff)$' | sort -u)
+            if [ -n "$bad" ]; then
+              echo "::error::$label: pods degraded during the isolated deploy:"
+              echo "$bad"
+              return 1
+            fi
+            # DNS failure signatures only: a bare "dns" substring matches
+            # coredns pod names in ordinary lifecycle events.
+            dns_events=$("$@" get events -A 2>/dev/null | grep -iE '\bdns\b|no such host|server misbehaving|temporary failure in name resolution|failed to resolve')
+            if [ -n "$dns_events" ]; then
+              echo "::error::$label: events referencing DNS during the isolated deploy:"
+              echo "$dns_events"
+              return 1
+            fi
+            return 0
+          }
+          if [ "$deploy_result" -eq 0 ]; then
+            {
+              echo "===== Post-deploy DNS posture (mgmt node, both blocks active) ====="
+            } >> "$dns_probe"
+            if docker exec airgap-mgmt-control-plane timeout 60 getent hosts github.com >> "$dns_probe" 2>&1; then
+              echo "::error::External DNS resolves from the mgmt node with the DNS block active after the deploy"
+              cat "$dns_probe"
+              exit 1
+            fi
+            echo "PROBE: github.com failed to resolve from the mgmt node (expected)" >> "$dns_probe"
+            if ! docker exec airgap-mgmt-control-plane timeout 60 getent hosts krops-registry-airgap >> "$dns_probe" 2>&1; then
+              echo "::error::Docker-internal name krops-registry-airgap does not resolve from the mgmt node"
+              cat "$dns_probe"
+              exit 1
+            fi
+            echo "PROBE: krops-registry-airgap resolved from the mgmt node (expected)" >> "$dns_probe"
+            assert_cluster_clean "mgmt cluster" kubectl --context kind-airgap-mgmt || {
+              cat "$dns_probe"
+              exit 1
+            }
+            # The workload cluster, if it came up (offline-run.sh writes its
+            # kubeconfig only when the workload API is reachable).
+            if [ -f /tmp/airgap-wl.kubeconfig ]; then
+              assert_cluster_clean "workload cluster" kubectl --kubeconfig /tmp/airgap-wl.kubeconfig || {
+                cat "$dns_probe"
+                exit 1
+              }
+            fi
+          fi
 
           if [ -s /tmp/airgap-public-egress.txt ]; then
             echo "::error::Public network traffic was attempted during the isolated deployment"
@@ -208,6 +349,7 @@ jobs:
             /tmp/airgap-sbom.*
             /tmp/airgap-public-egress.pcap
             /tmp/airgap-public-egress.txt
+            /tmp/airgap-dns-probe.txt
             /tmp/airgap-cert-manager-debug.txt
             /tmp/airgap-workload-debug.txt
           if-no-files-found: warn

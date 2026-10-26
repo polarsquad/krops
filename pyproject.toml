@@ -4,7 +4,7 @@ version = "0.0.0"
 description = "Documentation website build for krops (GitHub Pages)"
 requires-python = "==3.15.1"
 dependencies = [
-  "mkdocs-material==9.7.7",
+  "mkdocs-material==9.8.0",
   "pyyaml==6.0.3",
 ]
 

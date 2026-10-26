@@ -13,7 +13,7 @@ KROPS_PROFILE = "gcp"
 CLOUDSDK_CONFIG = "{{config_root}}/.gcloud"
 
 [tools]
-gcloud = "588.0.0"
+gcloud = "590.0.1"
 
 [tasks.gcp-bootstrap]
 description = "One-time project prep: enable APIs, create the krops-capg / krops-reader service accounts with their role grants and the krops workload identity pool; prints the values to commit. No key is created (issue #72)."

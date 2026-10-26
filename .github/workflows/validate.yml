@@ -63,7 +63,7 @@ jobs:
         uses: actions/checkout@v7.0.1
 
       - name: Install mise
-        uses: jdx/mise-action@v5.2.1
+        uses: jdx/mise-action@v5.2.3
         with:
           version: 2026.10.17
         env:
@@ -114,14 +114,14 @@ jobs:
       # The sops-keygen and local-host kubeconfig tests (#423) run mise tasks,
       # so mise and the pinned tools (age, kubectl) must be available here.
       - name: Install mise
-        uses: jdx/mise-action@v5.2.1
+        uses: jdx/mise-action@v5.2.3
         with:
           version: 2026.10.17
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.3.0
+        uses: astral-sh/setup-uv@v10.3.2
         with:
           version: "0.13.3"
 
@@ -266,7 +266,7 @@ jobs:
         uses: actions/checkout@v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.3.0
+        uses: astral-sh/setup-uv@v10.3.2
         with:
           version: "0.13.3"
 

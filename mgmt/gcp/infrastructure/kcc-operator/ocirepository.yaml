@@ -7,8 +7,8 @@ spec:
   interval: 1h
   url: oci://ghcr.io/lioramilbaum/config-connector-helm/config-connector
   ref:
-    tag: "1.159.0"
-    digest: sha256:bccb90ad94198e9ed43030e6af07784b5c7f6e9a7a2cc292a335a5d7490780d1
+    tag: "1.160.0"
+    digest: sha256:fae77d952ac4e761845ec51fcae0e2bd179305f51b4294fc061b8db4a76020b5
   verify:
     provider: cosign
     matchOIDCIdentity:

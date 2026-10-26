@@ -13,7 +13,7 @@ age = "1.3.2"
 uv = "0.13.5"
 # Markdown linting (#243): node hosts markdownlint-cli2. Keep the node pin
 # aligned with the setup-node pin in .github/workflows/validate.yml.
-node = "24.22.0"
+node = "26.12.1"
 "npm:markdownlint-cli2" = "0.24.0"
 
 # Zarf CLI (airgap prototype). See docs/dependencies.md's "Intentional

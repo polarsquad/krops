@@ -44,9 +44,9 @@ kind-node-image = "kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405
 # renovate: datasource=docker depName=ghcr.io/controlplaneio-fluxcd/charts/flux-operator
 flux-operator = "0.62.0"
 # renovate: datasource=helm registryUrl=https://charts.jetstack.io depName=cert-manager
-cert-manager = "1.21.2"
+cert-manager = "1.21.3"
 # renovate: datasource=helm registryUrl=https://kubernetes-sigs.github.io/cluster-api-operator depName=cluster-api-operator
-capi-operator = "0.29.0"
+capi-operator = "0.30.0"
 
 [teardown]
 # Constants for `krops-bootstrap teardown` (issue #100), mirroring the literal

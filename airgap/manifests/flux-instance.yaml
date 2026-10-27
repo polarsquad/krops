@@ -70,26 +70,26 @@ spec:
         patch: |-
           - op: replace
             path: /spec/template/spec/containers/0/image
-            value: ghcr.io/fluxcd/source-controller:v1.9.6@sha256:6a6693172589f8ff26123a231d5fa6ceb194a6efb4dc647cdf057c959f76a2e3
+            value: ghcr.io/fluxcd/source-controller:v1.10.1@sha256:611b6bca3eae95bcff471414d1fb14a4ab83d7f14e609cccef2bd389c121f37e
       - target:
           kind: Deployment
           name: kustomize-controller
         patch: |-
           - op: replace
             path: /spec/template/spec/containers/0/image
-            value: ghcr.io/fluxcd/kustomize-controller:v1.9.6@sha256:2ebeaa341da77d52b6abbbba5efcee0450d47f8b42f0e6f33b08f9020262d606
+            value: ghcr.io/fluxcd/kustomize-controller:v1.10.1@sha256:37db29b25dae35b881a5e064acedb0cc954442da453a39eaa0eab7a90dbecc4e
       - target:
           kind: Deployment
           name: helm-controller
         patch: |-
           - op: replace
             path: /spec/template/spec/containers/0/image
-            value: ghcr.io/fluxcd/helm-controller:v1.6.5@sha256:0d52fff5c4d476277b8fcb6beb9041e269adb5db943fe69f5a806ea0c92b1511
+            value: ghcr.io/fluxcd/helm-controller:v1.7.1@sha256:54526cc6ed1202d71d44c310676448065664f3255ad671d9a69ac26f904e617a
       - target:
           kind: Deployment
           name: notification-controller
         patch: |-
           - op: replace
             path: /spec/template/spec/containers/0/image
-            value: ghcr.io/fluxcd/notification-controller:v1.9.4@sha256:840f318265ee26f0d2c48a158bf7896b22aa4e998e320a18646309f0e40b15da
+            value: ghcr.io/fluxcd/notification-controller:v1.10.0@sha256:9f58b9532ec9d3ccf539cd3ccdf283477a5dcb7777b922db5477d8bbd4d3767c
   wait: true

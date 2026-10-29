@@ -305,6 +305,12 @@ install_ack_chart() {
   repo="oci://public.ecr.aws/aws-controllers-k8s/${chart}"
   tarball="${chart}-${tag}.tgz"
   if [ -n "$ACK_CHART_CACHE" ]; then
+    # actions/cache restores nothing (and creates no directory) on a miss,
+    # and helm's downloader opens <dest>/<tarball><random> without creating
+    # the directory. On a cold cache that is an immediate
+    # "open ...: no such file or directory" instead of a chart pull
+    # (observed on the self-hosted runner, krops run 40896512846).
+    mkdir -p "$ACK_CHART_CACHE"
     # Validate the cached tarball: a run killed mid-download can persist
     # a partial file through the cache save, and restore hands it back
     # to every later run. `helm show chart` is local-only and fails on

@@ -36,14 +36,14 @@ components:
         namespace: cert-manager
         url: https://charts.jetstack.io
         # renovate: datasource=helm registryUrl=https://charts.jetstack.io depName=cert-manager
-        version: v1.21.2
+        version: v1.21.3
         valuesFiles:
           - values/cert-manager.yaml
     images:
-      - quay.io/jetstack/cert-manager-controller:v1.21.2@sha256:70f532fd9cfde0b09d55687200942399d89838bc2d5d5b45152eb799a15912b8
-      - quay.io/jetstack/cert-manager-cainjector:v1.21.2@sha256:c85268c64f2e0e76684bf5fe8906caff34b82523561c6affe0fae3546bd87562
-      - quay.io/jetstack/cert-manager-webhook:v1.21.2@sha256:a60e2dac46dbb8a7f3df95c54ce941012f54c2fe022f0ee55aaa1ab40ed957ae
-      - quay.io/jetstack/cert-manager-startupapicheck:v1.21.2@sha256:46e75b6866359ffb5d82624f41e3ed1c70b2994982702ced547ce5edb418a8f5
+      - quay.io/jetstack/cert-manager-controller:v1.21.3@sha256:9f4f96a33c7774cef24466fcd85031997531a03a8d117f151126baa8d1290dcc
+      - quay.io/jetstack/cert-manager-cainjector:v1.21.3@sha256:083d0e906f8eb44e255fe4ff817ae54e49f9ed82e22f1011bb4e9e4f4b8a641f
+      - quay.io/jetstack/cert-manager-webhook:v1.21.3@sha256:055ac8e9de6a0ba6763794838fe38944acc650f68ebe1b01dd8be079e580f458
+      - quay.io/jetstack/cert-manager-startupapicheck:v1.21.3@sha256:1c519d4afca1413d1e4ccd78bdc756184418ab55a34569a3b3de39d32f9974e1
     healthChecks:
       - apiVersion: apps/v1
         kind: Deployment
@@ -66,11 +66,11 @@ components:
       - name: flux-operator
         namespace: flux-system
         url: oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator
-        version: 0.61.0
+        version: 0.62.0
         valuesFiles:
           - values/flux-operator.yaml
     images:
-      - ghcr.io/controlplaneio-fluxcd/flux-operator:v0.61.0@sha256:71041d9fff7f7b05f1a8123ebe73c73b7b156f4aacfe1e8e19b5aa953a98892c
+      - ghcr.io/controlplaneio-fluxcd/flux-operator:v0.62.0@sha256:061eff8bf782a14f9ea4770f1ec820da0a3bc895532096b8ade3b2e7569c34dc
     healthChecks:
       - apiVersion: apps/v1
         kind: Deployment
@@ -112,10 +112,10 @@ components:
             cmd: kubectl -n flux-system wait --for=condition=Ready fluxinstance/flux --timeout=1m
             maxTotalSeconds: 70
     images:
-      - ghcr.io/fluxcd/source-controller:v1.9.6@sha256:6a6693172589f8ff26123a231d5fa6ceb194a6efb4dc647cdf057c959f76a2e3
-      - ghcr.io/fluxcd/kustomize-controller:v1.9.6@sha256:2ebeaa341da77d52b6abbbba5efcee0450d47f8b42f0e6f33b08f9020262d606
-      - ghcr.io/fluxcd/helm-controller:v1.6.5@sha256:0d52fff5c4d476277b8fcb6beb9041e269adb5db943fe69f5a806ea0c92b1511
-      - ghcr.io/fluxcd/notification-controller:v1.9.4@sha256:840f318265ee26f0d2c48a158bf7896b22aa4e998e320a18646309f0e40b15da
+      - ghcr.io/fluxcd/source-controller:v1.10.1@sha256:611b6bca3eae95bcff471414d1fb14a4ab83d7f14e609cccef2bd389c121f37e
+      - ghcr.io/fluxcd/kustomize-controller:v1.10.1@sha256:37db29b25dae35b881a5e064acedb0cc954442da453a39eaa0eab7a90dbecc4e
+      - ghcr.io/fluxcd/helm-controller:v1.7.1@sha256:54526cc6ed1202d71d44c310676448065664f3255ad671d9a69ac26f904e617a
+      - ghcr.io/fluxcd/notification-controller:v1.10.0@sha256:9f58b9532ec9d3ccf539cd3ccdf283477a5dcb7777b922db5477d8bbd4d3767c
 
   # CAPI core: 13 CRDs (Cluster, Machine, MachineDeployment, ClusterClass,
   # ClusterResourceSet, ...) + the capi-controller-manager, rendered with

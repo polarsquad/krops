@@ -77,6 +77,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7.0.1
 
+      # ECR Public throttles the shared GitHub runner IP pool ("429:
+      # Data limit exceeded", #725). Cache the pinned ACK chart
+      # tarballs so a warm run never touches ECR Public; on a miss the
+      # script pulls with 429 retry. The key covers the pin file, and
+      # the restore-keys fallback is safe because tarball names embed
+      # the pinned tag (exact-name match, no version substitution).
+      - name: Cache ACK chart tarballs
+        uses: actions/cache@v6.1.0
+        with:
+          path: ${{ runner.temp }}/ack-charts
+          key: ack-charts-${{ hashFiles('mgmt/aws/infrastructure/ack-controllers/helm.yaml') }}
+          restore-keys: ack-charts-
+
       - name: Install mise
         uses: jdx/mise-action@v5.2.3
         with:
@@ -91,4 +104,5 @@ jobs:
       - name: Run the virtualized e2e
         env:
           MISE_ENV: aws
+          KROPS_E2E_CHART_CACHE: ${{ runner.temp }}/ack-charts
         run: mise run aws-e2e-virtualized

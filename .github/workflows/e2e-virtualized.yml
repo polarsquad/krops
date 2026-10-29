@@ -69,7 +69,7 @@ jobs:
 
   aws:
     name: AWS arm (boot scope)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, krops-e2e]
     timeout-minutes: 30
     needs: changes
     if: needs.changes.outputs.aws == 'true'

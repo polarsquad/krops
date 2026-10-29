@@ -263,15 +263,42 @@ kubectl create namespace ack-system
 kubectl create secret generic aws-credentials -n ack-system \
   --from-file=credentials="$WORK/aws-credentials"
 
+# ECR Public throttles anonymous pulls from the shared GitHub-hosted
+# runner IP pool ("429: toomanyrequests: Data limit exceeded"); retry
+# with backoff on that signature. A FetchReference failure happens
+# before release creation, so a plain re-run is safe (no "already
+# exists" collision). (#725)
+helm_install() {
+  local attempt=1 delay=10 output rc=0
+  while :; do
+    # `rc=$?` after the && || idiom captures helm's exit status; a bare
+    # `rc=$?` after an `if` compound would capture the if's own status
+    # (0) instead.
+    output="$(helm install "$@" 2>&1)" && rc=0 || rc=$?
+    if [ "$rc" -eq 0 ]; then
+      printf '%s\n' "$output"
+      return 0
+    fi
+    if [ "$attempt" -ge 5 ] || ! grep -q '429: toomanyrequests' <<<"$output"; then
+      printf '%s\n' "$output" >&2
+      return "$rc"
+    fi
+    log "    ECR Public 429 (rate limit); retry ${attempt}/4 in ${delay}s"
+    sleep "$delay"
+    delay=$((delay * 2))
+    attempt=$((attempt + 1))
+  done
+}
+
 # No --wait: the unpatched controllers crash loop on real-STS auth until
 # the step 6 patch lands (spike caveat).
-helm install ack-s3-controller "oci://public.ecr.aws/aws-controllers-k8s/s3-chart" \
+helm_install ack-s3-controller "oci://public.ecr.aws/aws-controllers-k8s/s3-chart" \
   --version "$(ack_chart_version s3-chart)" \
   -n ack-system -f "$WORK/ack-values.yaml"
-helm install ack-rds-controller "oci://public.ecr.aws/aws-controllers-k8s/rds-chart" \
+helm_install ack-rds-controller "oci://public.ecr.aws/aws-controllers-k8s/rds-chart" \
   --version "$(ack_chart_version rds-chart)" \
   -n ack-system -f "$WORK/ack-values.yaml"
-helm install ack-iam-controller "oci://public.ecr.aws/aws-controllers-k8s/iam-chart" \
+helm_install ack-iam-controller "oci://public.ecr.aws/aws-controllers-k8s/iam-chart" \
   --version "$(ack_chart_version iam-chart)" \
   -n ack-system -f "$WORK/ack-values.yaml"
 

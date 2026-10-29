@@ -264,17 +264,19 @@ kubectl create secret generic aws-credentials -n ack-system \
   --from-file=credentials="$WORK/aws-credentials"
 
 # ECR Public throttles anonymous pulls from the shared GitHub-hosted
-# runner IP pool ("429: toomanyrequests: Data limit exceeded"); retry
-# with backoff on that signature. A FetchReference failure happens
-# before release creation, so a plain re-run is safe (no "already
-# exists" collision). (#725)
-helm_install() {
-  local attempt=1 delay=10 output rc=0
+# runner IP pool ("429: toomanyrequests: Data limit exceeded"). A
+# runner drawn to a throttled IP 429s on every fetch until the limit
+# resets, so the fetches retry with backoff on that signature (#725).
+# A FetchReference failure happens before release creation, so a plain
+# re-run is safe (no "already exists" collision).
+retry_on_429() {
+  local desc="$1" attempt=1 delay=10 output rc=0
+  shift
   while :; do
-    # `rc=$?` after the && || idiom captures helm's exit status; a bare
-    # `rc=$?` after an `if` compound would capture the if's own status
-    # (0) instead.
-    output="$(helm install "$@" 2>&1)" && rc=0 || rc=$?
+    # `rc=$?` after the && || idiom captures the command's exit status;
+    # a bare `rc=$?` after an `if` compound would capture the if's own
+    # status (0) instead.
+    output="$("$@" 2>&1)" && rc=0 || rc=$?
     if [ "$rc" -eq 0 ]; then
       printf '%s\n' "$output"
       return 0
@@ -283,24 +285,57 @@ helm_install() {
       printf '%s\n' "$output" >&2
       return "$rc"
     fi
-    log "    ECR Public 429 (rate limit); retry ${attempt}/4 in ${delay}s"
+    log "    $desc: ECR Public 429 (rate limit); retry ${attempt}/4 in ${delay}s"
     sleep "$delay"
     delay=$((delay * 2))
     attempt=$((attempt + 1))
   done
 }
 
+# The workflow's "Cache ACK chart tarballs" step pre-populates
+# KROPS_E2E_CHART_CACHE with the pinned chart tarballs; a warm cache
+# keeps this step off ECR Public entirely. Tarball names embed the
+# pinned tag (helm pull: <chart>-<tag>.tgz), so a restore-keys
+# fallback can never substitute a different version: an exact-name
+# miss just pulls the pinned version.
+ACK_CHART_CACHE="${KROPS_E2E_CHART_CACHE:-}"
+install_ack_chart() {
+  local chart="$1" tag repo tarball
+  tag="$(ack_chart_version "$chart")"
+  repo="oci://public.ecr.aws/aws-controllers-k8s/${chart}"
+  tarball="${chart}-${tag}.tgz"
+  if [ -n "$ACK_CHART_CACHE" ]; then
+    # Validate the cached tarball: a run killed mid-download can persist
+    # a partial file through the cache save, and restore hands it back
+    # to every later run. `helm show chart` is local-only and fails on
+    # a truncated archive, so a corrupt entry re-pulls instead of
+    # failing every install.
+    if [ -f "$ACK_CHART_CACHE/$tarball" ] && \
+      helm show chart "$ACK_CHART_CACHE/$tarball" >/dev/null 2>&1; then
+      log "    ${chart} ${tag} from chart cache"
+    else
+      # rm first: a fetch that dies mid-download must not leave a
+      # partial file a later cache hit would install.
+      rm -f "$ACK_CHART_CACHE/$tarball"
+      retry_on_429 "pull ${chart} ${tag}" \
+        helm pull "$repo" --version "$tag" --destination "$ACK_CHART_CACHE" \
+        || return $?
+    fi
+    retry_on_429 "install ${chart}" \
+      helm install "ack-${chart%-chart}-controller" "$ACK_CHART_CACHE/$tarball" \
+        -n ack-system -f "$WORK/ack-values.yaml"
+  else
+    retry_on_429 "install ${chart}" \
+      helm install "ack-${chart%-chart}-controller" "$repo" --version "$tag" \
+        -n ack-system -f "$WORK/ack-values.yaml"
+  fi
+}
+
 # No --wait: the unpatched controllers crash loop on real-STS auth until
 # the step 6 patch lands (spike caveat).
-helm_install ack-s3-controller "oci://public.ecr.aws/aws-controllers-k8s/s3-chart" \
-  --version "$(ack_chart_version s3-chart)" \
-  -n ack-system -f "$WORK/ack-values.yaml"
-helm_install ack-rds-controller "oci://public.ecr.aws/aws-controllers-k8s/rds-chart" \
-  --version "$(ack_chart_version rds-chart)" \
-  -n ack-system -f "$WORK/ack-values.yaml"
-helm_install ack-iam-controller "oci://public.ecr.aws/aws-controllers-k8s/iam-chart" \
-  --version "$(ack_chart_version iam-chart)" \
-  -n ack-system -f "$WORK/ack-values.yaml"
+install_ack_chart s3-chart
+install_ack_chart rds-chart
+install_ack_chart iam-chart
 
 log "step 6/8: distribute the CA and patch the controller Deployments"
 kubectl create configmap wiremock-ca -n capa-system \

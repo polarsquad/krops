@@ -4,414 +4,258 @@ Guidance for AI coding agents working in this repository.
 
 ## What this repo is
 
-A working reference implementation of a GitOps pattern for managing AWS
-infrastructure through the Kubernetes API: no Terraform, no state files, no
-second toolchain. A local kind cluster bootstraps Flux, which reconciles
-everything else: CAPA-managed EKS workload clusters, per-cluster Flux
-instances (CAPI addons), and ACK operators (S3, RDS, IAM) managing cloud
-resources. There is no app source code here, only declarative infrastructure.
+krops is a working reference implementation, not a packaged product or a
+general-purpose framework, for managing Kubernetes clusters and cloud
+resources through Kubernetes APIs and Flux. A disposable kind cluster runs
+the imperative lifecycle, hands off to Flux, and pivots into a self-managed
+management cluster. Cluster API manages cluster lifecycle, cloud operators
+on the management cluster manage per-workload cloud resources, and Flux
+delivers the declared state. Use upstream resource APIs directly: krops has
+no controller or CRD of its own and no separate infrastructure state file or
+plan/apply toolchain. The repository also contains a Rust lifecycle CLI,
+shell fallback scripts, Python validation and documentation tooling, and CI,
+not just declarative YAML.
 
-- `mgmt/aws/`: synced by the MANAGEMENT cluster's Flux.
-  - `infrastructure/`: cert-manager, CAPI operator, CAPA identity, ACK
-    controllers (S3, RDS, IAM), the per-cluster Bucket/DBInstance/reader
-    Role CRs (`workload-resources/`), account-global IAM, konflate.
-  - `infrastructure/worker-run-tags/`: minute AWS CLI CronJob in ack-system
-    that eventually repairs four lifecycle tags on discoverable managed EKS
-    workers, using per-cluster EKS metadata. `tag_data.py` validates AWS JSON,
-    preserves supported tag characters/whitespace through NUL-delimited fields,
-    and checks exact UTC expiry calendar/time semantics before JSON tag writes.
-    Exact account/region/cluster guards
-    and fresh ASG membership/ownership checks precede writes. Requires an
-    external static-principal IAM grant; see docs/aws-iam.md. Offline regressions
-    (`tests/test-worker-run-tags.py`) run in validate and CI. Orphans that leave
-    their ASG before discovery are outside this guarantee.
-  - `capi-providers/`: capi-system, capa-system, caaph-system.
-  - `addons/flux-apps/`: installs Flux on each workload cluster
-    (HelmChartProxy + ResourceSet).
-  - `clusters/`: EKS cluster definitions per region (`eu-north-1`,
-    `eu-west-1`); `eu-north-1` also defines the self-managed management
-    cluster (`clusters/management/`).
-  Credentials: none at rest (issue #379); CAPA and ACK credentials are seeded imperatively at bootstrap/pivot time from the ambient `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (optional `AWS_SESSION_TOKEN`, from `.env`), which the `aws-credentials` mise task encodes into `AWS_B64ENCODED_CREDENTIALS`; the bootstrap/pivot code stores that value for `capa-system` and decodes it into an INI shared-credentials file for `ack-system`, matching the Azure/GCP posture.
-- `mgmt/local-host/`: the local-host management variant (kind-based).
-  Same layout as `mgmt/aws/` (`clusters/docker`, `capi-providers/`,
-  `addons/`, `infrastructure/`) with no cloud dependencies.
-- `mgmt/local-talos/`: the single-node Talos management variant (issue
-  #105). Same component layout as `mgmt/aws/` minus addons
-  (`infrastructure/`, `capi-providers/`, `clusters/management/`), synced
-  from the GitHub GitRepository source like `mgmt/aws`, NOT the laptop OCI
-  registry (a physical machine cannot reach krops-registry). Providers are
-  Talos + Tinkerbell (CABPT/CACPPT from sidero-community releases, CAPT)
-  instead of CAPD; the cluster definition is imperative (explicit
-  controlPlaneRef, no ClusterClass) with committed site-specific values
-  (control plane endpoint IP, Tinkerbell Hardware name). CAPT is pinned to
-  the shrinedogg fork release v0.7.1 (upstream main plus the
-  installer-image annotation mirror, PR tinkerbell#604; see
-  `capi-providers/capt-system/provider.yaml`); re-point at upstream once a
-  release there includes it. The installer image is deliberately NOT pinned
-  in the cluster definition: annotate the Tinkerbell Hardware CR with
-  `hardware.tinkerbell.org/installer-image` and the pinned CAPT fork (v0.7.1)
-  mirrors it into the InfraMachine's `status.installerImage` (#156), which
-  CABPT (>= v0.7.6, now v0.9.0) injects as `machine.install.image`; without
-  the annotation, installs use the default Image Factory schematic. That
-  annotation-mirror path was validated by the #105 hardware acceptance run
-  (done, closed, ISO boot); the only open item is the PXE/Tinkerbell-Workflow
-  provisioning transport run (issue #225). Fork retirement is tracked in
-  issue #266, blocked on upstream PR
-  tinkerbell/cluster-api-provider-tinkerbell#604. Scope fence:
-  management-only; no `addons/` (Talos ships its own CNI, no
-  HelmChartProxy consumers). The wiring landed in #169 and the docs in
-  #171.
-- `mgmt/azure/`: the Azure management variant (issue #71). Same component
-  layout as `mgmt/aws/` (`infrastructure/`, `capi-providers/`, `addons/`,
-  `clusters/`), synced from GitHub. CAPZ v1.27.0 (`capi-providers/capz-system/`)
-  bundles Azure Service Operator (ASO) into `capz-system`; clusters are
-  `AzureASOManaged*` (AKS) with the ASO resources inline. The bundled ASO also
-  reconciles the identity plumbing in `infrastructure/aso-workload-identity/`
-  (user-assigned identities, per-cluster data resource group, role assignment,
-  federated credentials), which replaces ACK pod identity. Credentials: none at
-  rest; workload identity via the `krops-capz` UAMI (AzureClusterIdentity
-  `type: WorkloadIdentity` + `credential-from` aso-credentials, a plain
-  Secret). Federation is set up by the `arc-federate` mise task
-  (`post-kind-create-task`): Arc OIDC issuer for kind, then the management
-  cluster's own OIDC issuer post-pivot (issue #236). Non-secret IDs live in
-  `azure-vars` (flux-system) and in the workload `cluster-vars`. Upgrade CAPZ
-  one minor at a time (ASO CRD migrations). Teardown is manual until the live
-  acceptance run.
-- `mgmt/gcp/`: the GCP management variant (issue #72). Same component
-  layout as `mgmt/aws/` (`infrastructure/`, `capi-providers/`, `addons/`,
-  `clusters/`), synced from GitHub. CAPG v1.13.1
-  (`capi-providers/capg-system/`) provisions GKE clusters
-  (`GCPManaged*`); the Config Connector operator (`infrastructure/kcc-operator/`)
-  is deployed via Flux HelmRelease consuming the published Helm chart from
-  `lioramilbaum/config-connector-helm` (the OCIRepository pins both `ref.tag`
-  and `ref.digest`; Renovate's native Flux manager bumps them in one edit). The
-  management Config Connector also reconciles the GCP
-  workload cloud CRs (`infrastructure/workload-resources/`: PSA range,
-  storage bucket, Cloud SQL, per-cluster reader GSA), ordered after
-  `kcc-identity` in `infrastructure/flux-ks.yaml` (issue #560). Credentials:
-  none at rest; Workload Identity Federation
-  through the `krops` pool with plain `external_account` Secrets
-  (`capg-wif-credentials`, `kcc-wif-credentials`), provider
-  `${GCP_WIF_PROVIDER:=mgmt}` (kind bootstrap overrides to `kind` via the
-  `gcp-wif` ConfigMap the `wif-federate` post-kind-create task creates; the
-  pivot pins `mgmt` via `pivot-manifest-vars`). Non-secret IDs live in
-  `gcp-vars` (flux-system) and the workload `cluster-vars`. Teardown is
-  manual until the live acceptance run.
-- `workload/`: synced by each WORKLOAD cluster's Flux.
-  - `base/`: intentionally empty since issue #346 (the ACK controllers and
-    the S3/RDS/IAM custom resources moved to `mgmt/aws/infrastructure/`);
-    the workload Flux instance stays ready for a future application
-    workload.
-  - `azure-base/`: cert-manager only since issue #559 (the workload ASO and
-    the Azure resources (VNet, storage account, PostgreSQL Flexible Server)
-    moved to `mgmt/azure/infrastructure/workload-resources/`, reconciled by
-    the management cluster's bundled ASO); the workload Flux instance stays
-    ready for a future application workload. `swedencentral-01/` points at it;
-    `tests/test-azure-identity-chain.py` (in `mise run validate` and CI)
-    cross-checks the management-side FICs and the moved CRs' data resource
-    group couplings against
-    `mgmt/azure/infrastructure/aso-workload-identity/`.
-  - `gcp-base/`: intentionally empty since issue #560 (the Config Connector
-    operator, the cluster-mode ConfigConnector, and the PSA range / bucket /
-    Cloud SQL / reader GSA CRs moved to
-    `mgmt/gcp/infrastructure/workload-resources/`, reconciled by the
-    management cluster's Config Connector as `krops-capg`); the workload Flux
-    instance stays ready for a future application workload. `europe-north1-01/`
-    points at it; `tests/test-gcp-identity-chain.py` cross-checks the WIF
-    pool/provider/subject couplings and the moved-CR grants against
-    `mgmt/gcp/`.
-  - `<region>-01/`: per-cluster overlays pointing at `../base`.
-- `airgap/`: Zarf offline transfer bundle for the local-host profile.
-  `zarf.yaml` is the authoritative image listing for the package and
-  `images.txt` is the superset inventory (the `scripts/` preloads derive from
-  the same pins); `airgap/tests/test-airgap-ownership.py` (in `mise run
-  validate` and CI) enforces that every `zarf.yaml` image appears in
-  `images.txt` with the identical tag and digest, guarding against partial
-  air-gap updates (issue #228); the CI-only
-  `airgap/tests/test-airgap-kubeadm-images.py` checks the k8s component pins in
-  `images.txt` against real `kubeadm config images list`. Both management [M]
-  and workload [W] sections must contain all seven components before any
-  download or write; `--fix` corrects existing tags and digests only after
-  completeness passes. The offline
-  `airgap/tests/test-airgap-kubeadm-images-regressions.py` runs in
-  `mise run validate` and CI; the live kubeadm gate remains CI-only.
-  `airgap/tests/test-airgap-image-existence.py` confirms every `images.txt` digest is pullable
-  (live registry calls); it runs only in the path-filtered `airgap-image-existence` workflow, not
-  in `mise run validate`. `scripts/` builds,
-  renders, and stages the bundle (`build-*`, `render-*`, `stage-*`,
-  `offline-run.sh`); `archives/` and `rendered/` are gitignored outputs.
-  Zarf fetches SHA-256-pinned CAAPH release assets and bundles arm64
-  `clusterctl`; its bounded deploy action renders and applies CAAPH from those
-  staged assets (the supported kind-cluster teardown, not `zarf package remove`,
-  removes those resources). The capi-core, capi-providers, and caaph deploy
-  actions source the shared `scripts/resolve-clusterctl.sh` (staged by
-  capi-core); `airgap/tests/test-resolve-clusterctl.py` (in `mise run
-  validate` and CI) exercises it against a temp-dir copy.
-  Every build is signed and contains Zarf-generated per-component Syft SBOMs.
-  `offline-run.sh` verifies the signature, checksums, and extracted SBOMs
-  before staging; operator builds use `ZARF_SIGNING_KEY` / `ZARF_VERIFY_KEY`,
-  while upstream CI uses GitHub OIDC keyless signing.
-  The `air-gapped` workflow (nightly at 02:17 UTC or manual dispatch, on
-  any repository that carries it) builds the ARM64 bundle on an arm64 runner,
-  then deploys it with external egress blocked (fails if any public traffic
-  was attempted). The deploy evidence artifact is uploaded.
-  The `report-status` job (scheduled runs only) opens or comments on one
-  tracking issue titled "air-gapped: scheduled workflow is failing" when a
-  needed job failed, and closes it when all succeeded; cancelled runs are
-  ignored. `airgap/tests/test-airgap-failure-notification.py` parses the
-  workflow YAML to guard its wiring. The `update-rollback` job is in the
-  `report-status` needs.
-  `airgap/scripts/update-package.sh` stages a new package archive, verifies it
-  before any swap, keeps `.bak` until `confirm`, and rolls back the archive
-  only (cluster state is not rolled back; see docs/airgap.md#updating-a-deployed-bundle).
-  `airgap/scripts/verify-package.sh` is the shared verification library sourced
-  by `offline-run.sh` and `update-package.sh`.
-  `airgap/tests/test-airgap-update-rollback.py` runs in stub mode in `mise run
-  validate` and CI; `--zarf-package` (real zarf) runs in the nightly
-  `update-rollback` job.
-- `virtualized-e2e/`: WireMock-virtualized e2e harness (issue #355), not
-  Flux-reconciled and not wired into a mise task yet (Phase 4). `lib/`
-  carries the shared components (WireMock manifest templates under
-  `lib/wiremock/`, the `scenario-schema.json` Phase 3 shape,
-  `sanitize_recording.py`, `assertions.py`); `<cloud>/wiremock/` carries one
-  arm per cloud with only what differs (interception patches, boot stubs,
-  arm README). `aws/` is the reference arm; `azure/` adds the second arm
-  (ASO endpoint configuration via `aso-controller-settings`, plus a
-  CoreDNS rewrite covering CAPZ and MSAL instance discovery); `gcp/`
-  mirrors the reference with the CoreDNS-rewrite + SAN-cert interception
-  and WIF credential repoint from its Phase 0 spike. `tests/test-kind-corefile-pin.py` (in
-  `mise run validate` and CI) requires the kind version in the GCP arm's
-  `patches/coredns-rewrites.yaml` header to match the `mise.toml` kind pin:
-  Renovate bumps only `mise.toml`, so the gate goes red until the full
-  Corefile is regenerated. The kustomize overlays here are built by `mise run
-  validate` like the `mgmt`/`workload` ones.
-- `bootstrap-rs/`: `krops-bootstrap`, the Rust CLI that ports the imperative
-  lifecycle (bootstrap + pivot; teardown under issue #100; read-only orphan
-  discovery under issue #380). Behavioral port: same step order, messages, and
-  env interface as the scripts, plus rerun-safe-by-default semantics. Chart
-  versions it installs imperatively are Renovate-annotated constants in
-  `src/main.rs`. CI (bootstrap-rs workflow) runs fmt/clippy/build/test; the
-  toolchain is pinned in `rust-toolchain.toml`. Five config-driven knobs added
-  for azure and gcp: `pivot-sops-secrets` (SOPS manifests applied in the pivot
-  target before the move), `teardown.manual` (refuse with operator text),
-  `post-kind-create-task` (mise task run after kind creation) and
-  `pivot-manifests` (plain manifests applied in the target before the move),
-  plus `pivot-manifest-vars` (key/value overrides merged onto the
-  flux-system ConfigMap data before `pivot-manifests` substitution; also
-  supports `${VAR:=default}` placeholders in those manifests, issue #72).
-  `run_tags.rs` writes and seeds the `krops-run` ConfigMap (four env knobs:
-  `KROPS_RUN_ID`, `KROPS_RUN_TTL`, `KROPS_REVISION`, `KROPS_RUN_KIND`) during
-  bootstrap/pivot for Flux `postBuild` substitution onto tagged AWS resources
-  (#381); the regression gates are `tests/test-aws-run-tags.py` and
-  `tests/test-shell-run-tags.py` (validate and CI). Flux preparation installs
-  the operator, validated run metadata is applied, then the FluxInstance
-  activates reconciliation. Pivot requires all four nonempty source data keys;
-  rerun bootstrap regenerates only when the ConfigMap is absent. See
-  `docs/operations.md` for the full tagging standard.
-- `.github/workflows/aws-orphan-report.yml`: Daily discovery of unowned AWS
-  resources in the e2e account (no deletion; issue #380). The `discover` job
-  runs `krops-bootstrap orphans aws` with OIDC assumption of the
-  `krops-ci-e2e` role. The `report-status` job opens/updates or closes a
-  tracking issue "aws-e2e: orphaned resources detected in the e2e account"
-  based on whether orphans were found or a query failed. No step invokes
-  mutating AWS verbs. `tests/test-aws-orphan-report-workflow.py` guards the
-  workflow structure (schedule trigger, permissions, role ARN, no mutation).
-- `bootstrap.sh` / `pivot.sh` / `teardown.sh`: the shell equivalents of the
-  CLI's phases. Kept until the binary completes full parity runs per
-  environment, then retired (issues #92/#95/#100). The lifecycle mise tasks
-  (`bootstrap`/`pivot`/`teardown`) run the krops-toolbox container via
-  `scripts/toolbox-run.sh` (issue #104); host Git metadata is forwarded as
-  `KROPS_OCI_GIT_SHA`, `KROPS_OCI_GIT_REF`, and `KROPS_OCI_SOURCE_URL` for
-  linked-worktree OCI publication (#426). Do not put these reserved values
-  in `.env`; mise reloads it inside the container. The regression gate
-  `tests/test-oci-push-worktree.py` runs in validate and CI; the scripts remain the native path
-  for development.
-- `docs/`: detailed documentation.
-- `mise.toml`: pinned tool versions and all task entrypoints.
-  `mise.aws.toml` is the AWS tool layer (aws-cli, clusterawsadm),
-  activated with `MISE_ENV=aws`. `mise.azure.toml` (azure-cli) and
-  `mise.gcp.toml` (gcloud, plus the `gcp-bootstrap`, `wif-federate` and
-  `kubeconfigs` tasks; gcloud state lives in the gitignored `.gcloud/`
-  shared with the toolbox) are the other per-environment layers.
-  The lifecycle wrapper mounts `$HOME/.krops-azure` at the effective
-  `AZURE_CONFIG_DIR` (default `/root/.azure`, resolved after `.env`) to reuse
-  Azure login sessions. `arc-federate` checks/login before subscription selection;
-  `tests/test-toolbox-run-azure-session.py` guards cache forwarding and login
-  failure ordering in validate and CI.
-  Helper tasks run inside the toolbox image via `--entrypoint mise`
-  (issue #423); `validate` and `podinfo-port-forward` stay host tasks by
-  design; `MISE_AUTO_INSTALL=0` is mandatory for in-toolbox runs and mise's
-  `env_file` makes `/workspace/.env` override `-e` values. Direct toolbox calls
-  parse supported single-line dotenv quotes, escapes, and variable references
-  without shell evaluation; `tests/test-toolbox-run-env-precedence.py` checks
-  parity against isolated real mise (required in CI). See docs/operations.md
-  for syntax limits.
-- `renovate.json5`: Renovate config. Dependency versions live in the native
-  files that consume them (mise configs, manifests, workflows, airgap
-  inventory); Renovate discovers and updates them weekly and tracks pending
-  updates in the dependency dashboard issue. See `docs/dependencies.md`.
-  Edit it only with the dry-run workflow in "Editing renovate.json5" below.
+### Environment scope
+
+| Environment | Implemented scope |
+|---|---|
+| `aws` | CAPA-managed EKS in two regions, ACK S3/RDS/IAM on the management cluster, workload Flux instances, automated teardown and read-only orphan discovery. |
+| `azure` | CAPZ-managed AKS with bundled ASO and workload identity. Cloud resources reconcile on the management cluster. |
+| `gcp` | CAPG-managed GKE with Config Connector and Workload Identity Federation. Cloud resources reconcile on the management cluster. |
+| `local-host` | CAPD management and workload clusters, a local OCI registry, and a Podinfo workload. This is the no-cloud lifecycle test environment. |
+| `local-talos` | A single-node Talos management cluster on operator-provided bare metal through Tinkerbell. Management only: no workload cluster and no CAPI addons. |
+| Air-gapped `local-host` | A Zarf package of the `local-host` environment, built and deployed through `airgap/scripts/`. It is not a separate `bootstrap.toml` environment and has no AWS variant. |
+
+Azure and GCP currently refuse automated teardown. Read `bootstrap.toml` and
+`docs/known-issues.md` for current acceptance and teardown limitations before
+a live run. Crossplane is a decided but unimplemented alternative resource
+plane, not a component of the current environments.
+
+### Repository map
+
+- `mgmt/<env>/`: management-cluster desired state. `mgmt/shared/` holds the
+  Flux Operator `HelmChartProxy` base consumed by AWS, Azure, GCP, and
+  local-host.
+- `workload/`: workload-cluster desired state. AWS and GCP roots are empty,
+  Azure installs cert-manager, and local-host installs Podinfo. Workload
+  clusters run no cloud resource operators and hold no cloud credentials.
+- `bootstrap-rs/`: the `krops-bootstrap` Rust CLI, Rust tests, and toolbox
+  Dockerfile. The CLI implements bootstrap with default pivot, teardown, and
+  read-only AWS orphan discovery.
+- `bootstrap.toml`: repository-owned lifecycle configuration and the
+  authoritative environment list. `bootstrap.sh`, `pivot.sh`, and
+  `teardown.sh` remain native reference and fallback paths.
+- `scripts/`: the Docker/Podman lifecycle wrapper and the AWS virtualized-e2e
+  entrypoint.
+- `airgap/`: offline package manifests, image inventory, build/deploy/update
+  scripts, and air-gap tests.
+- `virtualized-e2e/`: WireMock harness for controller-to-cloud API tests. It
+  is not Flux-reconciled. The AWS boot-scope leg is wired; the Azure and GCP
+  arms are buildable but have no wired lifecycle leg.
+- `tests/`: repository and workflow regression gates. `tools/`, `docs/`, and
+  `website/` implement the documentation site. `.github/workflows/` contains
+  path-filtered validation, release, review, and end-to-end automation.
+- `mise.toml` and `mise.<env>.toml`: pinned tools and tasks. `renovate.json5`
+  discovers dependency pins in their consuming files; there is no central
+  version catalog.
 
 ## The golden rules (read before changing anything)
 
-1. Edit YAML in Git; never mutate the clusters. Use kubectl to inspect live
-   state, but make every persistent change here and let Flux converge.
-2. Flux tracks `main`. Nothing reconciles until merged to `main`. Do not
-   promise a fix is "live" until then.
-3. Secrets via SOPS + age. Encrypted manifests are named `*.sops.yaml` and
-   only `data`/`stringData` fields are encrypted (per `.sops.yaml`). Never
-   commit plaintext secrets; `age.agekey` and `.env` are gitignored and must
-   stay that way. Encrypt with `mise run sops-encrypt <file>`. AWS credentials
-   are not stored in Git: AWS key rotation means updating `.env` and re-running
-   bootstrap/pivot, which seed the CAPA and ACK secrets imperatively; see
-   `docs/secrets.md` for the procedure. Age-identity compromise requires revoking
-   all still-valid current/historical exposed credentials, replacing the
-   recipient and data keys, and coordinating bootstrap-owned live secret
-   replacement; follow `docs/secrets.md` (Age-key compromise recovery).
-4. Run `mise run validate` before pushing. PRs are reviewed as rendered Flux
-   diffs by the konflate GitHub Actions workflow (backed by an in-cluster
-   instance), so what you push is what gets reviewed.
-
-## Keeping this file current
-
-When making changes that affect repository structure, architecture,
-development workflows, build or test procedures, deployment workflows, or
-other information used to navigate and understand the repository, update
-`AGENTS.md` as part of the same pull request.
-
-Do not update `AGENTS.md` for changes that do not affect repository
-understanding or agent workflows.
+1. Put persistent desired state in Git; never hand-edit cluster state. Use
+   `kubectl` to inspect. Imperative mutation belongs only in the documented
+   bootstrap, pivot, teardown, and credential-seeding paths.
+2. AWS, Azure, GCP, and local-talos Flux sources track `main`. Local-host
+   instead reconciles an OCI artifact published from the checkout. Do not call
+   a change live until the intended source has been updated and Flux has
+   converged; merging alone does not republish the local-host artifact.
+3. Never commit plaintext secrets, `.env`, or `age.agekey`. Git-owned secrets
+   use SOPS + age in `*.sops.yaml`, with only `data` and `stringData`
+   encrypted. Use the documented toolbox SOPS tasks. AWS CAPA/ACK credentials
+   and the management GitHub PAT are seeded from ambient inputs, not stored in
+   Git. Azure and GCP credential manifests contain non-secret workload
+   identity configuration; do not replace them with static keys.
+4. Treat lifecycle operations as real infrastructure changes. Before any
+   deletion, teardown, forced recreation, or scale-to-zero, verify the live
+   context, environment, exact target, and ownership. AWS provisioning costs
+   money, and `AWS_ONLY=1` teardown still deletes real AWS resources. Never
+   run cloud teardown unless the user explicitly requested that operation.
+5. Preserve the project scope: direct upstream APIs, one GitOps reconciliation
+   model, cloud resource operators on the management cluster, and minimal
+   abstraction. Open an issue before adding a provider, changing the bootstrap
+   sequence or `bootstrap.toml` shape, or editing `renovate.json5`.
+6. Run `mise run validate` plus the targeted checks for every changed surface
+   before pushing. A green local run is not proof of a live deployment or of
+   CI-only gates.
+7. Keep one logical change per PR. Follow `CONTRIBUTING.md` for branch, commit,
+   review, and issue conventions, and update documentation in the same PR as
+   the behavior or workflow change.
 
 ## App layout convention
 
-Each component pairs a plain kustomize root with a Flux `Kustomization`:
+The management tree separates Flux entrypoints from plain kustomize roots:
 
+```text
+mgmt/<env>/kustomization.yaml            # lists the Flux entrypoint files
+<category>/flux-ks.yaml                  # Flux Kustomization objects
+<category>/<component>/kustomization.yaml  # plain manifests or child roots
 ```
-<scope>/<component>/
-  kustomization.yaml   # kustomize.config.k8s.io: lists the manifests (+ flux-ks.yaml)
-  flux-ks.yaml         # Flux Kustomization(s): path, dependsOn, wait
-  ...                  # raw manifests (HelmRelease, CRs, ...)
-```
 
-- Register new components in the parent `kustomization.yaml` (the
-  `flux-ks.yaml` entry) and use `dependsOn` / `wait: true` for ordering.
-- Per-cluster values come from `postBuild.substituteFrom: cluster-vars`
-  (`${AWS_REGION}`, `${CLUSTER_NAME}`), not from hardcoding.
-- Adding a workload cluster or app is a documented multi-step procedure:
-  follow `docs/extending.md` exactly rather than improvising.
+- A Flux `Kustomization` uses `spec.path` to select a plain kustomize root and
+  a `sourceRef` appropriate to the environment: `GitRepository` for
+  GitHub-synced environments, `OCIRepository` for local-host.
+- Register each new root in its parent `kustomization.yaml`, then register its
+  Flux entrypoint in the environment root. Entrypoints can be category-level
+  or component-level, and some categories have no grouping kustomization.
+  Mirror the nearest sibling instead of imposing a uniform tree.
+- Use `dependsOn` for ordering. Use `wait: true` when later resources require
+  readiness or installed CRDs, not indiscriminately on long-running cloud
+  resources.
+- Per-cluster values flow through `cluster-vars` and run metadata through
+  `krops-run` with `postBuild.substituteFrom`. Preserve
+  `substituteStrategy: Always` where optional values have documented defaults.
+- Workload Flux delivery uses the shared `HelmChartProxy` plus a per-environment
+  `ResourceSet` and regional inputs. Changes under `mgmt/shared/` affect every
+  consuming environment and the air-gap package.
+- Adding a workload cluster or application touches several roots and sometimes
+  teardown configuration and tests. Follow `docs/extending.md`; do not invent
+  a shortened procedure.
 
-## Common tasks (mise)
+## Lifecycle and operational sharp edges
+
+Use the toolbox for lifecycle and helper tasks. Host mise is for validation,
+documentation tasks, and the deliberate host-side Podinfo port-forward.
 
 ```sh
-mise install            # host: pinned tools for validate and the docs tasks
-mise run validate       # host: build every kustomize overlay; mirrors CI
-scripts/toolbox-run.sh bootstrap [profile]   # toolbox: kind + Flux handoff + pivot
-scripts/toolbox-run.sh teardown  [profile]   # toolbox: full teardown
-# helper tasks (sops-*, *-bootstrap, kubeconfigs, oci-push) run the same image:
-docker run --rm -it -v "$PWD:/workspace" -w /workspace -e MISE_AUTO_INSTALL=0 \
-  --entrypoint mise "$TOOLBOX_IMAGE" -E aws run kubeconfigs      # see docs/operations.md
+scripts/toolbox-run.sh bootstrap <env>
+scripts/toolbox-run.sh pivot <env>       # resume the default bootstrap/pivot path
+scripts/toolbox-run.sh teardown <env>
 ```
+
+- Environment names are `[environments.*]` sections in `bootstrap.toml`.
+  `KROPS_PROFILE` overrides the positional argument; the checked-in default is
+  `aws`. Bootstrap pivots by default. The CLI has `teardown` and `orphans`
+  subcommands, but no `pivot` subcommand; the wrapper's `pivot` verb reruns the
+  normal resume path.
+- Build `krops-toolbox:dev` and set `TOOLBOX_IMAGE` only for unreleased toolbox
+  changes. Helper tasks run in that same image with `--entrypoint mise` and
+  `MISE_AUTO_INSTALL=0`; use the exact invocations in `docs/operations.md`.
+- Local-host publishes only `mgmt/local-host/` and `workload/local-host/` into
+  its OCI artifact. Republish through the documented toolbox `oci-push` helper
+  after local changes. Keep `KROPS_OCI_GIT_SHA`, `KROPS_OCI_GIT_REF`, and
+  `KROPS_OCI_SOURCE_URL` out of `.env`; the wrapper derives them so linked
+  worktrees publish the right checkout.
+- `.env` overrides the process environment in both the wrapper and toolbox
+  mise tasks. Do not put secrets in command arguments or logs.
+- Concurrent lifecycle runs need distinct host-local kind and registry names.
+  The wrapper does not forward all override knobs, so follow the raw-container
+  procedure in `docs/bootstrap-cli.md`. Native shell runs are not multiplex-safe.
+- Do not move ACK, ASO, or Config Connector resource CRs back under `workload/`.
+  The management-cluster placement is intentional and guarded by tests.
+- `mise -E aws run aws-e2e-virtualized` creates a throwaway kind cluster and
+  intercepts AWS APIs with WireMock. It uses no real cloud credentials, but it
+  is still a lifecycle test, not a read-only check.
+
+## Validation
+
+Start from a clean checkout and install the pinned host tools:
+
+```sh
+mise trust
+mise install
+mise run validate
+git diff --check
+```
+
+`mise run validate` runs shell and offline regression checks, Python ruff,
+configuration cross-checks, and every kustomize build under `mgmt/`,
+`workload/`, and `virtualized-e2e/`. It does not cover every CI job.
+
+Add the checks for the surfaces you changed:
+
+| Changed surface | Required local checks |
+|---|---|
+| `bootstrap-rs/` | From `bootstrap-rs/`: `cargo fmt --check`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo build --locked`, `cargo test --locked` |
+| `bootstrap.toml` or referenced files | `python3 tests/test-bootstrap-config.py`, then `mise run validate` |
+| `README.md`, `docs/`, or docs assembler | `mise run docs-test` and `mise run docs-build` |
+| Markdown | `mise run markdown-lint`; note that `.markdownlint-cli2.jsonc` deliberately excludes `AGENTS.md` |
+| `airgap/` | `python3 airgap/tests/test-airgap-image-digests.py --all`; run the documented offline package drill for lifecycle changes |
+| Lifecycle scripts or CLI behavior | Full local-host bootstrap and teardown through the toolbox |
+| `renovate.json5` or dependency discovery | The dry-run and regression checks below |
+
+CI additionally runs YAML lint, external link checks, rendered Flux diffs,
+CI-only Renovate and air-gap gates, and path-selected release or end-to-end
+workflows. Verify checks against the PR head SHA, not an earlier run.
 
 ## Editing renovate.json5
 
-Renovate configs fail silently in ways `renovate-config-validator` cannot
-see (it is a syntax gate only). Before pushing any change to
-`renovate.json5`, prove extraction with a local dry-run:
+Keep dependency versions in their consuming files and add Renovate coverage
+for every new pin. `renovate-config-validator` checks syntax only; prove real
+extraction and replacement behavior before pushing.
+
+Use Node 24.11 or newer and the Renovate version pinned in
+`.github/workflows/validate.yml` (currently `44.181.1`):
 
 ```sh
 GITHUB_COM_TOKEN=$(gh auth token) RENOVATE_TOKEN=$(gh auth token) \
-  LOG_LEVEL=debug npx --yes -p renovate@44.50.1 \
-  renovate --platform=local --dry-run=full > /tmp/rv.log 2>&1
+  LOG_LEVEL=debug mise x node@24 -- npx --yes -p renovate@44.181.1 \
+  renovate --platform=local --dry-run=full > /tmp/krops-renovate.log 2>&1
 ```
 
-Pin the CLI version (unversioned npx resolves "latest" inconsistently) and
-run it on Node >= 24.11 (renovate's `engines` field; the CI renovate job
-pins node 24). On older Node the dry-run logs an `unhandledRejection`
-(`RegExp.escape is not a function`) and still exits 0: a green-looking
-silent no-op.
-Without `GITHUB_COM_TOKEN` every GitHub datasource lookup skips, hiding
-dead depNames. Read the "Dependency extraction complete" stats and compare
-`fileCount`/`depCount` per manager against what the change claims to
-cover; grep for "Failed to look up" and the `skipReason` histogram.
+Read the extraction counts, lookup failures, and `skipReason` histogram even
+when the command exits zero. Missing GitHub tokens hide failed datasource
+lookups. Renovate uses RE2 for `matchStrings`, so JavaScript-only constructs
+such as lookbehind are invalid. Check multiline matching, JSON5 escaping, and
+replacement templates against actual output bytes, not just the diff.
 
-Traps that have bitten this repo (each caught in a live review):
+With the pinned Renovate CLI on PATH, also run:
 
-- `matchStrings` compile with only the `g` flag: `^`/`$` anchors silently
-  extract zero dependencies from multi-line files. Keep patterns
-  unanchored with literal context, and never end a pattern by consuming
-  `\n` (skips every second line).
-- JSON5 eats single backslashes: `\s` inside a matchString class parses to
-  plain `s`, and `\\n` / `\\\"` in an `autoReplaceStringTemplate` are
-  emitted verbatim by the bare-handlebars replacement path, corrupting
-  the bumped file. Verify loaded patterns and simulate replacements
-  through handlebars; check file bytes with `repr()`, never the diff's
-  appearance.
-- Custom `depNameTemplate`s must resolve to live repos and datasources
-  (`gh api repos/<owner>/<repo>`); three 404 depNames have shipped.
-  `github-releases` returns nothing for tag-only repos (golang/go,
-  python/cpython); use `github-tags` or `golang-version`.
-- `autoReplaceStringTemplate` only sees the dependency's standard fields
-  (`depName`, `currentValue`, `newValue`, `newDigest`, ...). Custom capture
-  groups (`indent`, `header`, `urlPrefix`, ...) render empty, `registryUrl`
-  is stored as `registryUrls`, and `depName` is the `depNameTemplate`
-  result. Prefer no template when the default replacement gives the
-  correct result: it swaps every `currentValue`/`currentDigest` inside
-  the match; an explicit `{{newValue}}`-only template is fine when the
-  output structure must be stated explicitly. That swap also hits a
-  pure-numeric tag (`registry:2`) inside its hex digest, so pin full
-  tags (`2.8.3`). Lookbehind is not an escape hatch: Renovate compiles
-  `matchStrings` with RE2, which rejects it (only a Node without RE2
-  falls back to JS `RegExp` and hides that).
+```sh
+mise x node@24 -- python3 tests/test-renovate-coverage.py
+python3 airgap/tests/test-renovate-digest-pinning.py
+python3 tests/test-renovate-auto-replace.py
+```
 
-Repo gates: `tests/test-renovate-coverage.py` (every managed pin is
-discovered) and the digest-pinning test run in CI only (the validate.yml
-`renovate-digest-pinning` job), not in `mise run validate`. Both run on the
-shared harness `tests/renovate_harness.py` (issue #97): a new Renovate test
-is a file list plus assertions, never a copy of the subprocess/parsing
-logic. The harness needs Node >= 24.11 (renovate's `engines` field);
-locally: `mise x node@24 -- python3 tests/test-renovate-coverage.py`.
-The offline unit test `tests/test-renovate-actions-grouping.py` also runs in
-that CI job and uses the shared harness to apply Renovate's real package-rule
-engine, checking that only action dependencies join the GitHub Actions group.
-Run locally with Renovate on PATH and Node >= 24.11. The offline
-`tests/test-renovate-auto-replace.py` (same CI job) covers the replacement
-path: it runs Renovate's real `doAutoReplace` on every dependency every regex
-manager extracts and fails unless only the version/digest changed. None of
-these cover lookup liveness; only the dry-run does.
-
-The digest-pinning, coverage, and release-assets tests all run sequentially
-in the same CI job and their fixtures overlap on `airgap/zarf.yaml`'s
-`kubernetes-sigs/cluster-api*` depNames, so the harness points every run at
-a shared `RENOVATE_CACHE_DIR` (defaulting to a fixed path under the OS temp
-dir): repeat datasource lookups hit Renovate's on-disk cache instead of the
-GitHub API again.
-
-The CI-only `tests/test-mise-zarf-pin.py` (validate.yml `zarf-mise-pin`
-job) installs the zarf pin through mise and checks the reported version,
-catching an `asset_pattern` that matches no release asset.
-
-The offline `airgap/tests/test-airgap-image-digests.py` gate is separate from
-Renovate: it scans air-gap inventories and scripts changed by the PR, requires
-readable tags plus SHA-256 digests, and rejects inconsistent repeated
-references within the changed files. Untouched legacy files are not checked.
-It runs in both `mise run validate` and CI and performs no registry lookups.
-Use `python3 airgap/tests/test-airgap-image-digests.py --all` for a full-clone
-audit, including untouched legacy files.
+See `docs/dependencies.md` for grouping, pinning policy, and update ownership.
 
 ## Where to look next
 
-Load these only when the task touches their domain:
+Load only the references relevant to the task:
 
-- `docs/architecture.md`: reconciliation order, how workload apps are delivered.
-- `docs/bootstrap-cli.md`: the `krops-bootstrap` Rust CLI: interface, env knobs, pivot, parity status.
-- `docs/azure.md`: the Azure environment: subscription prep, credentials, AKS clusters, ASO on workload clusters, upgrade rules.
-- `docs/gcp.md`: the GCP environment: project prep, WIF credentials (no keys), GKE clusters, Config Connector on the workload cluster, upgrade rules.
-- `docs/extending.md`: adding a workload cluster, adding apps, adding other providers (Azure, Talos, k0smotron).
-- `docs/secrets.md`: SOPS + age setup, credential rotation.
-- `docs/konflate.md`: rendered PR review, CI gate, tokens, write-back.
-- `docs/aws-iam.md`: management-cluster ACK controllers (static SOPS credentials, union scope), reader roles, reader user, CI OIDC role, e2e account incident and credential revocation. The ACK permission documentation guard (`tests/test-aws-iam-doc-scope.py`) and its offline regressions (`tests/test-aws-iam-doc-scope-regressions.py`) run through the locked `uv run python` environment in validate and CI.
-- `docs/operations.md`: e2e AWS account designation and budget, quotas, configuration, bootstrap, verification.
-- `docs/workload-resources.md`: S3/RDS posture, known limitations.
-- `docs/troubleshooting-ack.md`: ACK controller failure modes for the CRs krops ships (Terminal after the pivot, non-retrying Terminal, Recoverable backoff).
-- `docs/airgap.md`: Zarf offline bundle for the local-host profile.
-- `docs/crossplane.md`: Crossplane as an alternative resource plane (decided, not yet implemented): per-environment selector, one plane per environment, ownership rules, slices #446 to #455.
+- `docs/architecture.md`: reconciliation pillars and per-environment topology.
+- `docs/operations.md`: toolbox contracts, prerequisites, pivot recovery,
+  teardown, releases, and AWS operations.
+- `docs/bootstrap-cli.md`: CLI interface, `bootstrap.toml`, runtime controls,
+  concurrency, teardown, and orphan discovery.
+- `docs/extending.md`: adding clusters, workload apps, and providers.
+- `docs/secrets.md`: SOPS + age, bootstrap-owned secrets, rotation, and
+  compromise recovery.
+- `docs/aws.md`, `docs/azure.md`, `docs/gcp.md`: environment setup and
+  credentials.
+- `docs/dependencies.md`: dependency ownership, Renovate grouping, and update
+  procedures.
+- `docs/airgap.md`: offline bundle build, deployment, verification, and update
+  drills.
+- `docs/konflate.md`: rendered PR review and its CI gate.
+- `docs/known-issues.md`: current limitations and acceptance status. Consult
+  it before promising or running a live environment.
+- `docs/documentation.md`: documentation ownership, placement, links, and
+  strict-site rules.
+- `virtualized-e2e/README.md`: implemented WireMock arms and unwired phases.
+- `docs/crossplane.md`: frozen design record for an unimplemented alternative;
+  never cite it as current deployed architecture.
+
+## Keeping docs current
+
+When a change affects repository structure, workflows, or how to navigate the
+repository, update `AGENTS.md` and the relevant `docs/` page in the same PR.
+Keep this file and `CONTRIBUTING.md` consistent when contributor workflows
+change.
+
+The same applies when the repository moves forward in a way the docs describe:
+a provider or operator pin bump, a lifecycle change, a new environment or
+component, or a discovered or resolved limitation updates the affected `docs/`
+pages in the same PR. Record a discovered or resolved limitation, provider
+constraint, or platform constraint in `docs/known-issues.md` with linked
+sources. Remove a registry entry only when the fix is merged or confirmed gone
+in a live run, and note what closed it.

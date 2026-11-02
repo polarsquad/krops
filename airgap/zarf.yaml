@@ -70,7 +70,7 @@ components:
         valuesFiles:
           - values/flux-operator.yaml
     images:
-      - ghcr.io/controlplaneio-fluxcd/flux-operator:v0.62.0@sha256:061eff8bf782a14f9ea4770f1ec820da0a3bc895532096b8ade3b2e7569c34dc
+      - ghcr.io/controlplaneio-fluxcd/flux-operator:v0.62.1@sha256:1d09a3f96524d0895fb11e8072d84a3dd029cecdec0f869efa371be6b001469c
     healthChecks:
       - apiVersion: apps/v1
         kind: Deployment

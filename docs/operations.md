@@ -777,10 +777,14 @@ environment.
 
 Repository-owned lifecycle configuration lives in `bootstrap.toml`. It defines
 the environment names, sync paths, management clusters, imperative chart
-versions, provider manifests, and teardown targets. `krops-bootstrap` reads it
-from the working directory unless `BOOTSTRAP_CONFIG` selects another path.
-Runtime environment variables take precedence over configurable defaults, and
-`mise run validate` cross-checks the file against the manifests.
+versions, provider manifests, teardown targets, the local-host OCI repository
+name, and the management kubeconfig path. `krops-bootstrap` reads it from the
+working directory unless `BOOTSTRAP_CONFIG` selects another path. Runtime
+environment variables take precedence over the configurable defaults, and
+`mise run validate` cross-checks the file against the manifests. A missing
+key falls back to the binary's built-in value (the checked-in values equal
+the built-ins, so existing runs are unchanged); the one repository-specific
+built-in that remains is the OCI tag (`latest`).
 
 ## Bootstrap
 

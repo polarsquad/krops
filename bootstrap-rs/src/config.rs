@@ -53,6 +53,21 @@ pub struct BootstrapSection {
     /// kindest/node image (tag+digest) for the bootstrap kind node (#647);
     /// must equal the CAPD ClusterClass customImage pins.
     pub kind_node_image: String,
+    /// OCI repository name for the local-host artifact (issue #261).
+    /// Optional so configs written before the key existed keep parsing:
+    /// an absent value makes the binary fall back to its built-in
+    /// `krops`. The `OCI_REPOSITORY` environment variable keeps its
+    /// precedence over this value at runtime.
+    #[serde(default)]
+    pub oci_repository: Option<String>,
+    /// Management kubeconfig path (issue #261), relative to `$HOME` like
+    /// the built-in default's resolution. Optional so configs written
+    /// before the key existed keep parsing: an absent value makes the
+    /// binary fall back to its built-in `.kube/krops-mgmt.yaml`. The
+    /// `MGMT_KUBECONFIG` environment variable keeps its precedence over
+    /// this value at runtime.
+    #[serde(default)]
+    pub mgmt_kubeconfig: Option<String>,
 }
 
 /// The Flux sync source for an environment
@@ -360,6 +375,29 @@ manifest = "mgmt/aws/infrastructure/aws-identity/identity.yaml"
     }
 
     #[test]
+    fn parses_oci_repository_and_mgmt_kubeconfig() {
+        // Issue #261: repository-owned defaults with backward-compatible
+        // absence (a config written before the keys existed).
+        let with = MINIMAL.replace(
+            "kind-node-image",
+            "oci-repository = \"other-repo\"\nmgmt-kubeconfig = \".kube/other-mgmt.yaml\"\nkind-node-image",
+        );
+        let config = parse(&with).unwrap();
+        assert_eq!(
+            config.bootstrap.oci_repository.as_deref(),
+            Some("other-repo")
+        );
+        assert_eq!(
+            config.bootstrap.mgmt_kubeconfig.as_deref(),
+            Some(".kube/other-mgmt.yaml")
+        );
+        // Absent keys stay None; the built-in fallback lives in main.rs.
+        let config = parse(MINIMAL).unwrap();
+        assert!(config.bootstrap.oci_repository.is_none());
+        assert!(config.bootstrap.mgmt_kubeconfig.is_none());
+    }
+
+    #[test]
     fn environment_order_preserved_from_file() {
         // The PR 1 contract: error messages list environments in file order
         // ('local-host' before 'aws'), matching bootstrap.sh's wording.
@@ -486,6 +524,13 @@ manifest = "mgmt/aws/infrastructure/aws-identity/identity.yaml"
         assert!(config.environments.contains_key("aws"));
         assert!(config.environments.contains_key("local-host"));
         assert!(config.charts.len() >= 3);
+        // Issue #261: the checked-in values equal the binary's built-in
+        // fallbacks, so existing invocations keep their current behavior.
+        assert_eq!(config.bootstrap.oci_repository.as_deref(), Some("krops"));
+        assert_eq!(
+            config.bootstrap.mgmt_kubeconfig.as_deref(),
+            Some(".kube/krops-mgmt.yaml")
+        );
         let aws = config.environment("aws").unwrap();
         assert_eq!(aws.provider_manifests.len(), 6);
         assert_eq!(aws.move_fallbacks.len(), 1);

@@ -7,6 +7,6 @@ metadata:
   name: azure
   namespace: capz-system
 spec:
-  version: "v1.27.0"
+  version: "v1.28.0"
   configSecret:
     name: capz-variables

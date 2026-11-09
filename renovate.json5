@@ -685,6 +685,21 @@
       "matchFileNames": ["airgap/images.txt", "airgap/zarf.yaml"],
       "groupName": "platform-charts"
     },
+    {
+      // The CI digest-pinning job installs and runs the pinned Renovate CLI,
+      // and renovate 44.x declares engines node ^24.11.0, so a 26.x node pin
+      // would move the job's runner environment outside the supported range
+      // and fail the job (#718). Both CI node surfaces must stay on the
+      // 24.x line together: the mise pin (nodejs/node, jdx/mise-action
+      // installs from mise.toml) and the setup-node pin (node, tracked
+      // through actions/setup-node's node-version input in validate.yml).
+      // Cap both until a Renovate release supports node 26, then lift the
+      // cap and carry both pins to 26.x in one PR.
+      "description": "Cap the mise and setup-node pins to the 24.x line until Renovate supports node 26 (#724)",
+      "matchDepNames": ["nodejs/node", "node"],
+      "matchFileNames": ["mise.toml", ".github/workflows/validate.yml"],
+      "allowedVersions": "<25"
+    },
     // flux2, sops, age, and aws-cli were previously floating "latest" pins;
     // they are now pinned to concrete versions in mise.toml / mise.aws.toml
     // so Renovate tracks them normally. The zarf local-registry image keeps

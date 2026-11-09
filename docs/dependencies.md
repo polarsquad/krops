@@ -18,7 +18,13 @@ Renovate discovers and updates versions in:
   CLI pin, plus the azure-cli pipx pin (`mise.azure.toml`) and the gcloud pin
   (`mise.gcp.toml`, resolved via the gcr.io/google-cloud-cli docker
   datasource). Explicit per-tool custom managers replace the native mise
-  manager so each pin resolves against the intended upstream project.
+  manager so each pin resolves against the intended upstream project. The
+  node pin additionally carries a version cap (issue #724): the CI
+  digest-pinning job installs and runs the pinned Renovate CLI, which only
+  accepts node 24.x, so Renovate proposes 24.x updates for the mise node
+  pin and the setup-node pin in `.github/workflows/validate.yml` (which the
+  mise.toml comment requires to track it), but not the 26.x major until
+  Renovate itself supports node 26.
 - `pyproject.toml` and `uv.lock`: documentation site dependencies (mkdocs-material,
   pytest) through the native Python managers.
 - `bootstrap-rs/Cargo.toml` and `bootstrap-rs/Cargo.lock`: Rust crate

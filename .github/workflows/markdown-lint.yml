@@ -34,7 +34,7 @@ jobs:
         uses: actions/checkout@v7.0.1
 
       - name: Install mise
-        uses: jdx/mise-action@v5.2.3
+        uses: jdx/mise-action@v5.2.7
         with:
           version: 2026.11.5
         env:

@@ -263,6 +263,9 @@ jobs:
       COMMIT: ${{ github.sha }}
       SOURCE_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
       - name: Download SBOM artifact
         uses: actions/download-artifact@v8.0.2
         with:

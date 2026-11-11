@@ -125,13 +125,13 @@ components:
     required: true
     files:
       # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api
-      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.3/clusterctl-darwin-arm64
-        shasum: 5915523f13949884d29d5254445b8d294ba314b5dacb3e8eff9e42f1c9d2e684
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.4/clusterctl-darwin-arm64
+        shasum: bdd7e8dd0863f9c996f508b7525a86a0b894f36c6b05335b2659a1d928e8d20e
         target: /tmp/krops-airgap/bin/clusterctl-darwin-arm64
         executable: true
       # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api
-      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.3/clusterctl-linux-arm64
-        shasum: eea3a3ecc64ae155c57eea35378d833285a92cb549c3298a18765bc40a7a3f7b
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.4/clusterctl-linux-arm64
+        shasum: 25a693b888a307f68ea00f9a251aa02971026bc2795b518142a565737902289f
         target: /tmp/krops-airgap/bin/clusterctl-linux-arm64
         executable: true
       - source: files/clusterctl-providers.yaml
@@ -142,13 +142,13 @@ components:
         target: /tmp/krops-airgap/scripts/resolve-clusterctl.sh
         executable: true
       # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-core
-      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.3/core-components.yaml
-        shasum: f70be959af4aba061b91cb264b3b1961ae38ca49e2eb542ccf2640146f5221a7
-        target: /tmp/krops-airgap/capi/cluster-api/v1.14.3/core-components.yaml
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.4/core-components.yaml
+        shasum: 0030264eb0a0d90ebacc9da8f6bbb717bee32e45ffadc4a74784fb5ad7b9bb0b
+        target: /tmp/krops-airgap/capi/cluster-api/v1.14.4/core-components.yaml
       # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-core
-      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.3/metadata.yaml
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.4/metadata.yaml
         shasum: c470906f551ac3e3e9aedc9a3e733b5a5994428693df43e95f65ea67c035f9fe
-        target: /tmp/krops-airgap/capi/cluster-api/v1.14.3/metadata.yaml
+        target: /tmp/krops-airgap/capi/cluster-api/v1.14.4/metadata.yaml
     actions:
       onDeploy:
         after:
@@ -158,7 +158,7 @@ components:
               copy_registry_secret capi-system || exit 1
               rendered=/tmp/krops-airgap/capi/core.rendered.yaml
               # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-core
-              "$clusterctl" generate provider --core cluster-api:v1.14.3 \
+              "$clusterctl" generate provider --core cluster-api:v1.14.4 \
                 --config /tmp/krops-airgap/clusterctl-providers.yaml \
                 --write-to "$rendered" &&
               patch_feature_gates "$rendered" &&
@@ -166,7 +166,7 @@ components:
               kubectl apply -f "$rendered"
             maxTotalSeconds: 120
     images:
-      - registry.k8s.io/cluster-api/cluster-api-controller:v1.14.3@sha256:1110ddb0f4a9cfc1b557f305199e2d56911fe442edef6361e12e5cc4b11e23fd
+      - registry.k8s.io/cluster-api/cluster-api-controller:v1.14.4@sha256:ee7b274a4c237d7831840c1a05a950c383f11a1755d3cca6292103cabb00bd26
     healthChecks:
       - apiVersion: apps/v1
         kind: Deployment
@@ -180,29 +180,29 @@ components:
     required: true
     files:
       # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-bootstrap-kubeadm
-      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.3/bootstrap-components.yaml
-        shasum: 537d6db3b70aad723710825f76073659865dc1a115715ef5d5c470da3b9bcc39
-        target: /tmp/krops-airgap/capi/bootstrap-kubeadm/v1.14.3/bootstrap-components.yaml
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.4/bootstrap-components.yaml
+        shasum: cf805775f24d197581b06e938bcd0eb9a9ed49d675f67e0f689ce7b71e5e397c
+        target: /tmp/krops-airgap/capi/bootstrap-kubeadm/v1.14.4/bootstrap-components.yaml
       # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-bootstrap-kubeadm
-      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.3/metadata.yaml
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.4/metadata.yaml
         shasum: c470906f551ac3e3e9aedc9a3e733b5a5994428693df43e95f65ea67c035f9fe
-        target: /tmp/krops-airgap/capi/bootstrap-kubeadm/v1.14.3/metadata.yaml
+        target: /tmp/krops-airgap/capi/bootstrap-kubeadm/v1.14.4/metadata.yaml
       # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-control-plane-kubeadm
-      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.3/control-plane-components.yaml
-        shasum: a211e2e54b6b6fb93e59191f5db8ee76ad6ff92a698f1c62f9d6ce4d5218cf87
-        target: /tmp/krops-airgap/capi/control-plane-kubeadm/v1.14.3/control-plane-components.yaml
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.4/control-plane-components.yaml
+        shasum: 7fecb41843dcff7e05ab539dbe497c050a9aa7c888d4fb68be12d3c1805be438
+        target: /tmp/krops-airgap/capi/control-plane-kubeadm/v1.14.4/control-plane-components.yaml
       # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-control-plane-kubeadm
-      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.3/metadata.yaml
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.4/metadata.yaml
         shasum: c470906f551ac3e3e9aedc9a3e733b5a5994428693df43e95f65ea67c035f9fe
-        target: /tmp/krops-airgap/capi/control-plane-kubeadm/v1.14.3/metadata.yaml
+        target: /tmp/krops-airgap/capi/control-plane-kubeadm/v1.14.4/metadata.yaml
       # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-infrastructure-docker
-      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.3/infrastructure-components-development.yaml
-        shasum: 228d7936814703313cf468032d5da120725ec08383997f0fac0025c75c355d3f
-        target: /tmp/krops-airgap/capi/infrastructure-docker/v1.14.3/infrastructure-components-development.yaml
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.4/infrastructure-components-development.yaml
+        shasum: b37e8da93a6d68f4f66ceacf505ef1bd271b38a120a06b7bcabceaa8b6ee639f
+        target: /tmp/krops-airgap/capi/infrastructure-docker/v1.14.4/infrastructure-components-development.yaml
       # renovate: datasource=github-release-attachments depName=kubernetes-sigs/cluster-api-infrastructure-docker
-      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.3/metadata.yaml
+      - source: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.14.4/metadata.yaml
         shasum: c470906f551ac3e3e9aedc9a3e733b5a5994428693df43e95f65ea67c035f9fe
-        target: /tmp/krops-airgap/capi/infrastructure-docker/v1.14.3/metadata.yaml
+        target: /tmp/krops-airgap/capi/infrastructure-docker/v1.14.4/metadata.yaml
     actions:
       onDeploy:
         after:
@@ -212,28 +212,28 @@ components:
               config=/tmp/krops-airgap/clusterctl-providers.yaml
               copy_registry_secret capi-kubeadm-bootstrap-system capi-kubeadm-control-plane-system capd-system &&
               # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-bootstrap-kubeadm
-              "$clusterctl" generate provider --bootstrap kubeadm:v1.14.3 \
+              "$clusterctl" generate provider --bootstrap kubeadm:v1.14.4 \
                 --config "$config" --write-to /tmp/krops-airgap/capi/bootstrap.rendered.yaml &&
               patch_feature_gates /tmp/krops-airgap/capi/bootstrap.rendered.yaml &&
               pin_image_digests /tmp/krops-airgap/capi/bootstrap.rendered.yaml &&
               kubectl apply -f /tmp/krops-airgap/capi/bootstrap.rendered.yaml &&
               # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-control-plane-kubeadm
-              "$clusterctl" generate provider --control-plane kubeadm:v1.14.3 \
+              "$clusterctl" generate provider --control-plane kubeadm:v1.14.4 \
                 --config "$config" --write-to /tmp/krops-airgap/capi/control-plane.rendered.yaml &&
               patch_feature_gates /tmp/krops-airgap/capi/control-plane.rendered.yaml &&
               pin_image_digests /tmp/krops-airgap/capi/control-plane.rendered.yaml &&
               kubectl apply -f /tmp/krops-airgap/capi/control-plane.rendered.yaml &&
               # renovate: datasource=github-releases depName=kubernetes-sigs/cluster-api-infrastructure-docker
-              "$clusterctl" generate provider --infrastructure docker:v1.14.3 \
+              "$clusterctl" generate provider --infrastructure docker:v1.14.4 \
                 --config "$config" --write-to /tmp/krops-airgap/capi/infrastructure.rendered.yaml &&
               patch_feature_gates /tmp/krops-airgap/capi/infrastructure.rendered.yaml &&
               pin_image_digests /tmp/krops-airgap/capi/infrastructure.rendered.yaml &&
               kubectl apply -f /tmp/krops-airgap/capi/infrastructure.rendered.yaml
             maxTotalSeconds: 180
     images:
-      - registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.14.3@sha256:bc056ff51f8df7c86481745cb86cbc07b7e8cfd4ee3684017f9a98362ab45b8f
-      - registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.14.3@sha256:fbf0b07fd4e4575160d82977f0daeba4792c992a2f56efac111fb76cfe29d0e1
-      - gcr.io/k8s-staging-cluster-api/capd-manager:v1.14.3@sha256:6e02c5d059eb7372c9ecf6602e6b4a9b450087e92440a5979651d7e82f00ad73
+      - registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.14.4@sha256:674dd5e666d209c7bdb72525dd3bb40a670c068bd12d610b596b532a84463e62
+      - registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.14.4@sha256:49f5cc1a0f9b3f909434e1cccf87d5d868e85e5c9ce849e8ae65ff409458befc
+      - gcr.io/k8s-staging-cluster-api/capd-manager:v1.14.4@sha256:42e1b35636703a83a375b0c17daeafaf2582beae3b7aa74bc2d28355f35a2fff
     healthChecks:
       - apiVersion: apps/v1
         kind: Deployment

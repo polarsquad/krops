@@ -125,9 +125,12 @@ jobs:
           set -uo pipefail
 
           capture=/tmp/airgap-public-egress.pcap
+          dns_probe=/tmp/airgap-dns-probe.txt
           firewall_comment=krops-airgap-egress
+          dns_comment=krops-airgap-dns
           bridge_interface=
           tcpdump_pid=
+          dns_block_installed=0
 
           stop_capture() {
             if [ -n "$tcpdump_pid" ]; then
@@ -136,7 +139,26 @@ jobs:
               tcpdump_pid=
             fi
           }
+          # External DNS is blocked at the host OUTPUT chain, because the DNS
+          # path from the kind network never crosses the kind bridge:
+          # containers resolve through Docker's built-in DNS (127.0.0.11),
+          # and dockerd forwards unknown names to the host's upstream
+          # resolvers from the host network namespace (the egress rule and
+          # the pcap below never see it). Only non-loopback destinations are
+          # dropped. See docs/airgap.md (DNS in the gap). The block is
+          # lifted on step exit, before the evidence upload: the runner
+          # agent needs DNS for it.
+          remove_dns_block() {
+            if [ "$dns_block_installed" = "1" ]; then
+              sudo iptables -D OUTPUT -p udp --dport 53 ! -d 127.0.0.0/8 \
+                -m comment --comment "$dns_comment" -j DROP 2>/dev/null || true
+              sudo iptables -D OUTPUT -p tcp --dport 53 ! -d 127.0.0.0/8 \
+                -m comment --comment "$dns_comment" -j DROP 2>/dev/null || true
+              dns_block_installed=0
+            fi
+          }
           cleanup() {
+            remove_dns_block
             stop_capture
             if [ -n "$bridge_interface" ]; then
               sudo iptables -D DOCKER-USER \
@@ -178,6 +200,117 @@ jobs:
             exit 1
           fi
 
+          # External DNS isolation. The probe image is loaded from the
+          # downloaded bundle (no network access): a throwaway container on
+          # the kind network exercises exactly the DNS path every kind node
+          # and workload container uses (Docker's built-in DNS). The probe
+          # names are fresh random subdomains of a real domain, one per
+          # phase: a resolver cache cannot hold a name that has never
+          # existed, and the external chain answers them (NXDOMAIN or an
+          # empty answer), which the blocked path cannot. A reserved TLD
+          # (.invalid, .test) would not work: systemd-resolved answers it
+          # locally, never touching the network.
+          : > "$dns_probe"
+          registry_tar=$(ls airgap/archives/docker.io_library_registry_*.tar 2>/dev/null | head -n 1)
+          if [ -z "$registry_tar" ]; then
+            echo "::error::No registry image archive found in the downloaded bundle"
+            exit 1
+          fi
+          probe_image=$(docker load -i "$registry_tar" | sed -n 's/^Loaded image: //p' | head -n 1)
+          if [ -z "$probe_image" ]; then
+            echo "::error::Could not determine the loaded registry probe image ref"
+            exit 1
+          fi
+
+          # Probe signatures. nslookup prints an answer section header for
+          # any response it receives - NXDOMAIN, an empty (NODATA) answer,
+          # or a real one; resolvers differ in which of those they return
+          # for a nonexistent name, so the assertion keys off the header,
+          # not the RCODE text. A dead chain (upstream unreachable, i.e. the
+          # DNS block in effect) prints a timeout/no-servers/SERVFAIL
+          # signature and no answer header. The two are mutually exclusive.
+          dns_answer_re='Non-authoritative answer:|Authoritative answer:|can.t find|NXDOMAIN|Name error'
+          dns_dead_re='no servers could be reached|connection timed out|Servfail|server failure'
+
+          # Baseline (bridge block only, no DNS block yet): a fresh external
+          # name must get a response from the external chain - any answer,
+          # NXDOMAIN or otherwise - from a container on the kind network,
+          # proving the egress block alone leaves a DNS hole (the dockerd
+          # built-in DNS forwards upstream from the host network
+          # namespace). If the chain does not answer, the block assertions
+          # below would be vacuous.
+          baseline_name="krops-$(openssl rand -hex 12).github.com"
+          {
+            echo "===== DNS baseline probe (bridge block only, no DNS block) ====="
+            echo "\$ docker run --rm --network kind $probe_image nslookup $baseline_name"
+          } >> "$dns_probe"
+          baseline_rc=0
+          baseline_out=$(timeout 60 docker run --rm --network kind "$probe_image" \
+            nslookup "$baseline_name" 2>&1) || baseline_rc=$?
+          printf '%s\n' "$baseline_out" >> "$dns_probe"
+          echo "nslookup rc: $baseline_rc" >> "$dns_probe"
+          if [ "$baseline_rc" -ge 125 ]; then
+            echo "::error::DNS baseline probe failed to run (docker rc=$baseline_rc)"
+            cat "$dns_probe"
+            exit 1
+          fi
+          if printf '%s\n' "$baseline_out" | grep -qiE "$dns_dead_re"; then
+            echo "::error::DNS baseline probe failed: $baseline_name got no response (dead-chain signature) under the bridge block only; external DNS is not working on this runner and the block assertions below would be vacuous"
+            cat "$dns_probe"
+            exit 1
+          fi
+          if ! printf '%s\n' "$baseline_out" | grep -qiE "$dns_answer_re"; then
+            echo "::error::DNS baseline probe failed: $baseline_name got neither a response nor a failure signature under the bridge block only; the probe is inconclusive"
+            cat "$dns_probe"
+            exit 1
+          fi
+          echo "PROBE: $baseline_name got a response from the external chain under the bridge block only: external DNS is not covered by the egress block (the hole this test closes)" >> "$dns_probe"
+
+          # Block external DNS at the host (both protocols) and verify the
+          # rules landed.
+          sudo iptables -I OUTPUT 1 -p udp --dport 53 ! -d 127.0.0.0/8 \
+            -m comment --comment "$dns_comment" -j DROP
+          sudo iptables -I OUTPUT 1 -p tcp --dport 53 ! -d 127.0.0.0/8 \
+            -m comment --comment "$dns_comment" -j DROP
+          if ! sudo iptables -C OUTPUT -p udp --dport 53 ! -d 127.0.0.0/8 \
+                -m comment --comment "$dns_comment" -j DROP || \
+              ! sudo iptables -C OUTPUT -p tcp --dport 53 ! -d 127.0.0.0/8 \
+                -m comment --comment "$dns_comment" -j DROP; then
+            echo "::error::Failed to block external DNS from the host"
+            exit 1
+          fi
+          dns_block_installed=1
+
+          # The block must be effective from inside the kind network: a
+          # fresh external name must now get no response at all (the
+          # resolver cannot reach any upstream server).
+          blocked_name="krops-$(openssl rand -hex 12).github.com"
+          {
+            echo "===== DNS block assertion (fresh external name must get no answer) ====="
+            echo "\$ docker run --rm --network kind $probe_image nslookup $blocked_name"
+          } >> "$dns_probe"
+          blocked_rc=0
+          blocked_out=$(timeout 60 docker run --rm --network kind "$probe_image" \
+            nslookup "$blocked_name" 2>&1) || blocked_rc=$?
+          printf '%s\n' "$blocked_out" >> "$dns_probe"
+          echo "nslookup rc: $blocked_rc" >> "$dns_probe"
+          if [ "$blocked_rc" -ge 125 ]; then
+            echo "::error::DNS block probe failed to run (docker rc=$blocked_rc)"
+            cat "$dns_probe"
+            exit 1
+          fi
+          if printf '%s\n' "$blocked_out" | grep -qiE "$dns_answer_re"; then
+            echo "::error::External DNS still answers a fresh name with the DNS block active: the block is ineffective"
+            cat "$dns_probe"
+            exit 1
+          fi
+          if ! printf '%s\n' "$blocked_out" | grep -qiE "$dns_dead_re"; then
+            echo "::error::DNS block assertion inconclusive: the probe got no answer but no failure signature either; the probe did not run as intended"
+            cat "$dns_probe"
+            exit 1
+          fi
+          echo "PROBE: $blocked_name got no response with the DNS block active (expected): the block is effective" >> "$dns_probe"
+
           if airgap/scripts/offline-run.sh \
             airgap/zarf-package-krops-airgap-*.tar.zst; then
             deploy_result=0
@@ -188,6 +321,92 @@ jobs:
           stop_capture
           sudo tcpdump -n -r "$capture" \
             > /tmp/airgap-public-egress.txt 2>/dev/null
+
+          # The deploy came up under both blocks. Re-assert the DNS posture
+          # (the block still installed, external still dead from the kind
+          # network, Docker-internal names still resolving) and assert no
+          # component degraded because of a failed lookup: no crash loops,
+          # no image pull failures, and no events mentioning DNS.
+          assert_cluster_clean() {
+            local label=$1; shift
+            local bad dns_events
+            bad=$("$@" get pods -A \
+              -o jsonpath='{range .items[*]}{range .status.containerStatuses[*]}{.state.waiting.reason}{"\n"}{end}{end}' 2>/dev/null \
+              | grep -E '^(CrashLoopBackOff|ErrImagePull|ImagePullBackOff)$' | sort -u)
+            if [ -n "$bad" ]; then
+              echo "::error::$label: pods degraded during the isolated deploy:"
+              echo "$bad"
+              return 1
+            fi
+            # DNS failure signatures only: a bare "dns" substring matches
+            # coredns pod names in ordinary lifecycle events.
+            dns_events=$("$@" get events -A 2>/dev/null | grep -iE '\bdns\b|no such host|server misbehaving|temporary failure in name resolution|failed to resolve')
+            if [ -n "$dns_events" ]; then
+              echo "::error::$label: events referencing DNS during the isolated deploy:"
+              echo "$dns_events"
+              return 1
+            fi
+            return 0
+          }
+          if [ "$deploy_result" -eq 0 ]; then
+            {
+              echo "===== Post-deploy DNS posture (both blocks active) ====="
+            } >> "$dns_probe"
+            # The block must still be installed after the deploy, so the
+            # clean deploy above happened under DNS isolation.
+            if ! sudo iptables -C OUTPUT -p udp --dport 53 ! -d 127.0.0.0/8 \
+                  -m comment --comment "$dns_comment" -j DROP || \
+                ! sudo iptables -C OUTPUT -p tcp --dport 53 ! -d 127.0.0.0/8 \
+                  -m comment --comment "$dns_comment" -j DROP; then
+              echo "::error::The DNS block is no longer installed after the deploy"
+              cat "$dns_probe"
+              exit 1
+            fi
+            echo "PROBE: DNS block still installed after the deploy (expected)" >> "$dns_probe"
+            # External DNS must still be dead from the kind network (same
+            # built-in-DNS path, fresh name, authoritative check).
+            docker network inspect kind >/dev/null 2>&1 || docker network create kind >/dev/null
+            post_name="krops-$(openssl rand -hex 12).github.com"
+            {
+              echo "\$ docker run --rm --network kind $probe_image nslookup $post_name"
+            } >> "$dns_probe"
+            post_rc=0
+            post_out=$(timeout 60 docker run --rm --network kind "$probe_image" \
+              nslookup "$post_name" 2>&1) || post_rc=$?
+            printf '%s\n' "$post_out" >> "$dns_probe"
+            echo "nslookup rc: $post_rc" >> "$dns_probe"
+            if [ "$post_rc" -ge 125 ]; then
+              echo "::error::Post-deploy DNS probe failed to run (docker rc=$post_rc)"
+              cat "$dns_probe"
+              exit 1
+            fi
+            if ! printf '%s\n' "$post_out" | grep -qiE "$dns_dead_re"; then
+              echo "::error::External DNS answers a fresh name from the kind network after the deploy: the DNS block is not holding"
+              cat "$dns_probe"
+              exit 1
+            fi
+            echo "PROBE: $post_name got no response from the kind network after the deploy (expected)" >> "$dns_probe"
+            # Cluster-local (Docker-internal) DNS must still work: only
+            # external lookups are blocked.
+            if ! docker exec airgap-mgmt-control-plane timeout 60 getent hosts krops-registry-airgap >> "$dns_probe" 2>&1; then
+              echo "::error::Docker-internal name krops-registry-airgap does not resolve from the mgmt node"
+              cat "$dns_probe"
+              exit 1
+            fi
+            echo "PROBE: krops-registry-airgap resolved from the mgmt node (expected)" >> "$dns_probe"
+            assert_cluster_clean "mgmt cluster" kubectl --context kind-airgap-mgmt || {
+              cat "$dns_probe"
+              exit 1
+            }
+            # The workload cluster, if it came up (offline-run.sh writes its
+            # kubeconfig only when the workload API is reachable).
+            if [ -f /tmp/airgap-wl.kubeconfig ]; then
+              assert_cluster_clean "workload cluster" kubectl --kubeconfig /tmp/airgap-wl.kubeconfig || {
+                cat "$dns_probe"
+                exit 1
+              }
+            fi
+          fi
 
           if [ -s /tmp/airgap-public-egress.txt ]; then
             echo "::error::Public network traffic was attempted during the isolated deployment"
@@ -208,6 +427,7 @@ jobs:
             /tmp/airgap-sbom.*
             /tmp/airgap-public-egress.pcap
             /tmp/airgap-public-egress.txt
+            /tmp/airgap-dns-probe.txt
             /tmp/airgap-cert-manager-debug.txt
             /tmp/airgap-workload-debug.txt
           if-no-files-found: warn

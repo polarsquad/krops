@@ -91,7 +91,7 @@ jobs:
           restore-keys: ack-charts-
 
       - name: Install mise
-        uses: jdx/mise-action@v5.2.7
+        uses: jdx/mise-action@v5.2.10
         with:
           version: 2026.11.5
         env:

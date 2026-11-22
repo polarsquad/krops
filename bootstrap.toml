@@ -51,7 +51,7 @@ mgmt-kubeconfig = ".kube/krops-mgmt.yaml"
 # flux-operator and flux-instance version together upstream, so this one
 # pin serves both chart installs.
 # renovate: datasource=docker depName=ghcr.io/controlplaneio-fluxcd/charts/flux-operator
-flux-operator = "0.62.0"
+flux-operator = "0.63.1"
 # renovate: datasource=helm registryUrl=https://charts.jetstack.io depName=cert-manager
 cert-manager = "1.21.3"
 # renovate: datasource=helm registryUrl=https://kubernetes-sigs.github.io/cluster-api-operator depName=cluster-api-operator

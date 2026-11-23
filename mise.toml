@@ -14,7 +14,7 @@ uv = "0.13.9"
 # Markdown linting (#243): node hosts markdownlint-cli2. Keep the node pin
 # aligned with the setup-node pin in .github/workflows/validate.yml.
 node = "24.22.3"
-"npm:markdownlint-cli2" = "0.24.0"
+"npm:markdownlint-cli2" = "0.24.2"
 
 # Zarf CLI (airgap prototype). See docs/dependencies.md's "Intentional
 # differences" for why version/asset_pattern are written this way.

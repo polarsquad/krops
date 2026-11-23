@@ -28,7 +28,7 @@ RUN cd bootstrap-rs && cargo build --locked --release \
 FROM debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
 
 # renovate: datasource=github-releases depName=jdx/mise extractVersion=^v(?<version>.+) versioning=semver
-ARG MISE_VERSION=2026.11.5
+ARG MISE_VERSION=2026.11.12
 # Set by BuildKit: "amd64" or "arm64".
 ARG TARGETARCH
 

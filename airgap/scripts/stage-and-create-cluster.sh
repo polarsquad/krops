@@ -57,7 +57,7 @@ kubectl wait --for=condition=Ready node --all --timeout=60s
 
 # Recreate krops-registry (the workload cluster's Flux and CAAPH fetch from it;
 # the Zarf internal registry is only reachable inside the mgmt cluster).
-REGISTRY_IMAGE="${REGISTRY_IMAGE:-registry:3.1.2@sha256:38907510915c3f1604c7e83d6ab602ab3020d092f73bdaed8696773693ff768c}"
+REGISTRY_IMAGE="${REGISTRY_IMAGE:-registry:3.1.2@sha256:82f6ff4a7f982960c8aa51617fea3aabc485df6e55cce80d22deb1de36f1bc3c}"
 REGISTRY_NAME="${REGISTRY_NAME:-krops-registry}"
 REGISTRY_PORT="${REGISTRY_PORT:-5001}"
 registry_failure() {

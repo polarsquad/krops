@@ -17,7 +17,7 @@
 # slim-bookworm matches the runtime stage's glibc (bookworm, 2.36): a
 # binary built on the default rust image (trixie, glibc 2.39) fails on
 # bookworm with "GLIBC_2.39 not found".
-FROM rust:1.99.1-slim-bookworm@sha256:f2c004e3d2d8b547e8cf7ffbc29205385f4e71d23e53e4e383065db5e9f822cd AS build
+FROM rust:1.100.0-slim-bookworm@sha256:7c7d4eb4d05b7781187a327809466cfddf29753f6defdc3d19a0e291951b7a37 AS build
 
 WORKDIR /build
 COPY bootstrap-rs/ ./bootstrap-rs/
@@ -28,7 +28,7 @@ RUN cd bootstrap-rs && cargo build --locked --release \
 FROM debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
 
 # renovate: datasource=github-releases depName=jdx/mise extractVersion=^v(?<version>.+) versioning=semver
-ARG MISE_VERSION=2026.11.5
+ARG MISE_VERSION=2026.11.12
 # Set by BuildKit: "amd64" or "arm64".
 ARG TARGETARCH
 
@@ -40,7 +40,7 @@ ARG TARGETARCH
 # exec (CONTAINER_ENGINE=podman); it talks to the host socket the run
 # invocation mounts.
 # renovate: datasource=github-releases depName=containers/podman extractVersion=^v(?<version>.+) versioning=semver
-ARG PODMAN_VERSION=6.1.4
+ARG PODMAN_VERSION=6.2.0
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates curl git jq findutils gnupg python-is-python3 \

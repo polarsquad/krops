@@ -55,7 +55,7 @@ flux-operator = "0.62.0"
 # renovate: datasource=helm registryUrl=https://charts.jetstack.io depName=cert-manager
 cert-manager = "1.21.3"
 # renovate: datasource=helm registryUrl=https://kubernetes-sigs.github.io/cluster-api-operator depName=cluster-api-operator
-capi-operator = "0.30.0"
+capi-operator = "0.30.1"
 
 [teardown]
 # Constants for `krops-bootstrap teardown` (issue #100), mirroring the literal

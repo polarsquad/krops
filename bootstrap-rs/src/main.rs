@@ -3824,7 +3824,7 @@ else:
         assert_eq!(cfg.repo.bootstrap.registry_name, "krops-registry");
         assert_eq!(cfg.repo.bootstrap.flux_namespace, "flux-system");
         assert_eq!(cfg.repo.bootstrap.mgmt_namespace, "default");
-        assert_eq!(cfg.repo.charts["flux-operator"], "0.62.0");
+        assert_eq!(cfg.repo.charts["flux-operator"], "0.63.1");
     }
 
     #[test]

@@ -4,4 +4,4 @@ metadata:
   name: helm
   namespace: caaph-system
 spec:
-  version: "v0.6.4"
+  version: "v0.6.6"

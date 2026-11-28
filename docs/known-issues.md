@@ -345,6 +345,25 @@ by the registry; this section is the canonical copy of its entries).
 - **Workaround / status**: none; tracked as a design follow-up.
 - **Status**: open
 
+### Storage exhaustion during the deploy is not transactional
+
+- **What**: storage running out inside the deploy itself (`docker image
+  load`, the kind node's storage, the Zarf registry) is not transactional
+  and not covered by `update-package.sh`. A deploy that exits non-zero still
+  restores the prior archive or removes a first install (exit 3), but the
+  cluster is not rolled back. A backup that fails its integrity check during that
+  restore exits 4 and needs manual recovery.
+- **Where it bites**: air-gapped local-host, update (`apply`, deploy phase).
+- **Why**: platform constraint (the deploy writes to Docker, kind, and the
+  Zarf registry, which the update script does not control). Source: the
+  airgap page's [known limitations /
+  follow-ups](./airgap.md#known-limitations-follow-ups).
+- **Workaround / status**: the storage preflight covers only the archives
+  filesystem; keep free space on the host's Docker and kind storage beyond
+  the archive budget. The real-filesystem nightly test for these paths is
+  tracked in [#610](https://github.com/polarsquad/krops/issues/610).
+- **Status**: open
+
 ## Cross-environment
 
 ### cert-manager 1.21.2 runs outside its published Kubernetes support window

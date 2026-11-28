@@ -533,6 +533,15 @@ enforce it.
   re-issues while the clock is skewed carry a notBefore in the future and
   stay unusable until real time reaches it; force a re-issue at the correct
   time by deleting the serving Secret that holds them.
+- **Storage exhaustion during the deploy is not transactional.** The storage
+  rules under "Updating a deployed bundle" cover the archives filesystem and
+  the archive's own copies. Storage running out inside the deploy itself
+  (`docker image load`, the kind node's storage, the Zarf registry) is not
+  covered. A deploy that exits non-zero still restores the prior archive (or
+  removes a first install) and exits 3, but the cluster is not rolled back. If
+  the backup fails its integrity check during that restore, `apply` exits 4
+  and needs manual recovery. The real-filesystem nightly test for these paths
+  is still open in [#610](https://github.com/polarsquad/krops/issues/610).
 
 ## Updating a deployed bundle
 
@@ -559,7 +568,10 @@ active archive untouched. A failed deploy restores the prior archive and exits
 3. A successful deploy leaves `phase=awaiting-confirm`: a second `apply` is
 refused until you run `confirm` (drops the `.bak`) or `rollback` (restores the
 `.bak`). An `.update-state` with any other content also refuses `apply`
-(exit 1); inspect it and run `rollback` or remove it manually.
+(exit 1); inspect it and run `rollback`, or move it aside. A leftover `.bak` that
+differs from the active archive also makes `apply` exit 1: it is kept, because it
+may be the only copy of the prior archive. Move it aside, then run `apply`
+again. An `apply` whose package argument is the `.bak` file is refused.
 
 Disk budget: `apply` verifies the staged package, and `zarf package verify`
 and `zarf package inspect sbom` each extract the package to a temporary
@@ -570,7 +582,9 @@ package). `verify-package.sh` points zarf's temporary directory (global
 `--tmpdir` flag, zarf 0.88.0) at a sibling of the SBOM output directory and
 removes it on every exit path; zarf 0.88.0 leaves the extraction directory
 behind when verification fails, so that cleanup is what reclaims the space on
-a rejected package. Budget the peak on the filesystem holding `archives/`.
+a rejected package. Budget the peak on the filesystem holding `archives/`; when
+`TMPDIR` is on another filesystem, the extraction is budgeted there instead
+(see the storage section below).
 The nightly `update-rollback` job (air-gapped.yml) keeps all test scratch on
 that filesystem (the test fixtures hardlink the pristine package, which
 requires the same filesystem) and checks free space against this model before
@@ -584,8 +598,9 @@ Files, all under `airgap/archives/` (gitignored):
 | `<active>.bak` | Prior package, kept until `confirm` or `rollback` |
 | `<active>.bak.sha256` | Recorded digest of `.bak`, checked before any restore |
 | `.staging/` | Candidate package during verification; discarded by the next `apply` |
+| `.update-state.next` | Pre-written `phase=awaiting-confirm` state, renamed over `.update-state` after a successful deploy |
 | `.update-state` | `phase=cutover` or `phase=awaiting-confirm`, plus `first_install=1` for a first install |
-| `.update.lock` | Directory lock holding the owner pid; stale locks are reclaimed, and reclaiming is not race-free, so run one update at a time |
+| `.update.lock` | Symlink whose target is the owner pid; a stale lock (dead pid) is reclaimed, including an older lock directory, and reclaiming is not race-free, so run one update at a time. Where the filesystem has no symlinks, the lock is a directory with a `pid` file instead; creating it needs free space |
 
 The `*.tar` glob in `stage-and-create-cluster.sh` does not match any of these
 names, so staging and backups never get loaded as images.
@@ -595,10 +610,11 @@ Exit codes:
 | Code | Meaning |
 | --- | --- |
 | 0 | Success (`apply` deployed and awaiting confirm; `confirm` and `rollback` done) |
-| 1 | Blocked by prior state, a lock held by another run, or bad input |
-| 2 | Package rejected during staging; active archive untouched |
+| 1 | Blocked by prior state, a lock held by another run, a lock that cannot be created (nothing changed), a package that is the `.bak` file, a leftover `.bak` that differs from the active archive, a failed cutover rename, or bad input; also a deploy that succeeded whose result could not be recorded (phase stays `cutover`; run `rollback`) |
+| 2 | Package rejected during staging, or a staging directory, SBOM directory, copy, backup, or state write failed; active archive untouched |
 | 3 | Deploy failed; prior archive restored (or first install removed) |
 | 4 | Backup integrity check failed; active archive may have been swapped to the new package; manual recovery needed |
+| 5 | Not enough free space on the archives filesystem, or it could not be read; the active archive is untouched |
 | 64 | Usage error |
 
 Crash recovery:
@@ -606,11 +622,14 @@ Crash recovery:
 | State left behind | Meaning | Recovery |
 | --- | --- | --- |
 | `.staging/` only, no state | Crash during staging; active untouched | Nothing to do; the next `apply` discards it |
-| `phase=cutover` plus `.bak` | Crash between the swap and the deploy result | `rollback` restores the `.bak`; `confirm` is refused |
+| `.update-state.next` or `.update-state.tmp`, no state | Crash while preparing the cutover | Nothing to do; the next `apply` removes them |
+| `.bak` (and maybe `.bak.sha256`), no state, active archive present | Crash while preparing the cutover (the `.bak` is then the same file as the active archive, or an interrupted copy of it), or a copy left by an earlier run | The next `apply` removes a `.bak` that is the same file as, identical to, or a strict prefix of the active archive. Any other `.bak` makes `apply` exit 1 and is kept: move it aside, since it may be the only copy of the prior archive, then run `apply` again |
+| `.bak` (and maybe `.bak.sha256`), no state, no active archive | No script path creates this: `apply` and `rollback` only leave a `.bak` beside an active archive. It appears when the active archive was removed by hand while a `.bak` remained | `apply` keeps it, since it may be the only archive. A first install's `apply` keeps it too, and `confirm` of that first install deletes it. To keep it, move it aside before `apply` |
+| `phase=cutover` plus `.bak` | Crash between the swap and the deploy result, or a deploy whose result could not be recorded | `rollback` restores the `.bak`; `confirm` is refused. If the crash came before the swap, the `.bak` is a second link to the active archive and `rollback` just drops that link. Rerunning `rollback` finishes a rollback interrupted after the `.bak` was consumed: when the `.bak` is gone and the active archive matches the recorded checksum, the state and checksum are removed |
 | `phase=cutover` plus `first_install=1` | Crash during a first install | `rollback` removes the archive |
 | `phase=awaiting-confirm` | Deployed, not yet accepted | `confirm` to accept, or `rollback` to restore |
-| `.bak` present, `.bak.sha256` mismatch | Backup altered or corrupted | Exit 4; restore the archive from its source, then redeploy |
-| `.update.lock` with no live pid | Crash while holding the lock | Reclaimed automatically; with no pid recorded, remove it by hand after confirming no update runs |
+| `.bak` present, `.bak.sha256` mismatch, or `.bak` missing while the active archive does not match the recorded checksum | Backup altered or corrupted; `rollback` exits 4 and keeps `.update-state` and the checksum | Exit 4; restore the archive from its source. Then move `.update-state` and `.bak` aside before the next `apply`, which refuses while the state file exists |
+| `.update.lock` with no live pid | Crash while holding the lock | Reclaimed automatically. A lock with no readable owner is refused; remove it by hand after confirming no update runs |
 
 Scope: only the Zarf package archive is transactional. The host image tarballs,
 the init package, and the config artifact are not. Live cluster state is never
@@ -638,7 +657,54 @@ AIRGAP_VERIFY_WORKFLOW_REF=polarsquad/krops/.github/workflows/air-gapped.yml@ref
 ```
 
 Real-zarf mode runs the truncated, byte-flipped, and deploy-failure scenarios
-only. The stub suite covers the full apply, confirm, and rollback cycle.
+only. The stub suite covers the full apply, confirm, and rollback cycle, the
+storage and lock scenarios (including writes failing with `RLIMIT_FSIZE` 0),
+and the leftover and crash states in the crash recovery table.
+
+### Storage requirements and storage pressure
+
+Before the staged copy, `apply` refuses a package that is the `.bak` file,
+takes the lock, removes leftover temporary state files, and checks a leftover
+`.bak` (see the crash recovery table). Then it needs:
+
+- **Archives filesystem** (the one holding `archives/`): at least the package
+  size plus 1 MiB. This is a hard check. `apply` exits 5 and prints
+  `insufficient storage on <path>: need X KiB, have Y KiB; active archive
+  untouched`. If `df` gives no usable number for the path, `apply` also exits 5.
+  A negative figure counts as zero.
+- **`TMPDIR`** (default `/tmp`): about 1.6 times the package size, for zarf's
+  extraction during verification; 2.6 times when `TMPDIR` is on the same
+  device as `archives/`, because the staged copy is also there. This is a
+  warning only, because the extraction size is an estimate. A `TMPDIR` that
+  is too small for the extraction shows up as a verification failure (exit 2).
+
+The backup is a hard link on the same filesystem and takes no extra space. If
+the link cannot be made, the backup is a full copy that needs the active
+package's size again. The preflight does not budget for that fallback. If
+the copy fails, `apply` exits 2 as described below.
+
+On a shared filesystem, the peak is the one in "Disk budget" above (active,
+staged copy, and one extraction). The preflight reserves only the staged copy
+and the 1 MiB, so a shared filesystem can pass the preflight and still fail
+verification with exit 2.
+
+Behavior by phase:
+
+| Phase | Storage exhaustion | Exit | Active archive |
+| --- | --- | --- | --- |
+| Preflight | Refused before the staged copy; only provably redundant leftovers are removed first | 5 | untouched |
+| Staging copy | Staging directory creation or the copy fails; staging removed | 2 | untouched |
+| Verification | Failure removes staging, SBOM output, and zarf's temporary extraction. A pass removes the SBOM output and the temporary extraction | 2 | untouched |
+| Backup and state preparation | Partial `.bak` and `.bak.sha256` (not a kept first-install `.bak`), the state temporary files, and staging removed | 2 | untouched |
+| Cutover | The staged archive is renamed over the active one. A rename needs no new data on the same filesystem. A failed rename is not handled: it exits 1 with `phase=cutover`. `rollback` restores the `.bak`; a first install has no `.bak`, and `rollback` clears the state | 1 | unchanged after a failed rename; `rollback` restores the prior archive |
+| Post-deploy record | The awaiting-confirm state was written before the swap, so recording the result is one rename. If that rename fails, exit 1 with `phase=cutover` while the new archive is deployed | 1 | new archive, deployed |
+| Deploy | Non-zero exit restores the prior archive, or removes a first install; a failed integrity check during the restore exits 4 | 3 | restored |
+
+`confirm` and `rollback` copy nothing and do not check free space. They rename
+or delete existing files, and take the lock as a symlink, which needs no data
+block. The stub suite runs both with writes failing (`RLIMIT_FSIZE` 0). No real
+full-filesystem test covers them yet; that check is part of
+[#610](https://github.com/polarsquad/krops/issues/610).
 
 ### Config-only versus substrate changes
 

@@ -164,7 +164,7 @@
   <text x="1168" y="776" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">Workload Flux pulls config + charts</text>
   <text x="1168" y="802" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">from krops-registry; podinfo runs</text>
   <text x="1168" y="828" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">from pre-loaded images. Zero pulls,</text>
-  <text x="1168" y="854" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">zero public packets.</text>
+  <text x="1168" y="854" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">zero public packets, DNS aside.</text>
   <line x1="1122" y1="888" x2="1504" y2="888" stroke="#1F362A" stroke-width="1.2"/>
 
   <!-- update drill -->
@@ -175,6 +175,6 @@
   <text x="1122" y="1040" font-family="DejaVu Sans" font-size="17" fill="#D4E2DA">fresh <tspan font-family="DejaVu Sans Mono" font-size="16" fill="#FFFFFF">zarf package deploy</tspan>.</text>
 
   <!-- ===== footer ===== -->
-  <text x="800" y="1102" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">Validated end-to-end with the radio off: CI captures public traffic and fails on any packet.</text>
+  <text x="800" y="1102" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">Validated end-to-end with the radio off: CI fails on any captured public packet except UDP/TCP port 53 to container-namespace IPv4 upstreams.</text>
   <text x="800" y="1128" text-anchor="middle" font-family="DejaVu Sans" font-size="17" fill="#859D91">Same GitOps chain as local-host: only the delivery vehicle changes.</text>
 </svg>

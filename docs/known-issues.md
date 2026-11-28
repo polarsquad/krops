@@ -368,16 +368,148 @@ by the registry; this section is the canonical copy of its entries).
   moves.
 - **Status**: mitigated
 
-### The nightly air-gapped workflow is failing
+### The nightly air-gapped workflow fails in isolated-deploy
 
-- **What**: the scheduled air-gapped workflow fails in the "Staged update
-  rejection and offline rollback" job (ENOSPC while staging the built Zarf
-  package).
-- **Where it bites**: air-gapped local-host, CI (the update-rollback drill
-  does not run to completion).
-- **Why**: platform constraint (runner disk space). Sources:
-  [#612](https://github.com/polarsquad/krops/issues/612) (open), failing
-  run [40054621664](https://github.com/polarsquad/krops/actions/runs/40054621664).
-- **Workaround / status**: tracked in
-  [#612](https://github.com/polarsquad/krops/issues/612).
+- **What**: the scheduled air-gapped workflow failed in the "Deploy without
+  external egress" (`isolated-deploy`) job on every scheduled run from
+  2026-11-24 to 2026-11-27. The 2026-11-28 scheduled run
+  ([run 46097761178](https://github.com/polarsquad/krops/actions/runs/46097761178),
+  on `main` without these fixes) exceeded the job's 30 min limit and was
+  reported as cancelled. Its job log is not available, so its cause is not
+  confirmed; `report-status` files nothing for a cancelled run
+  ([#809](https://github.com/polarsquad/krops/issues/809)). Three causes are
+  known, tracked in
+  [#807](https://github.com/polarsquad/krops/issues/807). The clusterctl and
+  syft causes surfaced after
+  [PR #692](https://github.com/polarsquad/krops/pull/692) (host DNS block for
+  unavailable external DNS, merged 2026-11-23; 2026-11-24 was the first
+  scheduled run with it). On 2026-11-24 and 2026-11-26 the job did not report
+  a job timeout. Both ended with "The runner has received a shutdown signal"
+  during `zarf package deploy`, about 27 to 29 min into a 30 min limit; the
+  logs do not show the reason. The earlier update-rollback ENOSPC failure
+  ([#612](https://github.com/polarsquad/krops/issues/612)) is closed: fixed by
+  [#674](https://github.com/polarsquad/krops/pull/674) and
+  [#687](https://github.com/polarsquad/krops/pull/687); closed 2026-10-24
+  after manual run [40142073894](https://github.com/polarsquad/krops/actions/runs/40142073894)
+  passed (#674 alone did not fix it).
+- **Where it bites**: air-gapped local-host, CI (nightly runs; the job fails).
+- **Why**: provider behavior (causes A and C: the vendored syft and clusterctl
+  made network requests by default) and platform constraint (cause B: the
+  runner's Docker DNS path).
+  - Cause A, provider behavior, confirmed in the job logs: `zarf tools sbom
+    convert` runs once per SBOM document, and the vendored syft fetched
+    `toolbox-data.anchore.io` on every call. The update check was on by
+    default ([syft `update_check.go` at v1.51.1](https://github.com/anchore/syft/blob/v1.51.1/cmd/syft/internal/options/update_check.go)).
+    With blocked DNS each call failed after about 20 s, so the verification
+    pass over all 63 documents took about 21 min
+    ([run 45312061908](https://github.com/polarsquad/krops/actions/runs/45312061908),
+    2026-11-24; [run 45742055306](https://github.com/polarsquad/krops/actions/runs/45742055306),
+    2026-11-26).
+  - Cause C, provider behavior, from the clusterctl v1.14.4 source: after each
+    command, clusterctl asked the Go module proxy, falling back to GitHub, for
+    the latest release ([`version_checker.go`](https://github.com/kubernetes-sigs/cluster-api/blob/v1.14.4/cmd/clusterctl/cmd/version_checker.go),
+    [`cmd/clusterctl/cmd/root.go`](https://github.com/kubernetes-sigs/cluster-api/blob/v1.14.4/cmd/clusterctl/cmd/root.go),
+    [`internal/goproxy`](https://github.com/kubernetes-sigs/cluster-api/tree/v1.14.4/internal/goproxy)).
+    With the proxy refused, it retried the proxy for 60 s before falling back
+    to GitHub, and failed checks were not cached. With
+    `CLUSTERCTL_DISABLE_VERSIONCHECK=true` it makes no version-check request.
+    Observed in CI logs: the core render (`namespace/capi-system created` to
+    `configured`) took about 81 s on 2026-11-24 (02:54:49 to 02:56:10) and on
+    2026-11-26 (02:54:48 to 02:56:09). Attributing that time to the version
+    check is inferred from the source and the timing; the logs do not show the
+    cause. The `capi-providers` action runs three renders under a 180 s
+    `maxTotalSeconds`; at 81 s each they project to about 243 s. Neither run
+    reached the end of that action, so 243 s is a projection, not a
+    measurement.
+  - Cause B, platform constraint, partly observed: the DNS baseline probe got
+    no response on 2026-11-25 and 2026-11-27, and the job failed there
+    ([run 45532655320](https://github.com/polarsquad/krops/actions/runs/45532655320),
+    [run 45928038954](https://github.com/polarsquad/krops/actions/runs/45928038954)).
+    The probe passed on 2026-11-24 and failed on 2026-11-25 on runner image
+    [20261116.190](https://github.com/actions/runner-images/blob/ubuntu26-arm64/20261116.190/images/ubuntu/Ubuntu2604-Arm64-Readme.md),
+    and passed on 2026-11-26 and failed on 2026-11-27 on runner image
+    [20261122.195](https://github.com/actions/runner-images/blob/ubuntu26-arm64/20261122.195/images/ubuntu/Ubuntu2604-Arm64-Readme.md).
+    Both readmes list Docker Server 29.4.2, which does not show whether an
+    override is set. Both failing runs inserted the bridge egress block before
+    the baseline probe, so the probe ran with that block already active (the
+    host DNS block came later). tcpdump captured 6 packets on the bridge in
+    both failing runs; the stall runs captured 0.
+    The path is inferred. Upstream servers from the host's resolver
+    configuration are dialed from the host namespace; servers set by `--dns` or
+    the daemon's `dns` setting are dialed from the container namespace, over the
+    kind bridge, where the egress block drops the query (moby at tag
+    docker-v29.4.2:
+    [`TransformForIntNS`](https://github.com/moby/moby/blob/docker-v29.4.2/daemon/libnetwork/internal/resolvconf/resolvconf.go#L251-L264),
+    [`dialExtDNS`](https://github.com/moby/moby/blob/docker-v29.4.2/daemon/libnetwork/resolver.go#L499),
+    [`OptionDNS` callers](https://github.com/moby/moby/blob/docker-v29.4.2/daemon/container_operations.go#L60-L64)).
+    The logs of the failing runs do not record the runner's resolver
+    configuration, so whether those runners set such an override is not known;
+    the 2026-11-28 fork runs below show that the override is present on some
+    runners of image 20261122.195.1. The isolated-deploy job
+    now records the forwarding path in its probe transcript. The pcap gate
+    failure on 2026-11-18
+    ([run 44222887171](https://github.com/polarsquad/krops/actions/runs/44222887171))
+    captured 894 packets to 168.63.129.16:53 on the bridge, from 172.18.0.2
+    (718), 172.18.0.5 (134) and 172.18.0.6 (42), before the baseline probe
+    existed; it appears to be the same class (inferred). See
+    [DNS in the gap](./airgap.md#dns-in-the-gap).
+- **Workaround / status**: two environment variables address causes A and C:
+  `SYFT_CHECK_FOR_APP_UPDATE=false` (`airgap/scripts/verify-package.sh`) and
+  `CLUSTERCTL_DISABLE_VERSIONCHECK=true` (`airgap/scripts/resolve-clusterctl.sh`).
+  For cause B, `isolated-deploy` now runs the DNS baseline probe before any
+  block, records the forwarding path, and excludes only UDP and TCP port 53 to
+  container-namespace IPv4 upstreams from the egress gate (see
+  [DNS in the gap](./airgap.md#dns-in-the-gap)). A manual run on a fork at
+  commit `b8f0641`, before the capture liveness check was added
+  ([run 46070854386](https://github.com/lmilbaum/krops/actions/runs/46070854386),
+  2026-11-27, runner image 20261122.195.1), passed. Observed in its logs:
+  signature, checksum and SBOM verification of all 63 documents took 17 s
+  (21:37:40 to 21:37:57); the core render took about 1 s
+  (`namespace/capi-system created` at 21:40:55, `configured` at 21:40:56); and
+  the run took the host-namespace path (`# ExtServers: [host(127.0.0.53)]`),
+  captured 0 packets, and had an unfiltered gate. The DNS assertions are
+  inferred from the step result: the step passed, so every DNS assertion
+  passed. Three manual runs on a fork on 2026-11-28 (runner image
+  20261122.195.1) covered the container-namespace path. [Run
+  46118384418](https://github.com/lmilbaum/krops/actions/runs/46118384418), on
+  commit `d230847` with nothing added to the runner's Docker setup, took it and
+  passed: `/etc/docker/daemon.json` already set `dns` to `168.63.129.16`, Docker
+  reported `# ExtServers: [168.63.129.16]`, and the gate excluded 938 DNS
+  packets to that address, leaving 0. [Run
+  46118380143](https://github.com/lmilbaum/krops/actions/runs/46118380143), on
+  `throwaway/807-forced-dns-pr`, also took it; its DNS assertions passed (932
+  packets excluded, 0 remaining), and its cluster-clean scan then failed (see
+  the cluster-clean scan entry below). A control from `main` at `bbd5909` with a
+  throwaway step setting the same daemon `dns` ([run
+  46118382520](https://github.com/lmilbaum/krops/actions/runs/46118382520))
+  failed at the DNS baseline probe with 6 packets captured, matching the failure
+  message and packet count of the 2026-11-25 and 2026-11-27 runs. Those runs'
+  logs do not show `daemon.json`, so the override on their runners remains
+  inferred. [Run 46070854386](https://github.com/lmilbaum/krops/actions/runs/46070854386)
+  on the same image took the host-namespace path, so the Docker DNS setting
+  varies between runners of one image, for an unknown reason. The entry stays
+  open until a scheduled run passes.
+- **Status**: open
+
+### The cluster-clean scan matches a `dns` branch name
+
+- **What**: the isolated-deploy cluster-clean scan fails the job when a cluster
+  event matches `\bdns\b`. Flux writes the git ref into the `NewArtifact`
+  event of an `OCIRepository`, so a manual run from a branch that has `dns` as
+  a separate word in its name fails isolated-deploy after its DNS assertions
+  have passed. Observed in
+  [run 46118380143](https://github.com/lmilbaum/krops/actions/runs/46118380143)
+  (2026-11-28, fork, branch `throwaway/807-forced-dns-pr`): the mgmt cluster
+  scan reported the `NewArtifact` event for `ocirepository/flux-system`, and
+  the workload-cluster scan and the public-egress check did not run.
+- **Where it bites**: air-gapped local-host, CI (manual runs from a branch with
+  `dns` as a separate word in its name; scheduled runs on `main` are
+  unaffected).
+- **Why**: krops scan design. `assert_cluster_clean` in
+  `.github/workflows/air-gapped.yml` matches `\bdns\b` anywhere in the
+  `kubectl get events -A` output, which includes the git ref that Flux reports
+  in `NewArtifact` events. The pattern exists so that coredns pod names do not
+  match, but it does not exclude the ref.
+- **Workaround / status**: do not use `dns` as a separate word in the branch
+  name of a manual run.
 - **Status**: open

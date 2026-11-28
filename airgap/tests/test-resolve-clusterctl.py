@@ -27,6 +27,8 @@ esac
 
 def run(script: Path, script_suffix: str, fake_arch: str, fake_bin_dir: Path) -> subprocess.CompletedProcess:
     env = dict(os.environ, FAKE_ARCH=fake_arch, PATH=f"{fake_bin_dir}:{os.environ['PATH']}")
+    # A caller's own setting must not satisfy the export check below.
+    env.pop("CLUSTERCTL_DISABLE_VERSIONCHECK", None)
     cmd = f". {script}\n{script_suffix}"
     return subprocess.run(
         ["sh", "-c", cmd], env=env, capture_output=True, text=True, check=False
@@ -71,6 +73,12 @@ def main() -> int:
         elif f"clusterctl={clusterctl}" not in result.stdout:
             errors.append(f"happy path: $clusterctl not set to {clusterctl}, got stdout={result.stdout!r}")
 
+        # The clusterctl that the script selects runs as a child process: the
+        # version-check kill switch must be exported to it (docs/airgap.md).
+        result = run(script, "printenv CLUSTERCTL_DISABLE_VERSIONCHECK", "arm64", fake_bin_dir)
+        if result.returncode != 0 or result.stdout.strip() != "true":
+            errors.append(f"version check: expected CLUSTERCTL_DISABLE_VERSIONCHECK=true in the child env, got rc={result.returncode} stdout={result.stdout!r}")
+
         # patch_feature_gates must rewrite an existing --feature-gates flag in place.
         rendered = stage_dir / "rendered.yaml"
         rendered.write_text("        - --feature-gates=SomeOtherFlag=false\n")
@@ -87,7 +95,7 @@ def main() -> int:
             print(f"  - {error}", file=sys.stderr)
         return 1
 
-    print("resolve-clusterctl.sh: arch gate, missing-binary gate, happy path, and patch_feature_gates OK")
+    print("resolve-clusterctl.sh: arch gate, missing-binary gate, happy path, version-check export, and patch_feature_gates OK")
     return 0
 
 

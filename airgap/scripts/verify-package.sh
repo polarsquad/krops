@@ -46,7 +46,8 @@ airgap_verify_package() {
   fi
   while IFS= read -r -d '' doc; do
     sbom_found=1
-    if ! "$ZARF" tools sbom convert "$doc" -o syft-json >/dev/null; then
+    # Update check off so this decode makes no update-check request: see docs/airgap.md#sequence.
+    if ! SYFT_CHECK_FOR_APP_UPDATE=false "$ZARF" tools sbom convert "$doc" -o syft-json >/dev/null; then
       rm -rf "$ZARF_TMP"
       echo "airgap_verify_package: SBOM document failed to decode as Syft: $doc" >&2
       return 1

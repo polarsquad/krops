@@ -2,6 +2,8 @@
 # Sourced (not executed) by the capi-core, capi-providers, and caaph Zarf
 # onDeploy actions to set $clusterctl. See docs/airgap.md's "Empirical
 # findings" #1.
+# Offline version check stalls each call 60 s or more: docs/airgap.md#sequence.
+export CLUSTERCTL_DISABLE_VERSIONCHECK=true
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
 arch=$(uname -m)
 case "$arch" in

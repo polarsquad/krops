@@ -139,15 +139,16 @@ jobs:
               tcpdump_pid=
             fi
           }
-          # External DNS is blocked at the host OUTPUT chain, because the DNS
-          # path from the kind network never crosses the kind bridge:
-          # containers resolve through Docker's built-in DNS (127.0.0.11),
-          # and dockerd forwards unknown names to the host's upstream
-          # resolvers from the host network namespace (the egress rule and
-          # the pcap below never see it). Only non-loopback destinations are
-          # dropped. See docs/airgap.md (DNS in the gap). The block is
-          # lifted on step exit, before the evidence upload: the runner
-          # agent needs DNS for it.
+          # External DNS is blocked at the host OUTPUT chain, which covers
+          # upstreams dialed from the host network namespace. Containers
+          # resolve through Docker's built-in DNS (127.0.0.11), and dockerd
+          # forwards unknown names to its upstreams: those from the host's
+          # resolver configuration leave from the host namespace, and those
+          # set by --dns or the daemon's dns setting leave from the container
+          # namespace, over the kind bridge, where the egress block drops them.
+          # Only non-loopback destinations are dropped. See docs/airgap.md
+          # (DNS in the gap). The block is lifted on step exit, before the
+          # evidence upload: the runner agent needs DNS for it.
           remove_dns_block() {
             if [ "$dns_block_installed" = "1" ]; then
               sudo iptables -D OUTPUT -p udp --dport 53 ! -d 127.0.0.0/8 \
@@ -170,35 +171,109 @@ jobs:
           }
           trap cleanup EXIT
 
+          valid_ipv4() {
+            local re='^(0|[1-9][0-9]{0,2})(\.(0|[1-9][0-9]{0,2})){3}$' octet
+            [[ $1 =~ $re ]] || return 1
+            local IFS=.
+            for octet in $1; do
+              [ "$octet" -le 255 ] || return 1
+            done
+          }
+          valid_ipv6() {
+            local re='^[0-9A-Fa-f:.]+$'
+            [[ $1 == *:* && $1 =~ $re ]]
+          }
+
+          # Parses the upstreams from a container resolv.conf line written by
+          # moby's ResolvConf.Generate: "# ExtServers: [host(ADDR) ADDR ...]".
+          # host(ADDR) is dialed from the host namespace, a bare ADDR from the
+          # container namespace. Sets dns_path, dns_upstreams (the validated
+          # IPv4 container-namespace addresses, the only ones the egress gate
+          # excludes) and dns_notes.
+          parse_ext_servers() {
+            local line entry addr host_n=0 ctr_n=0 ipv6_n=0 bad_n=0
+            dns_path="unknown (no ExtServers line)"
+            dns_upstreams=
+            dns_notes=
+            line=$(grep -m1 '^# ExtServers: \[' "$1" 2>/dev/null || true)
+            [ -n "$line" ] || return 0
+            line=${line#*\[}
+            line=${line%\]*}
+            for entry in $line; do
+              case "$entry" in
+                host\(*\))
+                  addr=${entry#host(}
+                  addr=${addr%)}
+                  if valid_ipv4 "$addr" || valid_ipv6 "$addr"; then
+                    host_n=$((host_n + 1))
+                  else
+                    bad_n=$((bad_n + 1))
+                  fi
+                  ;;
+                *)
+                  if valid_ipv4 "$entry"; then
+                    ctr_n=$((ctr_n + 1))
+                    dns_upstreams="${dns_upstreams:+$dns_upstreams }$entry"
+                  elif valid_ipv6 "$entry"; then
+                    ctr_n=$((ctr_n + 1))
+                    ipv6_n=$((ipv6_n + 1))
+                  else
+                    bad_n=$((bad_n + 1))
+                  fi
+                  ;;
+              esac
+            done
+            if [ $((host_n + ctr_n)) -eq 0 ]; then
+              dns_path="unknown (no usable ExtServers entries)"
+            elif [ "$ctr_n" -eq 0 ]; then
+              dns_path="host namespace"
+            elif [ "$host_n" -eq 0 ]; then
+              dns_path="container namespace"
+            else
+              dns_path="mixed"
+            fi
+            if [ "$ipv6_n" -gt 0 ]; then
+              dns_notes="$ipv6_n IPv6 container-namespace upstream(s) not excluded from the gate"
+            fi
+            if [ "$bad_n" -gt 0 ]; then
+              dns_notes="${dns_notes:+$dns_notes; }malformed ExtServers entries ignored: $bad_n"
+            fi
+          }
+
+          # Writes the unfiltered capture read to $2 and the egress gate to $3.
+          # The gate drops only DNS (UDP or TCP port 53) to the upstreams in
+          # $4; with none it is unfiltered. Returns nonzero if tcpdump cannot
+          # read the capture or the split does not add up.
+          write_egress_gate() {
+            local capture_file=$1 all_out=$2 gate_out=$3 upstreams=$4
+            local dns_filter='' addr all_n gate_n excluded_n
+            for addr in $upstreams; do
+              dns_filter="${dns_filter:+$dns_filter or }dst host $addr"
+            done
+            sudo tcpdump -n -r "$capture_file" > "$all_out" || return 1
+            if [ -z "$dns_filter" ]; then
+              cp "$all_out" "$gate_out" || return 1
+              echo "Egress gate: no excludable IPv4 container-namespace DNS upstreams, the gate is unfiltered"
+              return 0
+            fi
+            dns_filter="(udp or tcp) and dst port 53 and ($dns_filter)"
+            sudo tcpdump -n -r "$capture_file" "not ($dns_filter)" > "$gate_out" || return 1
+            sudo tcpdump -n -r "$capture_file" "$dns_filter" > "$all_out.dns" || return 1
+            all_n=$(grep -c . "$all_out" || true)
+            gate_n=$(grep -c . "$gate_out" || true)
+            excluded_n=$(grep -c . "$all_out.dns" || true)
+            rm -f "$all_out.dns"
+            if [ $((gate_n + excluded_n)) -ne "$all_n" ]; then
+              echo "::error::The egress gate filter does not split the capture ($gate_n + $excluded_n != $all_n)"
+              return 1
+            fi
+            echo "Egress gate: excluded $excluded_n DNS packets to container-namespace upstreams ($upstreams) on port 53; $gate_n packets remain"
+          }
+
           docker network inspect kind >/dev/null 2>&1 || \
             docker network create kind >/dev/null
           network_id=$(docker network inspect kind --format '{{.Id}}')
           bridge_interface="br-${network_id:0:12}"
-
-          sudo iptables -I DOCKER-USER 1 \
-            -i "$bridge_interface" ! -o "$bridge_interface" \
-            -m conntrack --ctstate NEW \
-            -m comment --comment "$firewall_comment" -j DROP
-          if ! sudo iptables -C DOCKER-USER \
-            -i "$bridge_interface" ! -o "$bridge_interface" \
-            -m conntrack --ctstate NEW \
-            -m comment --comment "$firewall_comment" -j DROP; then
-            echo "::error::Failed to block external egress from the kind network"
-            exit 1
-          fi
-
-          sudo tcpdump \
-            -i "$bridge_interface" \
-            -w "$capture" \
-            '(ip and not dst net 10.0.0.0/8 and not dst net 172.16.0.0/12 and not dst net 192.168.0.0/16 and not dst net 127.0.0.0/8 and not dst net 169.254.0.0/16 and not multicast) or (ip6 and not dst net fc00::/7 and not dst net fe80::/10 and not dst host ::1 and not multicast)' &
-          tcpdump_pid=$!
-
-          sleep 1
-          if ! sudo kill -0 "$tcpdump_pid" 2>/dev/null; then
-            echo "::error::Traffic capture failed to start"
-            wait "$tcpdump_pid"
-            exit 1
-          fi
 
           # External DNS isolation. The probe image is loaded from the
           # downloaded bundle (no network access): a throwaway container on
@@ -226,22 +301,19 @@ jobs:
           # any response it receives - NXDOMAIN, an empty (NODATA) answer,
           # or a real one; resolvers differ in which of those they return
           # for a nonexistent name, so the assertion keys off the header,
-          # not the RCODE text. A dead chain (upstream unreachable, i.e. the
+          # not the RCODE text. A dead chain (upstream unreachable, e.g. the
           # DNS block in effect) prints a timeout/no-servers/SERVFAIL
           # signature and no answer header. The two are mutually exclusive.
           dns_answer_re='Non-authoritative answer:|Authoritative answer:|can.t find|NXDOMAIN|Name error'
           dns_dead_re='no servers could be reached|connection timed out|Servfail|server failure'
 
-          # Baseline (bridge block only, no DNS block yet): a fresh external
-          # name must get a response from the external chain - any answer,
-          # NXDOMAIN or otherwise - from a container on the kind network,
-          # proving the egress block alone leaves a DNS hole (the dockerd
-          # built-in DNS forwards upstream from the host network
-          # namespace). If the chain does not answer, the block assertions
-          # below would be vacuous.
+          # Baseline, before any block: a fresh external name must get a
+          # response from the external chain - any answer, NXDOMAIN or
+          # otherwise - from a container on the kind network. If the chain
+          # does not answer, the block assertions below would be vacuous.
           baseline_name="krops-$(openssl rand -hex 12).github.com"
           {
-            echo "===== DNS baseline probe (bridge block only, no DNS block) ====="
+            echo "===== DNS baseline probe (no blocks) ====="
             echo "\$ docker run --rm --network kind $probe_image nslookup $baseline_name"
           } >> "$dns_probe"
           baseline_rc=0
@@ -255,16 +327,62 @@ jobs:
             exit 1
           fi
           if printf '%s\n' "$baseline_out" | grep -qiE "$dns_dead_re"; then
-            echo "::error::DNS baseline probe failed: $baseline_name got no response (dead-chain signature) under the bridge block only; external DNS is not working on this runner and the block assertions below would be vacuous"
+            echo "::error::DNS baseline probe failed: $baseline_name got no response (dead-chain signature) with no blocks; external DNS is not working on this runner and the block assertions below would be vacuous"
             cat "$dns_probe"
             exit 1
           fi
           if ! printf '%s\n' "$baseline_out" | grep -qiE "$dns_answer_re"; then
-            echo "::error::DNS baseline probe failed: $baseline_name got neither a response nor a failure signature under the bridge block only; the probe is inconclusive"
+            echo "::error::DNS baseline probe failed: $baseline_name got neither a response nor a failure signature with no blocks; the probe is inconclusive"
             cat "$dns_probe"
             exit 1
           fi
-          echo "PROBE: $baseline_name got a response from the external chain under the bridge block only: external DNS is not covered by the egress block (the hole this test closes)" >> "$dns_probe"
+          echo "PROBE: $baseline_name got a response from the external chain before any block" >> "$dns_probe"
+
+          # Forwarding path. moby writes the upstreams it dials into the
+          # container's resolv.conf as "# ExtServers: [host(ADDR) ADDR ...]":
+          # host(ADDR) is dialed from the host network namespace, a bare ADDR
+          # from the container namespace, over the kind bridge.
+          container_resolv=/tmp/airgap-container-resolv.conf
+          {
+            echo "===== Forwarding path: container resolv.conf ====="
+            echo "\$ docker run --rm --network kind $probe_image cat /etc/resolv.conf"
+          } >> "$dns_probe"
+          timeout 60 docker run --rm --network kind "$probe_image" \
+            cat /etc/resolv.conf > "$container_resolv" 2>&1 || true
+          cat "$container_resolv" >> "$dns_probe"
+          for host_resolv in /etc/docker/daemon.json /run/systemd/resolve/resolv.conf; do
+            if [ -f "$host_resolv" ]; then
+              { echo "===== Host file: $host_resolv ====="; cat "$host_resolv"; } >> "$dns_probe" 2>&1 || true
+            fi
+          done
+          parse_ext_servers "$container_resolv"
+          { grep -m1 '^# ExtServers: \[' "$container_resolv" || echo "no ExtServers line in the container resolv.conf"; } | tee -a "$dns_probe"
+          echo "PROBE: forwarding path for external DNS from the kind network: $dns_path; container-namespace upstreams: ${dns_upstreams:-none}${dns_notes:+; $dns_notes}" | tee -a "$dns_probe"
+
+          sudo iptables -I DOCKER-USER 1 \
+            -i "$bridge_interface" ! -o "$bridge_interface" \
+            -m conntrack --ctstate NEW \
+            -m comment --comment "$firewall_comment" -j DROP
+          if ! sudo iptables -C DOCKER-USER \
+            -i "$bridge_interface" ! -o "$bridge_interface" \
+            -m conntrack --ctstate NEW \
+            -m comment --comment "$firewall_comment" -j DROP; then
+            echo "::error::Failed to block external egress from the kind network"
+            exit 1
+          fi
+
+          sudo tcpdump \
+            -i "$bridge_interface" \
+            -w "$capture" \
+            '(ip and not dst net 10.0.0.0/8 and not dst net 172.16.0.0/12 and not dst net 192.168.0.0/16 and not dst net 127.0.0.0/8 and not dst net 169.254.0.0/16 and not multicast) or (ip6 and not dst net fc00::/7 and not dst net fe80::/10 and not dst host ::1 and not multicast)' &
+          tcpdump_pid=$!
+
+          sleep 1
+          if ! sudo kill -0 "$tcpdump_pid" 2>/dev/null; then
+            echo "::error::Traffic capture failed to start"
+            wait "$tcpdump_pid"
+            exit 1
+          fi
 
           # Block external DNS at the host (both protocols) and verify the
           # rules landed.
@@ -318,9 +436,17 @@ jobs:
             deploy_result=$?
           fi
 
+          if ! sudo kill -0 "$tcpdump_pid" 2>/dev/null; then
+            echo "::error::Traffic capture stopped before the deploy finished; the egress gate would be incomplete"
+            exit 1
+          fi
+
           stop_capture
-          sudo tcpdump -n -r "$capture" \
-            > /tmp/airgap-public-egress.txt 2>/dev/null
+          if ! write_egress_gate "$capture" /tmp/airgap-public-egress-all.txt \
+            /tmp/airgap-public-egress.txt "$dns_upstreams"; then
+            echo "::error::Failed to read the egress capture or split it by DNS upstream"
+            exit 1
+          fi
 
           # The deploy came up under both blocks. Re-assert the DNS posture
           # (the block still installed, external still dead from the kind
@@ -352,6 +478,16 @@ jobs:
             {
               echo "===== Post-deploy DNS posture (both blocks active) ====="
             } >> "$dns_probe"
+            # The bridge egress block must still be installed after the deploy,
+            # so the capture above was recorded with the block installed.
+            if ! sudo iptables -C DOCKER-USER -i "$bridge_interface" ! -o "$bridge_interface" \
+                  -m conntrack --ctstate NEW \
+                  -m comment --comment "$firewall_comment" -j DROP; then
+              echo "::error::The egress block is no longer installed after the deploy"
+              cat "$dns_probe"
+              exit 1
+            fi
+            echo "PROBE: bridge egress block still installed after the deploy (expected)" >> "$dns_probe"
             # The block must still be installed after the deploy, so the
             # clean deploy above happened under DNS isolation.
             if ! sudo iptables -C OUTPUT -p udp --dport 53 ! -d 127.0.0.0/8 \
@@ -426,6 +562,7 @@ jobs:
             /tmp/airgap-offline-summary.txt
             /tmp/airgap-sbom.*
             /tmp/airgap-public-egress.pcap
+            /tmp/airgap-public-egress-all.txt
             /tmp/airgap-public-egress.txt
             /tmp/airgap-dns-probe.txt
             /tmp/airgap-cert-manager-debug.txt

@@ -137,6 +137,11 @@ if ! python3 airgap/tests/test-airgap-verify-identity.py; then
   echo "    FAILED: branch-dispatch signature identity wiring" >&2
   fail=1
 fi
+echo "==> offline SBOM decode (syft update check disabled)"
+if ! python3 airgap/tests/test-airgap-verify-offline.py; then
+  echo "    FAILED: offline SBOM decode" >&2
+  fail=1
+fi
 echo "==> shared clusterctl-resolution script"
 if ! python3 airgap/tests/test-resolve-clusterctl.py; then
   echo "    FAILED: shared clusterctl-resolution script" >&2

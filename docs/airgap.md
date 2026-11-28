@@ -224,7 +224,9 @@ The `air-gapped` GitHub Actions workflow runs nightly (cron `17 2 * * *`,
 default branch) or by manual dispatch, with no branch or fork guard, so a
 change can be verified before merge. It builds the ARM64 bundle, then runs
 the `isolated-deploy` job (blocks new external connections from the kind
-network, fails if any public packet is observed or attempted), the
+network, fails if the capture shows any public packet other than UDP or TCP
+port 53 to the container-namespace IPv4 upstreams recorded from Docker's
+`# ExtServers:` line; see [DNS in the gap](#dns-in-the-gap)), the
 `update-rollback` job (staged update rejection and offline rollback), and
 the `stale-clock` job (system clock skewed past certificate validity; see
 Known limitations below), plus a `report-status` job that files or closes
@@ -255,10 +257,34 @@ Before it creates or changes a cluster, `offline-run.sh` verifies the package
 signature and every archive checksum, extracts the embedded SBOMs with
 signature verification forced, and decodes each document with syft's own
 decoder (`zarf tools sbom convert`, the syft CLI vendored inside the zarf
-binary) so invalid Syft JSON fails the run. CI performs these steps while
-public egress is blocked or monitored; the extracted SBOM directory is
-retained with the deployment evidence. Any verification failure aborts
-before staging.
+binary) so invalid Syft JSON fails the run. That decode runs with syft's
+update check disabled (`SYFT_CHECK_FOR_APP_UPDATE=false`, set per command).
+Before the update check was disabled, the vendored syft (v1.51.1 in Zarf
+1.0.1) fetched `toolbox-data.anchore.io` on every call by default. In a gap
+with blocked DNS each fetch waited about 20 s for the resolver timeout, about
+21 min across the nightly's 63 documents, and each request was an outbound
+connection the gap must not make. CI performs these steps while public egress is blocked or
+monitored; the extracted SBOM directory is retained with the deployment
+evidence. Any verification failure aborts before staging.
+
+The deploy-time renders (`capi-core`, `capi-providers`, and `caaph` in
+`airgap/zarf.yaml`) run `clusterctl generate provider` with
+`CLUSTERCTL_DISABLE_VERSIONCHECK=true`, exported by
+`airgap/scripts/resolve-clusterctl.sh`. Without it, clusterctl asked the Go
+module proxy, falling back to GitHub, for the latest release after each
+command ([`version_checker.go`](https://github.com/kubernetes-sigs/cluster-api/blob/v1.14.4/cmd/clusterctl/cmd/version_checker.go),
+[`root.go`](https://github.com/kubernetes-sigs/cluster-api/blob/v1.14.4/cmd/clusterctl/cmd/root.go),
+[`internal/goproxy`](https://github.com/kubernetes-sigs/cluster-api/tree/v1.14.4/internal/goproxy)).
+With the proxy refused, the v1.14.4 binary (the version tested) retried the
+proxy for 60 s before it fell back to GitHub, and failed checks were not
+cached. The CI logs measure the core render (`namespace/capi-system created`
+to `configured`) at 81 s on 2026-11-24 (02:54:49 to 02:56:10) and on
+2026-11-26 (02:54:48 to 02:56:09); the other runs with logs took about 1 s.
+Attributing the 81 s to the version check is inferred from the source and the
+timing; the logs do not show the cause. The variable stops only that
+version-check request. The air-gap provider repositories are
+`file://` URLs, so the variable does not change where they are read from; a
+provider repository hosted on GitHub would still be fetched.
 
 Rehearsal isolation knobs (never touch a live baseline on the same Docker
 daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
@@ -269,8 +295,9 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
 - The package checksum and signature verify against either the pinned upstream
   workflow identity or the explicitly supplied public key.
 - Extracted SBOM JSON files are decoded by syft itself (`zarf tools sbom
-  convert`); every document must decode as a Syft SBOM, and at least one
-  document must be present.
+  convert`, update check disabled so this decode makes no update-check request);
+  every document must decode as a Syft SBOM, and at least one document must
+  be present.
 - `kubectl get pods -A -o jsonpath=...`: every non-kind-baked image is
   prefixed `127.0.0.1:31999/` (the Zarf internal registry).
 - `kubectl -n flux-system get ocirepository`: `url` is
@@ -283,18 +310,32 @@ daemon): `CLUSTER_NAME`, `AIRGAP_CLUSTER_NAME`, `WORKLOAD_REGISTRY_HOST`,
 
 ## DNS in the gap
 
-No component in the bundle needs external DNS. Every name resolved in the
-gap is served locally: Docker's built-in DNS (container names on the kind
+No component in the bundle needs external DNS. The names the bundle needs
+are served locally: Docker's built-in DNS (container names on the kind
 network, from its internal table, without an upstream query) or the
 clusters' CoreDNS (cluster service names, from its `kubernetes` plugin).
+Lookups for other names still leave the kind network; see below.
 
 The leak the egress block alone cannot cover: containers on the kind
 network resolve through Docker's built-in DNS at 127.0.0.11, and dockerd
-forwards any name it does not know to the host's upstream resolvers from
-the host network namespace. That path never crosses the kind bridge, so
-the `isolated-deploy` egress rule and its pcap cannot see it: external
-names can still resolve — while every public IP address is unreachable —
-until the TCP connection that would follow the answer is dropped.
+forwards any name it does not know to its upstream nameservers. Upstream
+servers taken from the host's resolver configuration are dialed from the
+host network namespace, which never crosses the kind bridge. Servers set by
+`--dns` or the daemon's `dns` setting are dialed from the container's
+namespace, over the kind bridge (moby at tag `docker-v29.4.2`:
+`daemon/libnetwork/internal/resolvconf/resolvconf.go` `TransformForIntNS`,
+`daemon/libnetwork/resolver.go` `dialExtDNS`; sources in the [known
+issues](./known-issues.md#the-nightly-air-gapped-workflow-fails-in-isolated-deploy)
+entry). On the host-namespace path the `isolated-deploy` egress rule and its
+pcap cannot see the forward: external names can still resolve, while every
+public IP address is unreachable, until the TCP connection that would follow
+the answer is dropped. On the container-namespace path the egress block
+drops the query. The 2026-11-25 and 2026-11-27 nightly runs failed at the DNS
+baseline probe with no response (observed). Those runs inserted the bridge
+egress block before the probe, so the probe ran with that block already
+active; the host DNS block did not exist yet. That fits the container-namespace
+path (inferred, because the logs do not record the resolver configuration).
+Whether the failing runners set such an override is unconfirmed.
 
 The nightly `isolated-deploy` job therefore also blocks external DNS for
 the duration of the deploy: host `OUTPUT` rules drop UDP and TCP
@@ -302,25 +343,63 @@ destination port 53 to non-loopback destinations (restored on step exit,
 before the evidence upload, which the runner agent performs over DNS).
 The job:
 
-1. probes the baseline first, with only the egress block active: a
-   fresh external name must get a response from the external chain from
-   a container on the kind network (a negative or empty answer from the
-   upstream is sufficient; only the external chain can produce one for a
-   name that never existed), proving the hole exists. A missing response
-   fails the job, because the assertions below would be vacuous;
-2. applies the DNS block and asserts that a fresh external name now gets
-   no response at all from the kind network (the resolver cannot reach
-   any upstream server);
-3. runs the deploy under both blocks;
-4. re-asserts that the block is still installed, that a fresh external
+1. probes the baseline before any block: a fresh external name must get a
+   response from the external chain from a container on the kind network
+   (a negative or empty answer from the upstream is sufficient; only the
+   external chain can produce one for a name that never existed). A missing
+   response fails the job, because the assertions below would be vacuous;
+2. records the forwarding path. The container's `/etc/resolv.conf` goes to
+   the probe transcript, with `/etc/docker/daemon.json` and
+   `/run/systemd/resolve/resolv.conf` when present. Its
+   `# ExtServers: [...]` line lists the upstreams: `host(ADDR)` entries are
+   dialed from the host namespace, bare `ADDR` entries from the container
+   namespace. The `# ExtServers:` line and a `PROBE` line naming the path
+   (host namespace, container namespace, mixed, or unknown) go to both the
+   transcript and the step log. Nothing fails on this step itself, but the
+   container-namespace IPv4 addresses it parses are what the egress gate excludes.
+3. applies the bridge egress block, starts the capture, applies the host DNS
+   block, and asserts that a fresh external name now gets no response at
+   all from the kind network (the resolver cannot reach any upstream
+   server);
+4. runs the deploy under both blocks;
+5. re-asserts that both blocks are still installed, that a fresh external
    name still gets no response from the kind network, and that the
    `krops-registry-airgap` container name still resolves from the mgmt
    node, and asserts that no component degraded because of a failed
    lookup: no crash-looping or image-pull-failing pods, and no events
    mentioning DNS, on both the mgmt cluster and the workload cluster.
 
+The egress gate is applied after the deploy to the capture. With excludable
+upstreams the capture is read three times. `airgap-public-egress-all.txt` is
+the unfiltered read.
+`airgap-public-egress.txt` is the gate, and it drops only UDP and TCP
+destination port 53 packets to the container-namespace upstreams from step 2.
+A third read counts those excluded packets, and the step fails unless the gate
+plus the excluded count equals the unfiltered count. Every other captured
+packet still fails the gate, including port 53 to any other address and any
+non-DNS packet to those upstreams. The step log prints the excluded packet
+count. Only IPv4 addresses enter the filter. IPv6 upstreams and malformed
+entries are never excluded. The capture records only public destinations
+(IPv4 private, loopback and link-local ranges, IPv6 ULA `fc00::/7`, link-local
+`fe80::/10`, `::1`, and multicast are never recorded). So queries to a public
+IPv6 upstream are captured and fail the gate, and queries to a private upstream
+of either family are never captured. Host-namespace upstreams are never in the
+list, because their queries do not cross the bridge. With no excludable IPv4
+upstreams, the gate is the unfiltered read (fail closed), and the step log
+says so. A failed read fails the step; it does not produce an empty gate that
+passes. The step also fails if tcpdump has exited before the deploy ends, so a
+capture that stopped early cannot pass as an empty gate.
+
+What is weaker: on the container-namespace path, DNS queries from the kind
+network to the recorded upstreams no longer fail the gate, whatever name they
+ask for: the gate excludes by destination and port, not by query name. Those
+queries are still in `airgap-public-egress-all.txt`, and the block assertions
+and the post-deploy probe are what show that no answer comes back. If the
+record is missing, the gate stays unfiltered and fails closed.
+
 The probe transcript is retained with the deployment evidence as
-`airgap-dns-probe.txt`.
+`airgap-dns-probe.txt`, with the two capture reads as
+`airgap-public-egress-all.txt` and `airgap-public-egress.txt`.
 
 The probe names are fresh random subdomains of a real domain
 (`krops-<random>.github.com`), one per phase, because both obvious
@@ -346,10 +425,21 @@ answers `cluster.local` names, and everything else falls through to
 `forward . /etc/resolv.conf`, and the kind node's `/etc/resolv.conf`
 points at the Docker daemon's built-in DNS (127.0.0.11 on the CI
 runner). In the gap that means external lookups end in SERVFAIL after
-the resolver timeout — and nothing in the bundle issues them: the Zarf
-internal registry and krops-registry are dialed by IP or by a name
+the resolver timeout. The bundle's components do not need external names:
+the Zarf internal registry and krops-registry are dialed by IP or by a name
 served locally, and Flux pulls from the OCI repositories it was given.
-No `forward` override and no stub zones are required.
+Lookups for other names still happen. The 2026-11-18 capture, from the
+failing gate run (before the baseline probe existed), shows containers on the
+kind network sending queries to the runner's upstream 168.63.129.16 for names
+that are not internal: NS `.` queries, HINFO queries from a probe loop,
+`host.docker.internal.`, and internal names carrying the runner's
+search-domain suffix. Docker's DNS forwards each unknown name to its upstream.
+With the blocks in place none of them gets an answer: the block assertion
+checks that a fresh external name gets none from the kind network. On the
+container-namespace path the egress gate tolerates such queries, because it
+excludes by destination and port (UDP or TCP port 53 to the recorded
+upstream), not by query name. No `forward` override and no stub zones are
+required.
 
 If an operator site needs external names to fail fast, or to never reach
 an upstream resolver at all (for example behind a DNS firewall that

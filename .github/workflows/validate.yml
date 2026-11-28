@@ -37,6 +37,8 @@ jobs:
         run: python3 airgap/tests/test-airgap-kubeadm-images.py
       - name: Verify branch-dispatch signature identity wiring (#328)
         run: python3 airgap/tests/test-airgap-verify-identity.py
+      - name: Verify SBOM decode runs with syft update check disabled
+        run: python3 airgap/tests/test-airgap-verify-offline.py
       - name: Verify the shared clusterctl-resolution script
         run: python3 airgap/tests/test-resolve-clusterctl.py
       - name: Verify cert-manager debug capture on deploy failure (#329)
@@ -47,6 +49,11 @@ jobs:
         run: python3 airgap/tests/test-airgap-pin-image-digests.py
       - name: Verify host-daemon images are saved and referenced by tag
         run: python3 airgap/tests/test-airgap-host-image-tags.py
+      - name: Install tcpdump and shellcheck for the air-gapped workflow test
+        run: |
+          if ! command -v tcpdump >/dev/null || ! command -v shellcheck >/dev/null; then
+            sudo apt-get update && sudo apt-get install -y tcpdump shellcheck
+          fi
       - name: Verify the air-gapped workflow triggers, guards, and timeouts
         run: python3 airgap/tests/test-airgap-workflow-config.py
       - name: Verify staged update rejection and offline rollback (#369)

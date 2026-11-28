@@ -26,7 +26,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: reconcile
-              image: public.ecr.aws/aws-cli/aws-cli:2.42.1@sha256:b0102d2269f87d8531d931c1a59e248101ace586886e6c077058d94c1c37b846
+              image: public.ecr.aws/aws-cli/aws-cli:2.42.5@sha256:4e569d37c0b93893f660946f9b00a442b1172b1c4ba86338a3a1af3937ed62b5
               command: ["/bin/bash", "/scripts/reconcile.sh"]
               env:
                 - name: AWS_SHARED_CREDENTIALS_FILE
